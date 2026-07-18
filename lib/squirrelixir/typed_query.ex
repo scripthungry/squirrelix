@@ -102,10 +102,31 @@ defmodule Squirrelixir.TypedQueryDirectory do
   Typed queries grouped by the SQL directory they came from.
   """
 
+  alias Squirrelixir.QueryDirectory
   alias Squirrelixir.TypedQuery
 
   @enforce_keys [:directory, :queries]
-  defstruct [:directory, :queries]
+  defstruct [:directory, :queries, errors: []]
 
-  @type t :: %__MODULE__{directory: Path.t(), queries: [TypedQuery.t()]}
+  @type t :: %__MODULE__{directory: Path.t(), queries: [TypedQuery.t()], errors: [struct()]}
+
+  @spec from_query_directory(QueryDirectory.t(), %{String.t() => keyword()}) :: t()
+  def from_query_directory(%QueryDirectory{} = query_directory, metadata) when is_map(metadata) do
+    {typed_queries, errors} =
+      query_directory.queries
+      |> Enum.reduce({[], query_directory.errors}, fn query, {typed_queries, errors} ->
+        query_metadata = Map.fetch!(metadata, query.file)
+
+        case TypedQuery.from_query(query, query_metadata) do
+          {:ok, typed_query} -> {[typed_query | typed_queries], errors}
+          {:error, error} -> {typed_queries, errors ++ [error]}
+        end
+      end)
+
+    %__MODULE__{
+      directory: query_directory.directory,
+      queries: Enum.reverse(typed_queries),
+      errors: errors
+    }
+  end
 end
