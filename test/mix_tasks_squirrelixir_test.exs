@@ -70,6 +70,36 @@ defmodule MixTasksSquirrelixirTest do
     assert File.read!(Path.join(root, "lib/accounts/sql.ex")) =~ "required(:name) => String.t()"
   end
 
+  test "mix squirrelixir.gen can infer metadata from a Postgres URL" do
+    root = tmp_project(:acorn_counter)
+    write_query(root, "select $1::text as name")
+
+    output =
+      File.cd!(root, fn ->
+        capture_io(fn ->
+          Mix.Task.run("squirrelixir.gen", [
+            "--infer",
+            "--url",
+            "postgres://#{System.get_env("USER")}@localhost/postgres"
+          ])
+        end)
+      end)
+
+    assert output =~ "Generated 1 query."
+    assert File.read!(Path.join(root, "lib/accounts/sql.ex")) =~ "required(:name) => String.t()"
+  end
+
+  test "mix squirrelixir.gen rejects invalid Postgres URLs" do
+    root = tmp_project(:acorn_counter)
+    write_query(root, "select $1::text as name")
+
+    assert_raise Mix.Error, "Invalid Postgres connection URL", fn ->
+      File.cd!(root, fn ->
+        Mix.Task.run("squirrelixir.gen", ["--infer", "--url", "mysql://localhost/postgres"])
+      end)
+    end
+  end
+
   defp tmp_project(app) do
     path = Squirrelixir.TestSupport.tmp_dir!("squirrelixir-mix-task")
 

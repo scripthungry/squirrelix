@@ -1,17 +1,21 @@
 defmodule Squirrelixir.MixTask do
   @moduledoc false
 
+  alias Squirrelixir.CLI
   alias Squirrelixir.CodegenCheckSummary
   alias Squirrelixir.CodegenSummary
+  alias Squirrelixir.ConnectionOptions
   alias Squirrelixir.Metadata
   alias Squirrelixir.Postgres
 
   @switches [
     metadata: :string,
     infer: :boolean,
+    url: :string,
     database: :string,
     hostname: :string,
     username: :string,
+    password: :string,
     port: :integer
   ]
 
@@ -63,8 +67,65 @@ defmodule Squirrelixir.MixTask do
 
   defp connection_opts(opts) do
     opts
-    |> Keyword.take([:database, :hostname, :username, :port])
+    |> base_connection_opts()
+    |> Keyword.merge(env_connection_opts())
+    |> Keyword.merge(flag_connection_opts(opts))
     |> Keyword.put_new_lazy(:database, fn -> System.get_env("PGDATABASE") || "postgres" end)
+  end
+
+  defp base_connection_opts(opts) do
+    case Keyword.fetch(opts, :url) do
+      {:ok, url} -> url_connection_opts!(url)
+      :error -> []
+    end
+  end
+
+  defp url_connection_opts!(url) do
+    case CLI.parse_connection_url(url) do
+      {:ok, connection_options} -> postgrex_connection_opts(connection_options)
+      :error -> Mix.raise("Invalid Postgres connection URL")
+    end
+  end
+
+  defp postgrex_connection_opts(%ConnectionOptions{} = connection_options) do
+    [
+      hostname: connection_options.host,
+      port: connection_options.port,
+      username: connection_options.user,
+      password: connection_options.password,
+      database: connection_options.database,
+      timeout: connection_options.timeout_seconds * 1000
+    ]
+  end
+
+  defp env_connection_opts do
+    [
+      hostname: System.get_env("PGHOST"),
+      username: System.get_env("PGUSER"),
+      password: System.get_env("PGPASSWORD"),
+      database: System.get_env("PGDATABASE"),
+      port: parse_port(System.get_env("PGPORT"))
+    ]
+    |> compact_opts()
+  end
+
+  defp flag_connection_opts(opts) do
+    opts
+    |> Keyword.take([:database, :hostname, :username, :password, :port])
+    |> compact_opts()
+  end
+
+  defp compact_opts(opts) do
+    Enum.reject(opts, fn {_key, value} -> value in [nil, ""] end)
+  end
+
+  defp parse_port(nil), do: nil
+
+  defp parse_port(port) when is_binary(port) do
+    case Integer.parse(port) do
+      {value, ""} -> value
+      _invalid -> nil
+    end
   end
 
   defp load_metadata!(opts, root) do
