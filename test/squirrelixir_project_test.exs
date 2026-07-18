@@ -46,6 +46,29 @@ defmodule SquirrelixirProjectTest do
            ]
   end
 
+  test "module_for_sql_directory derives an app-namespaced module from lib path" do
+    root = tmp_dir()
+    File.write!(Path.join(root, "mix.exs"), mixfile(:acorn_counter))
+
+    assert Project.module_for_sql_directory(root, Path.join(root, "lib/accounts/sql")) ==
+             {:ok, AcornCounter.Accounts.SQL}
+  end
+
+  test "module_for_sql_directory derives an app-namespaced module from test path" do
+    root = tmp_dir()
+    File.write!(Path.join(root, "mix.exs"), mixfile(:acorn_counter))
+
+    assert Project.module_for_sql_directory(root, Path.join(root, "test/support/sql")) ==
+             {:ok, AcornCounter.Support.SQL}
+  end
+
+  test "module_for_sql_directory returns error for paths outside source roots" do
+    root = tmp_dir()
+    File.write!(Path.join(root, "mix.exs"), mixfile(:acorn_counter))
+
+    assert Project.module_for_sql_directory(root, Path.join(root, "priv/sql")) == :error
+  end
+
   defp tmp_dir do
     path =
       Path.join(

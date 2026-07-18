@@ -30,6 +30,16 @@ defmodule Squirrelixir.Project do
     ]
   end
 
+  @spec module_for_sql_directory(Path.t(), Path.t()) :: {:ok, module()} | :error
+  def module_for_sql_directory(root, sql_directory)
+      when is_binary(root) and is_binary(sql_directory) do
+    with {:ok, app} <- app(root),
+         {:ok, relative_segments} <- relative_sql_segments(root, sql_directory) do
+      module_parts = [app_module_part(app) | Enum.map(relative_segments, &Macro.camelize/1)]
+      {:ok, Module.concat(module_parts ++ ["SQL"])}
+    end
+  end
+
   defp do_root(path) do
     cond do
       File.regular?(Path.join(path, "mix.exs")) ->
@@ -62,5 +72,30 @@ defmodule Squirrelixir.Project do
       nil -> :error
       app when is_atom(app) -> {:ok, app}
     end
+  end
+
+  defp relative_sql_segments(root, sql_directory) do
+    root = Path.expand(root)
+    sql_directory = Path.expand(sql_directory)
+
+    source_roots(root)
+    |> Enum.find_value(:error, fn source_root ->
+      source_root = Path.expand(source_root)
+      relative_path = Path.relative_to(sql_directory, source_root)
+
+      with true <- Path.basename(sql_directory) == "sql",
+           false <- Path.type(relative_path) == :absolute do
+        segments = relative_path |> Path.dirname() |> Path.split() |> Enum.reject(&(&1 == "."))
+        {:ok, segments}
+      else
+        _ -> false
+      end
+    end)
+  end
+
+  defp app_module_part(app) do
+    app
+    |> Atom.to_string()
+    |> Macro.camelize()
   end
 end
