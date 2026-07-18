@@ -4,6 +4,7 @@ defmodule Squirrelixir.CLI do
   """
 
   alias Squirrelixir.ConnectionOptions
+  alias Squirrelixir.Project
 
   @default_host "localhost"
   @default_user "postgres"
@@ -52,6 +53,14 @@ defmodule Squirrelixir.CLI do
   @spec walk(String.t()) :: %{String.t() => [String.t()]}
   def walk(from) when is_binary(from) do
     do_walk(from)
+  end
+
+  @spec query_files(Path.t()) :: %{String.t() => [String.t()]}
+  def query_files(root) when is_binary(root) do
+    root
+    |> Project.source_roots()
+    |> Enum.map(&walk/1)
+    |> Enum.reduce(%{}, &Map.merge/2)
   end
 
   @spec directory_to_output_file(String.t()) :: String.t()

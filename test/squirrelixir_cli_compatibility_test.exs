@@ -110,6 +110,33 @@ defmodule SquirrelixirCliCompatibilityTest do
     assert CLI.walk(Path.join(tmp, "src")) == expected
   end
 
+  test "query_files discovers sql files under conventional Elixir project roots" do
+    tmp =
+      Path.join(System.tmp_dir!(), "squirrelixir-cli-#{System.unique_integer([:positive])}")
+
+    File.mkdir_p!(Path.join(tmp, "lib/accounts/sql"))
+    File.mkdir_p!(Path.join(tmp, "test/support/sql"))
+    File.mkdir_p!(Path.join(tmp, "dev/scratch/sql"))
+    File.mkdir_p!(Path.join(tmp, "priv/sql"))
+    File.write!(Path.join(tmp, "mix.exs"), "defmodule Temp.MixProject do\nend\n")
+    File.write!(Path.join(tmp, "lib/accounts/sql/find_user.sql"), "select 1")
+    File.write!(Path.join(tmp, "test/support/sql/test_query.sql"), "select 2")
+    File.write!(Path.join(tmp, "dev/scratch/sql/dev_query.sql"), "select 3")
+    File.write!(Path.join(tmp, "priv/sql/ignored.sql"), "select 4")
+
+    assert CLI.query_files(tmp) == %{
+             Path.join(tmp, "dev/scratch/sql") => [
+               Path.join(tmp, "dev/scratch/sql/dev_query.sql")
+             ],
+             Path.join(tmp, "lib/accounts/sql") => [
+               Path.join(tmp, "lib/accounts/sql/find_user.sql")
+             ],
+             Path.join(tmp, "test/support/sql") => [
+               Path.join(tmp, "test/support/sql/test_query.sql")
+             ]
+           }
+  end
+
   test "directory_to_output_file maps sql directory to sibling sql.ex" do
     assert CLI.directory_to_output_file("/tmp/my_app/src/admin/sql") ==
              "/tmp/my_app/src/admin/sql.ex"
