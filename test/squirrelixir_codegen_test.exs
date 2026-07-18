@@ -63,6 +63,45 @@ defmodule SquirrelixirCodegenTest do
              ~s|@doc """\n  Finds a user.\n  Returns every matching row.\n  """|
   end
 
+  test "write_directory writes a generated module next to the sql directory" do
+    root = tmp_project(:acorn_counter)
+    sql_directory = Path.join(root, "lib/accounts/sql")
+    File.mkdir_p!(sql_directory)
+
+    query =
+      typed_query(
+        Path.join(sql_directory, "find_user.sql"),
+        "find_user",
+        "select * from users",
+        []
+      )
+
+    assert Codegen.write_directory(root, sql_directory, [query], version: "v-test") == :ok
+
+    output_file = Path.join(root, "lib/accounts/sql.ex")
+    assert File.exists?(output_file)
+
+    assert File.read!(output_file) =~ "defmodule AcornCounter.Accounts.SQL do"
+    assert File.read!(output_file) =~ "def find_user(connection)"
+  end
+
+  test "write_directory returns error for sql directories outside project source roots" do
+    root = tmp_project(:acorn_counter)
+    sql_directory = Path.join(root, "priv/sql")
+    File.mkdir_p!(sql_directory)
+
+    query =
+      typed_query(
+        Path.join(sql_directory, "find_user.sql"),
+        "find_user",
+        "select * from users",
+        []
+      )
+
+    assert Codegen.write_directory(root, sql_directory, [query], version: "v-test") ==
+             {:error, :invalid_sql_directory}
+  end
+
   defp typed_query(file, name, content, params) do
     %TypedQuery{
       file: file,
@@ -73,5 +112,27 @@ defmodule SquirrelixirCodegenTest do
       params: params,
       returns: [%Column{name: "id", type: :integer, nullable?: false}]
     }
+  end
+
+  defp tmp_project(app) do
+    path =
+      Path.join(
+        System.tmp_dir!(),
+        "squirrelixir-codegen-#{System.os_time(:nanosecond)}-#{System.unique_integer([:positive])}"
+      )
+
+    File.mkdir_p!(path)
+
+    File.write!(Path.join(path, "mix.exs"), """
+    defmodule TempProject.MixProject do
+      use Mix.Project
+
+      def project do
+        [app: #{inspect(app)}, version: "0.1.0"]
+      end
+    end
+    """)
+
+    path
   end
 end

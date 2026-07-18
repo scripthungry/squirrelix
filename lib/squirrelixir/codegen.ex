@@ -4,6 +4,8 @@ defmodule Squirrelixir.Codegen do
   """
 
   alias Squirrelixir.Parameter
+  alias Squirrelixir.Output
+  alias Squirrelixir.Project
   alias Squirrelixir.TypedQuery
 
   @spec generate_module(module(), [TypedQuery.t()], keyword()) :: String.t()
@@ -26,6 +28,20 @@ defmodule Squirrelixir.Codegen do
     |> Code.format_string!()
     |> IO.iodata_to_binary()
     |> Kernel.<>("\n")
+  end
+
+  @spec write_directory(Path.t(), Path.t(), [TypedQuery.t()], keyword()) ::
+          :ok | {:error, :invalid_sql_directory | struct()}
+  def write_directory(root, sql_directory, queries, opts \\ [])
+      when is_binary(root) and is_binary(sql_directory) and is_list(queries) and is_list(opts) do
+    with {:ok, module} <- Project.module_for_sql_directory(root, sql_directory) do
+      content = generate_module(module, queries, opts)
+      output_file = sql_directory |> Path.dirname() |> Path.join("sql.ex")
+
+      Output.safe_write(output_file, content)
+    else
+      :error -> {:error, :invalid_sql_directory}
+    end
   end
 
   defp function_source(%TypedQuery{} = query) do

@@ -90,8 +90,7 @@ defmodule SquirrelixirCliCompatibilityTest do
   end
 
   test "walk finds only sql directories and sql files" do
-    tmp =
-      Path.join(System.tmp_dir!(), "squirrelixir-#{System.unique_integer([:positive])}")
+    tmp = tmp_dir("squirrelixir")
 
     File.mkdir_p!(tmp)
 
@@ -113,8 +112,7 @@ defmodule SquirrelixirCliCompatibilityTest do
   end
 
   test "query_files discovers sql files under conventional Elixir project roots" do
-    tmp =
-      Path.join(System.tmp_dir!(), "squirrelixir-cli-#{System.unique_integer([:positive])}")
+    tmp = tmp_dir("squirrelixir-cli")
 
     File.mkdir_p!(Path.join(tmp, "lib/accounts/sql"))
     File.mkdir_p!(Path.join(tmp, "test/support/sql"))
@@ -140,8 +138,7 @@ defmodule SquirrelixirCliCompatibilityTest do
   end
 
   test "query_directories loads discovered SQL files into query directories" do
-    tmp =
-      Path.join(System.tmp_dir!(), "squirrelixir-cli-#{System.unique_integer([:positive])}")
+    tmp = tmp_dir("squirrelixir-cli")
 
     File.mkdir_p!(Path.join(tmp, "lib/accounts/sql"))
     File.write!(Path.join(tmp, "mix.exs"), "defmodule Temp.MixProject do\nend\n")
@@ -161,5 +158,12 @@ defmodule SquirrelixirCliCompatibilityTest do
   test "directory_to_output_file maps sql directory to sibling sql.ex" do
     assert CLI.directory_to_output_file("/tmp/my_app/src/admin/sql") ==
              "/tmp/my_app/src/admin/sql.ex"
+  end
+
+  defp tmp_dir(prefix) do
+    Path.join(
+      System.tmp_dir!(),
+      "#{prefix}-#{System.os_time(:nanosecond)}-#{System.unique_integer([:positive])}"
+    )
   end
 end
