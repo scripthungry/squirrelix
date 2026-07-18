@@ -51,6 +51,8 @@ defmodule Squirrelixir.Output do
   end
 
   defp write_file(file, content) do
+    content = format_content(file, content)
+
     file
     |> Path.dirname()
     |> File.mkdir_p()
@@ -64,5 +66,18 @@ defmodule Squirrelixir.Output do
       {:error, reason} ->
         {:error, %CannotWriteFile{file: file, reason: reason}}
     end
+  end
+
+  defp format_content(file, content) do
+    if Path.extname(file) in [".ex", ".exs"] do
+      content
+      |> Code.format_string!()
+      |> IO.iodata_to_binary()
+      |> Kernel.<>("\n")
+    else
+      content
+    end
+  rescue
+    _ -> content
   end
 end

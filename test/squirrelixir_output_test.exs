@@ -21,16 +21,55 @@ defmodule SquirrelixirOutputTest do
 
   test "safe_write overwrites likely generated files" do
     path = write_file("sql.ex", @generated_content)
+    content = "defmodule Sql do\ndef all do\n[]\nend\nend\n"
 
-    assert Output.safe_write(path, "new generated content") == :ok
-    assert File.read!(path) == "new generated content"
+    assert Output.safe_write(path, content) == :ok
+
+    assert File.read!(path) == """
+           defmodule Sql do
+             def all do
+               []
+             end
+           end
+           """
   end
 
   test "safe_write overwrites empty files" do
     path = write_file("sql.ex", "  \n\t")
+    content = "defmodule Sql do\ndef all do\n[]\nend\nend\n"
 
-    assert Output.safe_write(path, "new content") == :ok
-    assert File.read!(path) == "new content"
+    assert Output.safe_write(path, content) == :ok
+
+    assert File.read!(path) == """
+           defmodule Sql do
+             def all do
+               []
+             end
+           end
+           """
+  end
+
+  test "safe_write formats Elixir files before writing" do
+    path = Path.join(tmp_dir(), "sql.ex")
+    content = "defmodule Sql do\ndef all do\n:ok\nend\nend\n"
+
+    assert Output.safe_write(path, content) == :ok
+
+    assert File.read!(path) == """
+           defmodule Sql do
+             def all do
+               :ok
+             end
+           end
+           """
+  end
+
+  test "safe_write does not format non-Elixir files" do
+    path = Path.join(tmp_dir(), "query.sql")
+    content = "select   *\nfrom users"
+
+    assert Output.safe_write(path, content) == :ok
+    assert File.read!(path) == content
   end
 
   test "safe_write refuses to overwrite human-written files" do
@@ -79,7 +118,10 @@ defmodule SquirrelixirOutputTest do
 
   defp tmp_dir do
     path =
-      Path.join(System.tmp_dir!(), "squirrelixir-output-#{System.unique_integer([:positive])}")
+      Path.join(
+        System.tmp_dir!(),
+        "squirrelixir-output-#{System.os_time(:nanosecond)}-#{System.unique_integer([:positive])}"
+      )
 
     File.mkdir_p!(path)
     path
