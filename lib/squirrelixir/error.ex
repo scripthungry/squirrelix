@@ -102,3 +102,14 @@ defmodule Squirrelixir.Error.InvalidQueryMetadataFile do
 
   @type t :: %__MODULE__{file: String.t(), reason: term()}
 end
+
+defmodule Squirrelixir.Error.UnsupportedPostgresType do
+  @moduledoc """
+  Error returned when a Postgres type has no Elixir mapping yet.
+  """
+
+  @enforce_keys [:name]
+  defstruct [:name]
+
+  @type t :: %__MODULE__{name: String.t()}
+end

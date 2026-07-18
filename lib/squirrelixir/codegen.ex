@@ -266,8 +266,13 @@ defmodule Squirrelixir.Codegen do
   defp type_spec(:string), do: "String.t()"
   defp type_spec(:boolean), do: "boolean()"
   defp type_spec(:float), do: "float()"
+  defp type_spec(:decimal), do: "Decimal.t()"
   defp type_spec(:binary), do: "binary()"
   defp type_spec(:map), do: "map()"
+  defp type_spec(:uuid), do: "String.t()"
+  defp type_spec(:date), do: "Date.t()"
+  defp type_spec(:time), do: "Time.t()"
+  defp type_spec(:naive_datetime), do: "NaiveDateTime.t()"
   defp type_spec({:list, type}), do: "[#{type_spec(type)}]"
   defp type_spec(_type), do: "term()"
 

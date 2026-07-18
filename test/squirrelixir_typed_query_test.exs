@@ -40,6 +40,28 @@ defmodule SquirrelixirTypedQueryTest do
              )
   end
 
+  test "from_query normalizes Postgres type descriptors in metadata" do
+    query = %Query{
+      file: "find_user.sql",
+      starting_line: 1,
+      name: "find_user",
+      comment: [],
+      content: "select tags from users where id = $1"
+    }
+
+    assert {:ok,
+            %TypedQuery{
+              params: [%Parameter{type: :integer}],
+              returns: [%Column{name: "tags", type: {:list, :string}, nullable?: false}]
+            }} =
+             TypedQuery.from_query(query,
+               params: [{:postgres, "int4"}],
+               returns: [
+                 %{name: "tags", type: %{postgres: "text", array_dimensions: 1}, nullable?: false}
+               ]
+             )
+  end
+
   test "from_query rejects duplicate return column names" do
     query = %Query{
       file: "duplicate.sql",

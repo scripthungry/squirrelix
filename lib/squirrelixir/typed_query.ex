@@ -34,6 +34,7 @@ defmodule Squirrelixir.TypedQuery do
   alias Squirrelixir.Parameter
   alias Squirrelixir.Query
   alias Squirrelixir.SQL
+  alias Squirrelixir.TypeMapper
 
   @type t :: %__MODULE__{
           file: String.t(),
@@ -46,12 +47,13 @@ defmodule Squirrelixir.TypedQuery do
         }
 
   @spec from_query(Query.t(), keyword()) ::
-          {:ok, t()} | {:error, DuplicateReturnColumns.t() | MissingQueryMetadataField.t()}
+          {:ok, t()}
+          | {:error, DuplicateReturnColumns.t() | MissingQueryMetadataField.t() | struct()}
   def from_query(%Query{} = query, opts) when is_list(opts) do
     with {:ok, params} <- fetch_metadata_field(query, opts, :params),
-         {:ok, returns} <- fetch_metadata_field(query, opts, :returns) do
-      returns = Enum.map(returns, &column/1)
-
+         {:ok, returns} <- fetch_metadata_field(query, opts, :returns),
+         {:ok, params} <- normalize_params(params),
+         {:ok, returns} <- normalize_returns(returns) do
       case duplicate_column_names(returns) do
         [] ->
           {:ok,
@@ -94,10 +96,37 @@ defmodule Squirrelixir.TypedQuery do
     end)
   end
 
-  defp column(%Column{} = column), do: column
+  defp normalize_params(params) do
+    traverse(params, &TypeMapper.normalize_type/1)
+  end
+
+  defp normalize_returns(returns) do
+    traverse(returns, &column/1)
+  end
+
+  defp traverse(values, mapper) do
+    Enum.reduce_while(values, {:ok, []}, fn value, {:ok, mapped_values} ->
+      case mapper.(value) do
+        {:ok, mapped_value} -> {:cont, {:ok, [mapped_value | mapped_values]}}
+        {:error, error} -> {:halt, {:error, error}}
+      end
+    end)
+    |> case do
+      {:ok, mapped_values} -> {:ok, Enum.reverse(mapped_values)}
+      {:error, error} -> {:error, error}
+    end
+  end
+
+  defp column(%Column{} = column) do
+    with {:ok, type} <- TypeMapper.normalize_type(column.type) do
+      {:ok, %Column{column | type: type}}
+    end
+  end
 
   defp column(%{name: name, type: type, nullable?: nullable?}) do
-    %Column{name: name, type: type, nullable?: nullable?}
+    with {:ok, type} <- TypeMapper.normalize_type(type) do
+      {:ok, %Column{name: name, type: type, nullable?: nullable?}}
+    end
   end
 
   defp duplicate_column_names(columns) do
