@@ -17,6 +17,14 @@ defmodule SquirrelixirQueryCompatibilityTest do
             }} = Query.from_file(path)
   end
 
+  test "from_file accepts Elixir predicate and bang function names" do
+    predicate_path = write_temp_sql("active?.sql", "select true")
+    bang_path = write_temp_sql("save!.sql", "insert into squirrels values (1)")
+
+    assert {:ok, %Query{name: "active?"}} = Query.from_file(predicate_path)
+    assert {:ok, %Query{name: "save!"}} = Query.from_file(bang_path)
+  end
+
   test "from_file preserves query content exactly" do
     content = "\n  select *\n  from squirrels\n  where acorns > $1\n"
     path = write_temp_sql("exact_content.sql", content)

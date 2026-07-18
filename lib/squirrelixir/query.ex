@@ -93,7 +93,7 @@ defmodule Squirrelixir.Query do
 
       [first | rest] ->
         cond do
-          not lowercase_letter?(first) ->
+          not first_identifier_grapheme?(first) ->
             {:error, {:invalid_grapheme, 0, first}}
 
           true ->
@@ -105,10 +105,15 @@ defmodule Squirrelixir.Query do
   defp validate_identifier_rest([], _position, name), do: {:ok, name}
 
   defp validate_identifier_rest([grapheme | rest], position, name) do
-    if identifier_grapheme?(grapheme) do
-      validate_identifier_rest(rest, position + 1, name)
-    else
-      {:error, {:invalid_grapheme, position, grapheme}}
+    cond do
+      identifier_grapheme?(grapheme) ->
+        validate_identifier_rest(rest, position + 1, name)
+
+      grapheme in ["?", "!"] and rest == [] ->
+        {:ok, name}
+
+      true ->
+        {:error, {:invalid_grapheme, position, grapheme}}
     end
   end
 
@@ -134,6 +139,10 @@ defmodule Squirrelixir.Query do
 
   defp identifier_grapheme?(grapheme) do
     grapheme == "_" or lowercase_letter?(grapheme) or digit?(grapheme)
+  end
+
+  defp first_identifier_grapheme?(grapheme) do
+    grapheme == "_" or lowercase_letter?(grapheme)
   end
 
   defp lowercase_letter?(<<char::utf8>>) do
