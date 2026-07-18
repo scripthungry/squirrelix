@@ -48,7 +48,10 @@ defmodule SquirrelixirProjectTest do
 
   defp tmp_dir do
     path =
-      Path.join(System.tmp_dir!(), "squirrelixir-project-#{System.unique_integer([:positive])}")
+      Path.join(
+        System.tmp_dir!(),
+        "squirrelixir-project-#{System.os_time(:nanosecond)}-#{System.unique_integer([:positive])}"
+      )
 
     File.mkdir_p!(path)
     path
