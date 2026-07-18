@@ -43,6 +43,55 @@ defmodule SquirrelixirPostgresTest do
             ]} = Postgres.describe(conn, query)
   end
 
+  test "describe marks not-null table columns as non-nullable", %{conn: conn} do
+    Postgrex.query!(
+      conn,
+      "create temporary table squirrelixir_people (id integer not null, nickname text)",
+      []
+    )
+
+    query = query("select id, nickname from squirrelixir_people")
+
+    assert {:ok,
+            [
+              params: [],
+              returns: [
+                %Column{name: "id", type: :integer, nullable?: false},
+                %Column{name: "nickname", type: :string, nullable?: true}
+              ]
+            ]} = Postgres.describe(conn, query)
+  end
+
+  test "describe keeps left joined columns nullable", %{conn: conn} do
+    Postgrex.query!(
+      conn,
+      "create temporary table squirrelixir_teams (id integer not null, name text not null)",
+      []
+    )
+
+    Postgrex.query!(
+      conn,
+      "create temporary table squirrelixir_members (team_id integer not null, name text not null)",
+      []
+    )
+
+    query =
+      query("""
+      select teams.name as team_name, members.name as member_name
+      from squirrelixir_teams teams
+      left join squirrelixir_members members on members.team_id = teams.id
+      """)
+
+    assert {:ok,
+            [
+              params: [],
+              returns: [
+                %Column{name: "team_name", type: :string, nullable?: false},
+                %Column{name: "member_name", type: :string, nullable?: true}
+              ]
+            ]} = Postgres.describe(conn, query)
+  end
+
   test "describe output can be converted into a typed query", %{conn: conn} do
     query = %Query{
       file: "find_account.sql",
