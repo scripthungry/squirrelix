@@ -7,6 +7,7 @@ defmodule Squirrelixir.Codegen do
   alias Squirrelixir.Output
   alias Squirrelixir.Project
   alias Squirrelixir.TypedQuery
+  alias Squirrelixir.TypedQueryDirectory
 
   @spec generate_module(module(), [TypedQuery.t()], keyword()) :: String.t()
   def generate_module(module, queries, opts \\ []) when is_atom(module) and is_list(queries) do
@@ -42,6 +43,18 @@ defmodule Squirrelixir.Codegen do
     else
       :error -> {:error, :invalid_sql_directory}
     end
+  end
+
+  @spec write_directories(Path.t(), [TypedQueryDirectory.t()], keyword()) :: [
+          {Path.t(), :ok | {:error, :invalid_sql_directory | struct()}}
+        ]
+  def write_directories(root, directories, opts \\ [])
+      when is_binary(root) and is_list(directories) and is_list(opts) do
+    directories
+    |> Enum.sort_by(& &1.directory)
+    |> Enum.map(fn %TypedQueryDirectory{directory: directory, queries: queries} ->
+      {directory, write_directory(root, directory, queries, opts)}
+    end)
   end
 
   defp function_source(%TypedQuery{} = query) do

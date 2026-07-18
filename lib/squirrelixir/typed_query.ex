@@ -96,3 +96,16 @@ defmodule Squirrelixir.TypedQuery do
     |> Enum.sort()
   end
 end
+
+defmodule Squirrelixir.TypedQueryDirectory do
+  @moduledoc """
+  Typed queries grouped by the SQL directory they came from.
+  """
+
+  alias Squirrelixir.TypedQuery
+
+  @enforce_keys [:directory, :queries]
+  defstruct [:directory, :queries]
+
+  @type t :: %__MODULE__{directory: Path.t(), queries: [TypedQuery.t()]}
+end

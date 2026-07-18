@@ -3,6 +3,7 @@ defmodule SquirrelixirCodegenTest do
 
   alias Squirrelixir.Column
   alias Squirrelixir.Parameter
+  alias Squirrelixir.TypedQueryDirectory
   alias Squirrelixir.TypedQuery
   alias Squirrelixir.Codegen
 
@@ -114,6 +115,34 @@ defmodule SquirrelixirCodegenTest do
 
     assert Codegen.write_directory(root, sql_directory, [query], version: "v-test") ==
              {:error, :invalid_sql_directory}
+  end
+
+  test "write_directories writes each typed query directory and returns outcomes" do
+    root = tmp_project(:acorn_counter)
+    accounts_dir = Path.join(root, "lib/accounts/sql")
+    billing_dir = Path.join(root, "lib/billing/sql")
+
+    File.mkdir_p!(accounts_dir)
+    File.mkdir_p!(billing_dir)
+
+    directories = [
+      %TypedQueryDirectory{
+        directory: billing_dir,
+        queries: [typed_query(Path.join(billing_dir, "invoice.sql"), "invoice", "select 2", [])]
+      },
+      %TypedQueryDirectory{
+        directory: accounts_dir,
+        queries: [typed_query(Path.join(accounts_dir, "account.sql"), "account", "select 1", [])]
+      }
+    ]
+
+    assert Codegen.write_directories(root, directories, version: "v-test") == [
+             {accounts_dir, :ok},
+             {billing_dir, :ok}
+           ]
+
+    assert File.read!(Path.join(root, "lib/accounts/sql.ex")) =~ "def account(connection)"
+    assert File.read!(Path.join(root, "lib/billing/sql.ex")) =~ "def invoice(connection)"
   end
 
   defp typed_query(file, name, content, params) do
