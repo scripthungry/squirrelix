@@ -42,12 +42,16 @@ defmodule Squirrelixir do
   @doc """
   Generates query modules for SQL files discovered under an Elixir project root.
   """
-  @spec generate(Path.t(), %{String.t() => keyword()}, keyword()) ::
+  @spec generate(
+          Path.t(),
+          %{String.t() => keyword()} | Squirrelixir.Inference.describer(),
+          keyword()
+        ) ::
           Squirrelixir.CodegenSummary.t()
-  def generate(root, metadata, opts \\ [])
-      when is_binary(root) and is_map(metadata) and is_list(opts) do
+  def generate(root, metadata_or_describer, opts \\ [])
+      when is_binary(root) and is_list(opts) do
     root
-    |> typed_query_directories(metadata)
+    |> typed_query_directories(metadata_or_describer)
     |> Enum.map(&write_typed_directory(root, &1, opts))
     |> Squirrelixir.Codegen.summarize_write_outcomes()
   end
@@ -55,12 +59,16 @@ defmodule Squirrelixir do
   @doc """
   Checks that generated query modules are current without writing files.
   """
-  @spec check(Path.t(), %{String.t() => keyword()}, keyword()) ::
+  @spec check(
+          Path.t(),
+          %{String.t() => keyword()} | Squirrelixir.Inference.describer(),
+          keyword()
+        ) ::
           Squirrelixir.CodegenCheckSummary.t()
-  def check(root, metadata, opts \\ [])
-      when is_binary(root) and is_map(metadata) and is_list(opts) do
+  def check(root, metadata_or_describer, opts \\ [])
+      when is_binary(root) and is_list(opts) do
     root
-    |> typed_query_directories(metadata)
+    |> typed_query_directories(metadata_or_describer)
     |> Enum.map(&check_typed_directory(root, &1, opts))
     |> Squirrelixir.Codegen.summarize_check_outcomes()
   end
@@ -143,11 +151,18 @@ defmodule Squirrelixir do
       char in [?_]
   end
 
-  defp typed_query_directories(root, metadata) do
+  defp typed_query_directories(root, metadata) when is_map(metadata) do
     root
     |> Squirrelixir.CLI.query_directories()
     |> Enum.map(&Squirrelixir.TypedQueryDirectory.from_query_directory(&1, metadata))
     |> Enum.sort_by(& &1.directory)
+  end
+
+  defp typed_query_directories(root, describer)
+       when is_function(describer, 1) or is_atom(describer) do
+    root
+    |> Squirrelixir.CLI.query_directories()
+    |> Squirrelixir.Inference.from_query_directories(describer)
   end
 
   defp write_typed_directory(
