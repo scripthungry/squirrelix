@@ -33,3 +33,15 @@ defmodule Squirrelixir.Error.OutdatedFile do
 
   @type t :: %__MODULE__{file: String.t()}
 end
+
+defmodule Squirrelixir.Error.DuplicateReturnColumns do
+  @enforce_keys [:file, :starting_line, :content, :names]
+  defstruct [:file, :starting_line, :content, :names]
+
+  @type t :: %__MODULE__{
+          file: String.t(),
+          starting_line: pos_integer(),
+          content: String.t(),
+          names: [String.t()]
+        }
+end
