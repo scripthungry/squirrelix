@@ -50,6 +50,12 @@ defmodule SquirrelixirSQLTest do
     assert SQL.infer_parameter_names(sql) == %{1 => "name", 2 => "email"}
   end
 
+  test "infer_parameter_names keeps backslash-escaped quotes inside strings" do
+    sql = "select * from users where note = 'not done \\' and $1 = fake' and email = $1"
+
+    assert SQL.infer_parameter_names(sql) == %{1 => "email"}
+  end
+
   test "infer_parameter_names leaves unmatched parameters unnamed" do
     assert SQL.infer_parameter_names("select * from users where $1 is null") == %{}
   end

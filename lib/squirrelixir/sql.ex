@@ -117,6 +117,10 @@ defmodule Squirrelixir.SQL do
     strip_single_quoted_string(rest, [?\s, ?\s | acc])
   end
 
+  defp strip_single_quoted_string([?\\, ?' | rest], acc) do
+    strip_single_quoted_string(rest, [?\s, ?\s | acc])
+  end
+
   defp strip_single_quoted_string([?' | rest], acc) do
     strip_normal(rest, [?\s | acc])
   end
