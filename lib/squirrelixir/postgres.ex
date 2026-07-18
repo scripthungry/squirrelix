@@ -8,12 +8,14 @@ defmodule Squirrelixir.Postgres do
   alias Squirrelixir.TypeMapper
 
   @type_lookup_query """
-  with recursive types as (
+  with recursive types(oid, name, elem, kind, base, array_dimensions, jumps) as (
     select
       pg_type.oid as oid,
       pg_type.typname as name,
       pg_type.typelem as elem,
       pg_type.typtype as kind,
+      pg_type.typbasetype as base,
+      0 as array_dimensions,
       0 as jumps
     from pg_type
     where pg_type.oid = $1::oid
@@ -23,13 +25,20 @@ defmodule Squirrelixir.Postgres do
       pg_type.typname as name,
       pg_type.typelem as elem,
       pg_type.typtype as kind,
+      pg_type.typbasetype as base,
+      next_type.array_dimensions as array_dimensions,
       types.jumps + 1 as jumps
-    from pg_type
-    join types
-      on pg_type.oid = types.elem
-      and types.name != 'name'
+    from types
+    join lateral (
+      values
+        (case when types.elem != 0 and types.name != 'name' then types.elem end, types.array_dimensions + 1),
+        (case when types.kind = 'd' then types.base end, types.array_dimensions)
+    ) as next_type(oid, array_dimensions)
+      on next_type.oid is not null
+    join pg_type
+      on pg_type.oid = next_type.oid
   )
-  select types.name, types.kind, types.jumps
+  select types.name, types.kind, types.array_dimensions
   from types
   order by types.jumps desc
   limit 1

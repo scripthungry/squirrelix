@@ -68,6 +68,24 @@ defmodule SquirrelixirPostgresTest do
     end)
   end
 
+  test "describe infers custom domain types from their base type", %{conn: conn} do
+    Postgrex.query!(conn, "drop domain if exists squirrelixir_email cascade", [])
+    Postgrex.query!(conn, "create domain squirrelixir_email as text", [])
+
+    query = query("select $1::squirrelixir_email as email, $2::squirrelixir_email[] as emails")
+
+    capture_log(fn ->
+      assert {:ok,
+              [
+                params: [:string, {:list, :string}],
+                returns: [
+                  %Column{name: "email", type: :string, nullable?: true},
+                  %Column{name: "emails", type: {:list, :string}, nullable?: true}
+                ]
+              ]} = Postgres.describe(conn, query)
+    end)
+  end
+
   test "describe infers timestamp with time zone as utc datetime", %{conn: conn} do
     query = query("select now() as occurred_at")
 

@@ -34,6 +34,17 @@ defmodule SquirrelixirTypeMapperTest do
              {:ok, {:list, :string}}
   end
 
+  test "from_postgres maps custom Postgres domains to their base type" do
+    assert TypeMapper.from_postgres("squirrelixir_email", kind: "d", base: "text") ==
+             {:ok, :string}
+
+    assert TypeMapper.from_postgres("squirrelixir_email",
+             kind: "d",
+             base: "text",
+             array_dimensions: 1
+           ) == {:ok, {:list, :string}}
+  end
+
   test "from_postgres rejects unsupported types" do
     assert TypeMapper.from_postgres("point") ==
              {:error, %UnsupportedPostgresType{name: "point"}}

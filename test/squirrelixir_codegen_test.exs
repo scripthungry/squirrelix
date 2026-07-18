@@ -1,3 +1,11 @@
+defmodule PostgrexRowsMock do
+  def query!({_module, owner, rows: rows}, sql, params) do
+    send(owner, {:query!, sql, params})
+
+    %Postgrex.Result{columns: ["name"], rows: rows}
+  end
+end
+
 defmodule SquirrelixirCodegenTest do
   use ExUnit.Case, async: true
 
@@ -487,13 +495,5 @@ defmodule PostgrexCommandMock do
     send(owner, {:query!, sql, params})
 
     %Postgrex.Result{command: :insert, columns: nil, rows: nil, num_rows: 1}
-  end
-end
-
-defmodule PostgrexRowsMock do
-  def query!({_module, owner, rows: rows}, sql, params) do
-    send(owner, {:query!, sql, params})
-
-    %Postgrex.Result{columns: ["name"], rows: rows}
   end
 end
