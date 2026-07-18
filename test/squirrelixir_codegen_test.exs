@@ -210,6 +210,28 @@ defmodule SquirrelixirCodegenTest do
     assert_received {:query!, "select name from users where id = $1", [123]}
   end
 
+  test "generated functions decode multiple rows and empty results" do
+    query =
+      typed_query("list_users.sql", "list_users", "select name from users", [], [
+        %Column{name: "name", type: :string, nullable?: false}
+      ])
+
+    code =
+      Codegen.generate_module(Squirrelixir.GeneratedRowsTest.SQL, [query],
+        version: "v-test",
+        postgrex: PostgrexRowsMock
+      )
+
+    [{module, _bytecode}] = Code.compile_string(code)
+
+    assert module.list_users({PostgrexRowsMock, self(), rows: [["Ada"], ["Grace"]]}) == [
+             %{name: "Ada"},
+             %{name: "Grace"}
+           ]
+
+    assert module.list_users({PostgrexRowsMock, self(), rows: []}) == []
+  end
+
   test "generated command functions return ok" do
     query =
       typed_query(
@@ -465,5 +487,13 @@ defmodule PostgrexCommandMock do
     send(owner, {:query!, sql, params})
 
     %Postgrex.Result{command: :insert, columns: nil, rows: nil, num_rows: 1}
+  end
+end
+
+defmodule PostgrexRowsMock do
+  def query!({_module, owner, rows: rows}, sql, params) do
+    send(owner, {:query!, sql, params})
+
+    %Postgrex.Result{columns: ["name"], rows: rows}
   end
 end
