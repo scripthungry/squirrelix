@@ -82,6 +82,20 @@ defmodule SquirrelixirCodegenTest do
              ~s|@doc """\n  Finds a user.\n  Returns every matching row.\n  """|
   end
 
+  test "generate_module emits code that compiles against Postgrex" do
+    query =
+      typed_query("find_user.sql", "find_user", "select * from users where id = $1", [
+        %Parameter{index: 1, name: "id", type: :integer}
+      ])
+
+    code =
+      Codegen.generate_module(Squirrelixir.GeneratedCompileTest.SQL, [query], version: "v-test")
+
+    assert Code.ensure_loaded?(Postgrex)
+    assert [{Squirrelixir.GeneratedCompileTest.SQL, _bytecode}] = Code.compile_string(code)
+    assert function_exported?(Squirrelixir.GeneratedCompileTest.SQL, :find_user, 2)
+  end
+
   test "write_directory writes a generated module next to the sql directory" do
     root = tmp_project(:acorn_counter)
     sql_directory = Path.join(root, "lib/accounts/sql")
