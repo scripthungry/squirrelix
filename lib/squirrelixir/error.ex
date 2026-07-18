@@ -26,3 +26,10 @@ defmodule Squirrelixir.Error.CannotWriteFile do
 
   @type t :: %__MODULE__{file: String.t(), reason: File.posix()}
 end
+
+defmodule Squirrelixir.Error.OutdatedFile do
+  @enforce_keys [:file]
+  defstruct [:file]
+
+  @type t :: %__MODULE__{file: String.t()}
+end

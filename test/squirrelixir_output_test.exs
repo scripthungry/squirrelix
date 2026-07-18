@@ -3,6 +3,7 @@ defmodule SquirrelixirOutputTest do
 
   alias Squirrelixir.Error.CannotOverwriteFile
   alias Squirrelixir.Error.CannotWriteFile
+  alias Squirrelixir.Error.OutdatedFile
   alias Squirrelixir.Output
 
   @generated_content """
@@ -46,6 +47,27 @@ defmodule SquirrelixirOutputTest do
 
     assert {:error, %CannotWriteFile{file: ^path, reason: :eisdir}} =
              Output.safe_write(path, @generated_content)
+  end
+
+  test "check_file returns ok when output matches ignoring comments and whitespace" do
+    path = write_file("sql.ex", "# Generated\ndefmodule Sql do\n  def all(), do: []\nend\n")
+    expected = "defmodule Sql do\ndef all(), do: []\nend\n"
+
+    assert Output.check_file(path, expected) == :ok
+  end
+
+  test "check_file returns an outdated-file error when output differs" do
+    path = write_file("sql.ex", "defmodule Sql do\n  def all(), do: []\nend\n")
+    expected = "defmodule Sql do\n  def all(), do: [1]\nend\n"
+
+    assert Output.check_file(path, expected) == {:error, %OutdatedFile{file: path}}
+  end
+
+  test "check_file returns a read error when output is missing" do
+    path = Path.join(tmp_dir(), "missing.ex")
+
+    assert {:error, %Squirrelixir.Error.CannotReadFile{file: ^path, reason: :enoent}} =
+             Output.check_file(path, @generated_content)
   end
 
   defp write_file(file_name, content) do

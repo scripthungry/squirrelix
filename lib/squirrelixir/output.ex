@@ -4,7 +4,9 @@ defmodule Squirrelixir.Output do
   """
 
   alias Squirrelixir.Error.CannotOverwriteFile
+  alias Squirrelixir.Error.CannotReadFile
   alias Squirrelixir.Error.CannotWriteFile
+  alias Squirrelixir.Error.OutdatedFile
 
   @spec safe_write(Path.t(), String.t()) ::
           :ok | {:error, CannotOverwriteFile.t() | CannotWriteFile.t()}
@@ -24,6 +26,20 @@ defmodule Squirrelixir.Output do
 
       {:error, reason} ->
         {:error, %CannotWriteFile{file: file, reason: reason}}
+    end
+  end
+
+  @spec check_file(Path.t(), String.t()) :: :ok | {:error, CannotReadFile.t() | OutdatedFile.t()}
+  def check_file(file, expected_content) when is_binary(file) and is_binary(expected_content) do
+    case File.read(file) do
+      {:ok, actual_content} ->
+        case Squirrelixir.compare_code_snippets(actual_content, expected_content) do
+          :same -> :ok
+          :different -> {:error, %OutdatedFile{file: file}}
+        end
+
+      {:error, reason} ->
+        {:error, %CannotReadFile{file: file, reason: reason}}
     end
   end
 
