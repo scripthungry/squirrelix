@@ -1,0 +1,118 @@
+defmodule Squirrelixir.SQL do
+  @moduledoc """
+  SQL helpers used by query analysis and code generation.
+  """
+
+  @identifier ~S/(?:"(?:[^"]|"")*"|[A-Za-z_][A-Za-z0-9_]*)(?:\.(?:"(?:[^"]|"")*"|[A-Za-z_][A-Za-z0-9_]*))?/
+  @horizontal_space ~S/[ \t\r]*/
+
+  @left_equality Regex.compile!(
+                   "(?<identifier>" <>
+                     @identifier <>
+                     ")" <> @horizontal_space <> "=" <> @horizontal_space <> "\\$(?<index>\\d+)"
+                 )
+
+  @right_equality Regex.compile!(
+                    "\\$(?<index>\\d+)" <>
+                      @horizontal_space <>
+                      "=" <> @horizontal_space <> "(?<identifier>" <> @identifier <> ")"
+                  )
+
+  @spec infer_parameter_names(String.t()) :: %{pos_integer() => String.t()}
+  def infer_parameter_names(sql) when is_binary(sql) do
+    stripped_sql = strip_comments_and_strings(sql)
+
+    [@left_equality, @right_equality]
+    |> Enum.flat_map(&Regex.scan(&1, stripped_sql, capture: :all_names))
+    |> Enum.reduce(%{}, fn [identifier, index], names ->
+      Map.put_new(names, String.to_integer(index), normalize_identifier(identifier))
+    end)
+  end
+
+  defp normalize_identifier(identifier) do
+    identifier
+    |> String.split(".")
+    |> List.last()
+    |> String.trim(~s/"/)
+    |> String.replace(~r/""/, ~s/"/)
+    |> String.replace(~r/[^A-Za-z0-9_]+/, "_")
+    |> String.trim("_")
+    |> String.downcase()
+  end
+
+  defp strip_comments_and_strings(sql) do
+    sql
+    |> String.to_charlist()
+    |> strip_normal([])
+    |> Enum.reverse()
+    |> List.to_string()
+  end
+
+  defp strip_normal([], acc), do: acc
+
+  defp strip_normal([?-, ?- | rest], acc) do
+    strip_line_comment(rest, [?\s, ?\s | acc])
+  end
+
+  defp strip_normal([?/, ?* | rest], acc) do
+    strip_block_comment(rest, 1, [?\s, ?\s | acc])
+  end
+
+  defp strip_normal([?' | rest], acc) do
+    strip_single_quoted_string(rest, [?\s | acc])
+  end
+
+  defp strip_normal([char | rest], acc) do
+    strip_normal(rest, [char | acc])
+  end
+
+  defp strip_line_comment([], acc), do: acc
+
+  defp strip_line_comment([?\n | rest], acc) do
+    strip_normal(rest, [?\n | acc])
+  end
+
+  defp strip_line_comment([_char | rest], acc) do
+    strip_line_comment(rest, [?\s | acc])
+  end
+
+  defp strip_block_comment([], _depth, acc), do: acc
+
+  defp strip_block_comment([?/, ?* | rest], depth, acc) do
+    strip_block_comment(rest, depth + 1, [?\s, ?\s | acc])
+  end
+
+  defp strip_block_comment([?*, ?/ | rest], 1, acc) do
+    strip_normal(rest, [?\s, ?\s | acc])
+  end
+
+  defp strip_block_comment([?*, ?/ | rest], depth, acc) do
+    strip_block_comment(rest, depth - 1, [?\s, ?\s | acc])
+  end
+
+  defp strip_block_comment([?\n | rest], depth, acc) do
+    strip_block_comment(rest, depth, [?\n | acc])
+  end
+
+  defp strip_block_comment([_char | rest], depth, acc) do
+    strip_block_comment(rest, depth, [?\s | acc])
+  end
+
+  defp strip_single_quoted_string([], acc), do: acc
+
+  defp strip_single_quoted_string([?', ?' | rest], acc) do
+    strip_single_quoted_string(rest, [?\s, ?\s | acc])
+  end
+
+  defp strip_single_quoted_string([?' | rest], acc) do
+    strip_normal(rest, [?\s | acc])
+  end
+
+  defp strip_single_quoted_string([?\n | rest], acc) do
+    strip_single_quoted_string(rest, [?\n | acc])
+  end
+
+  defp strip_single_quoted_string([_char | rest], acc) do
+    strip_single_quoted_string(rest, [?\s | acc])
+  end
+end
