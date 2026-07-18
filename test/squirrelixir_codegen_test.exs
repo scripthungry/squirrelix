@@ -155,6 +155,30 @@ defmodule SquirrelixirCodegenTest do
     assert_received {:query!, "select name from users where id = $1", [123]}
   end
 
+  test "generated command functions return ok" do
+    query =
+      typed_query(
+        "insert_user.sql",
+        "insert_user",
+        "insert into users(name) values ($1)",
+        [%Parameter{index: 1, name: "name", type: :string}],
+        []
+      )
+
+    code =
+      Codegen.generate_module(Squirrelixir.GeneratedCommandTest.SQL, [query],
+        version: "v-test",
+        postgrex: PostgrexCommandMock
+      )
+
+    assert code =~ "@spec insert_user(Postgrex.conn(), String.t()) :: :ok"
+
+    [{module, _bytecode}] = Code.compile_string(code)
+
+    assert module.insert_user({PostgrexCommandMock, self()}, "Ada") == :ok
+    assert_received {:query!, "insert into users(name) values ($1)", ["Ada"]}
+  end
+
   test "write_directory writes a generated module next to the sql directory" do
     root = tmp_project(:acorn_counter)
     sql_directory = Path.join(root, "lib/accounts/sql")
@@ -378,5 +402,13 @@ defmodule PostgrexMock do
     send(owner, {:query!, sql, params})
 
     %Postgrex.Result{columns: ["name"], rows: [["Ada"]]}
+  end
+end
+
+defmodule PostgrexCommandMock do
+  def query!({_module, owner}, sql, params) do
+    send(owner, {:query!, sql, params})
+
+    %Postgrex.Result{command: :insert, columns: nil, rows: nil, num_rows: 1}
   end
 end

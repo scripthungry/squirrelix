@@ -172,27 +172,64 @@ defmodule Squirrelixir.Codegen do
       def #{query.name}(#{Enum.join(all_args, ", ")}) do
         connection
         |> #{inspect(postgrex_module)}.query!(#{inspect(query.content)}, [#{params}])
-        |> decode_rows(#{inspect(return_column_names(query.returns))})
+        |> #{decode_call(query.returns)}
       end
     """
   end
 
   defp decode_helpers([]), do: ""
 
-  defp decode_helpers(_queries) do
-    """
-
-      defp decode_rows(%Postgrex.Result{rows: rows}, columns) do
-        Enum.map(rows, &row_to_map(&1, columns))
-      end
-
-      defp row_to_map(row, columns) do
-        columns
-        |> Enum.zip(row)
-        |> Map.new()
-      end
-    """
+  defp decode_helpers(queries) do
+    queries
+    |> decode_helper_sources()
+    |> Enum.join("\n")
   end
+
+  defp decode_helper_sources(queries) do
+    []
+    |> maybe_add_command_helper(queries)
+    |> maybe_add_rows_helper(queries)
+    |> Enum.reverse()
+  end
+
+  defp maybe_add_command_helper(sources, queries) do
+    if Enum.any?(queries, &(&1.returns == [])) do
+      [
+        """
+          defp decode_command(%Postgrex.Result{}) do
+            :ok
+          end
+        """
+        | sources
+      ]
+    else
+      sources
+    end
+  end
+
+  defp maybe_add_rows_helper(sources, queries) do
+    if Enum.any?(queries, &(&1.returns != [])) do
+      [
+        """
+          defp decode_rows(%Postgrex.Result{rows: rows}, columns) do
+            Enum.map(rows, &row_to_map(&1, columns))
+          end
+
+          defp row_to_map(row, columns) do
+            columns
+            |> Enum.zip(row)
+            |> Map.new()
+          end
+        """
+        | sources
+      ]
+    else
+      sources
+    end
+  end
+
+  defp decode_call([]), do: "decode_command()"
+  defp decode_call(columns), do: "decode_rows(#{inspect(return_column_names(columns))})"
 
   defp argument_names(params) do
     params
@@ -243,7 +280,7 @@ defmodule Squirrelixir.Codegen do
     |> Enum.map_join("", &", #{&1}")
   end
 
-  defp return_spec([]), do: "[map()]"
+  defp return_spec([]), do: ":ok"
 
   defp return_spec(columns) do
     columns
