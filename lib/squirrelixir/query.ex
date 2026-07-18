@@ -1,6 +1,13 @@
-defmodule Squirrelixir.Query.UntypedQuery do
+defmodule Squirrelixir.Query do
+  @moduledoc """
+  Query file parsing helpers reimplemented from Squirrel.
+  """
+
   @enforce_keys [:file, :starting_line, :name, :comment, :content]
   defstruct [:file, :starting_line, :name, :comment, :content]
+
+  alias Squirrelixir.Error.CannotReadFile
+  alias Squirrelixir.Error.QueryFileHasInvalidName
 
   @type t :: %__MODULE__{
           file: String.t(),
@@ -9,23 +16,13 @@ defmodule Squirrelixir.Query.UntypedQuery do
           comment: [String.t()],
           content: String.t()
         }
-end
 
-defmodule Squirrelixir.Query do
-  @moduledoc """
-  Query file parsing helpers reimplemented from Squirrel.
-  """
-
-  alias Squirrelixir.Error.CannotReadFile
-  alias Squirrelixir.Error.QueryFileHasInvalidName
-  alias Squirrelixir.Query.UntypedQuery
-
-  @spec from_file(String.t()) :: {:ok, UntypedQuery.t()} | {:error, struct()}
+  @spec from_file(String.t()) :: {:ok, t()} | {:error, struct()}
   def from_file(file) when is_binary(file) do
     with {:ok, content} <- read_query_file(file),
          {:ok, name} <- query_name(file) do
       {:ok,
-       %UntypedQuery{
+       %__MODULE__{
          file: file,
          starting_line: 1,
          name: name,
