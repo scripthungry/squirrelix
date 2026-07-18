@@ -27,13 +27,13 @@ defmodule SquirrelixirSQLTest do
     select name from users where users.id = $1 and $2 = users.name
     """
 
-    assert SQL.infer_parameter_names(sql) == %{1 => "id", 2 => "name"}
+    assert SQL.infer_parameter_names(sql) == %{1 => "users_id", 2 => "users_name"}
   end
 
   test "infer_parameter_names handles quoted names" do
     sql = ~s|select name from users where users."special id" = $1 and $2 = "account name"|
 
-    assert SQL.infer_parameter_names(sql) == %{1 => "special_id", 2 => "account_name"}
+    assert SQL.infer_parameter_names(sql) == %{1 => "users_special_id", 2 => "account_name"}
   end
 
   test "infer_parameter_names ignores comments and strings" do

@@ -30,9 +30,22 @@ defmodule Squirrelixir.SQL do
   end
 
   defp normalize_identifier(identifier) do
+    case String.split(identifier, ".", parts: 2) do
+      [column] -> snake_identifier(column)
+      [table, column] -> table_identifier(table, column)
+    end
+  end
+
+  defp table_identifier(table, column) do
+    table = snake_identifier(table)
+    column = snake_identifier(column)
+    column = String.replace_prefix(column, "#{table}_", "")
+
+    "#{table}_#{column}"
+  end
+
+  defp snake_identifier(identifier) do
     identifier
-    |> String.split(".")
-    |> List.last()
     |> String.trim(~s/"/)
     |> String.replace(~r/""/, ~s/"/)
     |> String.replace(~r/[^A-Za-z0-9_]+/, "_")

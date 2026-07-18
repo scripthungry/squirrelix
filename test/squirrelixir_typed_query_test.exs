@@ -40,6 +40,48 @@ defmodule SquirrelixirTypedQueryTest do
              )
   end
 
+  test "from_query infers table-qualified parameter names" do
+    query = %Query{
+      file: "find_user.sql",
+      starting_line: 1,
+      name: "find_user",
+      comment: [],
+      content:
+        "select name from squirrel_user where squirrel_user.id = $1 and $2 = accounts.email"
+    }
+
+    assert {:ok,
+            %TypedQuery{
+              params: [
+                %Parameter{index: 1, name: "squirrel_user_id", type: :integer},
+                %Parameter{index: 2, name: "accounts_email", type: :string}
+              ]
+            }} =
+             TypedQuery.from_query(query,
+               params: [:integer, :string],
+               returns: [%{name: "name", type: :string, nullable?: false}]
+             )
+  end
+
+  test "from_query infers quoted table-qualified parameter names" do
+    query = %Query{
+      file: "find_user.sql",
+      starting_line: 1,
+      name: "find_user",
+      comment: [],
+      content: ~s(select name from squirrel_user where squirrel_user."special id" = $1)
+    }
+
+    assert {:ok,
+            %TypedQuery{
+              params: [%Parameter{index: 1, name: "squirrel_user_special_id", type: :integer}]
+            }} =
+             TypedQuery.from_query(query,
+               params: [:integer],
+               returns: [%{name: "name", type: :string, nullable?: false}]
+             )
+  end
+
   test "from_query normalizes Postgres type descriptors in metadata" do
     query = %Query{
       file: "find_user.sql",
