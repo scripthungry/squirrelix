@@ -1,0 +1,96 @@
+defmodule SquirrelixirPostgresTest do
+  use ExUnit.Case, async: false
+
+  alias Squirrelixir.CodegenSummary
+  alias Squirrelixir.Column
+  alias Squirrelixir.Parameter
+  alias Squirrelixir.Postgres
+  alias Squirrelixir.Query
+
+  setup_all do
+    opts = [hostname: "localhost", username: System.get_env("USER"), database: "postgres"]
+
+    case Postgrex.start_link(opts) do
+      {:ok, conn} ->
+        on_exit(fn -> GenServer.stop(conn) end)
+        {:ok, conn: conn}
+
+      {:error, reason} ->
+        flunk("local Postgres is required for this test: #{inspect(reason)}")
+    end
+  end
+
+  test "describe infers parameter and return types from a prepared query", %{conn: conn} do
+    query = query("select 1::int4 as id, $1::text as name")
+
+    assert {:ok,
+            [
+              params: [:string],
+              returns: [
+                %Column{name: "id", type: :integer, nullable?: true},
+                %Column{name: "name", type: :string, nullable?: true}
+              ]
+            ]} = Postgres.describe(conn, query)
+  end
+
+  test "describe infers array dimensions", %{conn: conn} do
+    query = query("select $1::int4[] as ids")
+
+    assert {:ok,
+            [
+              params: [{:list, :integer}],
+              returns: [%Column{name: "ids", type: {:list, :integer}, nullable?: true}]
+            ]} = Postgres.describe(conn, query)
+  end
+
+  test "describe output can be converted into a typed query", %{conn: conn} do
+    query = %Query{
+      file: "find_account.sql",
+      starting_line: 1,
+      name: "find_account",
+      comment: [],
+      content: "select $1::text as name"
+    }
+
+    assert {:ok, metadata} = Postgres.describe(conn, query)
+
+    assert {:ok,
+            %Squirrelixir.TypedQuery{
+              params: [%Parameter{name: nil, type: :string}],
+              returns: [%Column{name: "name", type: :string, nullable?: true}]
+            }} = Squirrelixir.TypedQuery.from_query(query, metadata)
+  end
+
+  test "describer can generate modules from a live Postgres connection", %{conn: conn} do
+    root = tmp_project(:acorn_counter)
+    sql_directory = Path.join(root, "lib/accounts/sql")
+    File.mkdir_p!(sql_directory)
+
+    File.write!(Path.join(sql_directory, "find_account.sql"), "select $1::text as name")
+
+    assert Squirrelixir.generate(root, Postgres.describer(conn), version: "v-test") ==
+             %CodegenSummary{generated_count: 1, errors: [], status: :ok}
+
+    assert File.read!(Path.join(root, "lib/accounts/sql.ex")) =~ "required(:name) => String.t()"
+  end
+
+  defp query(content) do
+    %Query{file: "query.sql", starting_line: 1, name: "query", comment: [], content: content}
+  end
+
+  defp tmp_project(app) do
+    path = Squirrelixir.TestSupport.tmp_dir!("squirrelixir-postgres")
+
+    File.write!(Path.join(path, "mix.exs"), """
+    defmodule TempProject.MixProject do
+      use Mix.Project
+
+      def project do
+        [app: #{inspect(app)}, version: "0.1.0"]
+      end
+    end
+    """)
+
+    path
+  end
+end

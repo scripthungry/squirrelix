@@ -55,6 +55,21 @@ defmodule MixTasksSquirrelixirTest do
     assert output =~ "Generated 1 query."
   end
 
+  test "mix squirrelixir.gen can infer metadata from Postgres" do
+    root = tmp_project(:acorn_counter)
+    write_query(root, "select $1::text as name")
+
+    output =
+      File.cd!(root, fn ->
+        capture_io(fn ->
+          Mix.Task.run("squirrelixir.gen", ["--infer", "--database", "postgres"])
+        end)
+      end)
+
+    assert output =~ "Generated 1 query."
+    assert File.read!(Path.join(root, "lib/accounts/sql.ex")) =~ "required(:name) => String.t()"
+  end
+
   defp tmp_project(app) do
     path = Squirrelixir.TestSupport.tmp_dir!("squirrelixir-mix-task")
 
@@ -71,12 +86,12 @@ defmodule MixTasksSquirrelixirTest do
     path
   end
 
-  defp write_query(root) do
+  defp write_query(root, content \\ "select name from accounts where id = $1") do
     sql_directory = Path.join(root, "lib/accounts/sql")
     File.mkdir_p!(sql_directory)
 
     query_file = Path.join(sql_directory, "find_account.sql")
-    File.write!(query_file, "select name from accounts where id = $1")
+    File.write!(query_file, content)
 
     query_file
   end

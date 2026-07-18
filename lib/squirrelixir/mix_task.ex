@@ -4,31 +4,70 @@ defmodule Squirrelixir.MixTask do
   alias Squirrelixir.CodegenCheckSummary
   alias Squirrelixir.CodegenSummary
   alias Squirrelixir.Metadata
+  alias Squirrelixir.Postgres
 
-  @switches [metadata: :string]
+  @switches [
+    metadata: :string,
+    infer: :boolean,
+    database: :string,
+    hostname: :string,
+    username: :string,
+    port: :integer
+  ]
 
   @spec generate([String.t()]) :: :ok
   def generate(args) do
     root = File.cwd!()
-    metadata = load_metadata!(args, root)
+    opts = parse_args!(args)
 
-    root
-    |> Squirrelixir.generate(metadata, version: version())
-    |> report_generate_summary()
+    with_query_source!(opts, root, fn query_source ->
+      root
+      |> Squirrelixir.generate(query_source, version: version())
+      |> report_generate_summary()
+    end)
   end
 
   @spec check([String.t()]) :: :ok
   def check(args) do
     root = File.cwd!()
-    metadata = load_metadata!(args, root)
+    opts = parse_args!(args)
 
-    root
-    |> Squirrelixir.check(metadata, version: version())
-    |> report_check_summary()
+    with_query_source!(opts, root, fn query_source ->
+      root
+      |> Squirrelixir.check(query_source, version: version())
+      |> report_check_summary()
+    end)
   end
 
-  defp load_metadata!(args, root) do
-    opts = parse_args!(args)
+  defp with_query_source!(opts, root, callback) do
+    if opts[:infer] do
+      with_postgres_describer!(opts, callback)
+    else
+      callback.(load_metadata!(opts, root))
+    end
+  end
+
+  defp with_postgres_describer!(opts, callback) do
+    case Postgrex.start_link(connection_opts(opts)) do
+      {:ok, conn} ->
+        try do
+          callback.(Postgres.describer(conn))
+        after
+          GenServer.stop(conn)
+        end
+
+      {:error, error} ->
+        Mix.raise("Could not connect to Postgres: #{inspect(error)}")
+    end
+  end
+
+  defp connection_opts(opts) do
+    opts
+    |> Keyword.take([:database, :hostname, :username, :port])
+    |> Keyword.put_new_lazy(:database, fn -> System.get_env("PGDATABASE") || "postgres" end)
+  end
+
+  defp load_metadata!(opts, root) do
     metadata_file = opts |> Keyword.get(:metadata, "squirrelixir.exs") |> Path.expand(root)
 
     case Metadata.from_file(metadata_file, root: root) do
