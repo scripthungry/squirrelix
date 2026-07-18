@@ -91,3 +91,14 @@ defmodule Squirrelixir.Error.MissingQueryMetadataField do
 
   @type t :: %__MODULE__{file: String.t(), field: :params | :returns}
 end
+
+defmodule Squirrelixir.Error.InvalidQueryMetadataFile do
+  @moduledoc """
+  Error returned when a query metadata file cannot be evaluated to a metadata map.
+  """
+
+  @enforce_keys [:file, :reason]
+  defstruct [:file, :reason]
+
+  @type t :: %__MODULE__{file: String.t(), reason: term()}
+end
