@@ -15,7 +15,7 @@ defmodule Squirrelixir.Codegen do
       @moduledoc \"\"\"
       This module contains generated query functions.
 
-      Generated automatically using Squirrelixir #{version}.
+      > This module was generated automatically using Squirrelixir #{version}.
       \"\"\"
 
     #{queries |> Enum.sort_by(& &1.file) |> Enum.map_join("\n\n", &function_source/1)}
@@ -34,6 +34,7 @@ defmodule Squirrelixir.Codegen do
     params = Enum.join(args, ", ")
 
     """
+      #{doc_source(query)}
       @spec #{query.name}(Postgrex.conn()#{spec_args(query.params)}) :: Postgrex.Result.t()
       def #{query.name}(#{Enum.join(all_args, ", ")}) do
         Postgrex.query!(connection, #{inspect(query.content)}, [#{params}])
@@ -43,6 +44,16 @@ defmodule Squirrelixir.Codegen do
 
   defp argument_name(%Parameter{name: nil, index: index}), do: "arg_#{index}"
   defp argument_name(%Parameter{name: name}) when is_binary(name), do: name
+
+  defp doc_source(%TypedQuery{comment: []}), do: ""
+
+  defp doc_source(%TypedQuery{comment: comments}) do
+    """
+      @doc \"\"\"
+      #{Enum.join(comments, "\n")}
+      \"\"\"
+    """
+  end
 
   defp spec_args([]), do: ""
 

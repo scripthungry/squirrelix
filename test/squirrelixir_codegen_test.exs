@@ -19,7 +19,7 @@ defmodule SquirrelixirCodegenTest do
              @moduledoc \"\"\"
              This module contains generated query functions.
 
-             Generated automatically using Squirrelixir v-test.
+             > This module was generated automatically using Squirrelixir v-test.
              \"\"\"
 
              @spec find_user(Postgrex.conn(), integer()) :: Postgrex.Result.t()
@@ -43,6 +43,24 @@ defmodule SquirrelixirCodegenTest do
 
     assert Codegen.generate_module(MyApp.SQL, [query], version: "v-test") =~
              "def search(connection, arg_1)"
+  end
+
+  test "generate_module output is classified as generated" do
+    query = typed_query("all.sql", "all", "select * from users", [])
+
+    code = Codegen.generate_module(MyApp.SQL, [query], version: "v-test")
+
+    assert Squirrelixir.classify_file_content(code) == :likely_generated
+  end
+
+  test "generate_module emits query comments as function docs" do
+    query = %TypedQuery{
+      typed_query("find_user.sql", "find_user", "select * from users", [])
+      | comment: ["Finds a user.", "Returns every matching row."]
+    }
+
+    assert Codegen.generate_module(MyApp.SQL, [query], version: "v-test") =~
+             ~s|@doc """\n  Finds a user.\n  Returns every matching row.\n  """|
   end
 
   defp typed_query(file, name, content, params) do
