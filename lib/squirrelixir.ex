@@ -39,6 +39,21 @@ defmodule Squirrelixir do
     end
   end
 
+  @doc """
+  Generates query modules for SQL files discovered under an Elixir project root.
+  """
+  @spec generate(Path.t(), %{String.t() => keyword()}, keyword()) ::
+          Squirrelixir.CodegenSummary.t()
+  def generate(root, metadata, opts \\ [])
+      when is_binary(root) and is_map(metadata) and is_list(opts) do
+    root
+    |> Squirrelixir.CLI.query_directories()
+    |> Enum.map(&Squirrelixir.TypedQueryDirectory.from_query_directory(&1, metadata))
+    |> Enum.sort_by(& &1.directory)
+    |> Enum.map(&write_typed_directory(root, &1, opts))
+    |> Squirrelixir.Codegen.summarize_write_outcomes()
+  end
+
   @spec tokenize(String.t()) :: [String.t()]
   defp tokenize(code) do
     chars = String.to_charlist(code)
@@ -117,5 +132,20 @@ defmodule Squirrelixir do
       (char >= ?A and char <= ?Z) or
       (char >= ?0 and char <= ?9) or
       char in [?_]
+  end
+
+  defp write_typed_directory(
+         root,
+         %Squirrelixir.TypedQueryDirectory{errors: []} = directory,
+         opts
+       ) do
+    outcome =
+      Squirrelixir.Codegen.write_directory(root, directory.directory, directory.queries, opts)
+
+    {directory.directory, outcome, length(directory.queries)}
+  end
+
+  defp write_typed_directory(_root, %Squirrelixir.TypedQueryDirectory{} = directory, _opts) do
+    {directory.directory, {:error, directory.errors}, length(directory.queries)}
   end
 end
