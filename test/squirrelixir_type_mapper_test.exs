@@ -27,6 +27,13 @@ defmodule SquirrelixirTypeMapperTest do
              {:ok, {:list, {:list, :string}}}
   end
 
+  test "from_postgres maps custom Postgres enums to strings" do
+    assert TypeMapper.from_postgres("squirrelixir_mood", kind: "e") == {:ok, :string}
+
+    assert TypeMapper.from_postgres("squirrelixir_mood", kind: "e", array_dimensions: 1) ==
+             {:ok, {:list, :string}}
+  end
+
   test "from_postgres rejects unsupported types" do
     assert TypeMapper.from_postgres("point") ==
              {:error, %UnsupportedPostgresType{name: "point"}}

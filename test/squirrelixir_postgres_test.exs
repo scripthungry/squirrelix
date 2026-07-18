@@ -1,6 +1,8 @@
 defmodule SquirrelixirPostgresTest do
   use ExUnit.Case, async: false
 
+  import ExUnit.CaptureLog
+
   alias Squirrelixir.CodegenSummary
   alias Squirrelixir.Column
   alias Squirrelixir.Parameter
@@ -8,7 +10,12 @@ defmodule SquirrelixirPostgresTest do
   alias Squirrelixir.Query
 
   setup_all do
-    opts = [hostname: "localhost", username: System.get_env("USER"), database: "postgres"]
+    opts = [
+      hostname: "localhost",
+      username: System.get_env("USER"),
+      database: "postgres",
+      log: false
+    ]
 
     case Postgrex.start_link(opts) do
       {:ok, conn} ->
@@ -41,6 +48,24 @@ defmodule SquirrelixirPostgresTest do
               params: [{:list, :integer}],
               returns: [%Column{name: "ids", type: {:list, :integer}, nullable?: true}]
             ]} = Postgres.describe(conn, query)
+  end
+
+  test "describe infers custom enum types as strings", %{conn: conn} do
+    Postgrex.query!(conn, "drop type if exists squirrelixir_mood", [])
+    Postgrex.query!(conn, "create type squirrelixir_mood as enum ('happy', 'sleepy')", [])
+
+    query = query("select $1::squirrelixir_mood as mood, $2::squirrelixir_mood[] as moods")
+
+    capture_log(fn ->
+      assert {:ok,
+              [
+                params: [:string, {:list, :string}],
+                returns: [
+                  %Column{name: "mood", type: :string, nullable?: true},
+                  %Column{name: "moods", type: {:list, :string}, nullable?: true}
+                ]
+              ]} = Postgres.describe(conn, query)
+    end)
   end
 
   test "describe infers timestamp with time zone as utc datetime", %{conn: conn} do

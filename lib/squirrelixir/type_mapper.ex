@@ -51,8 +51,16 @@ defmodule Squirrelixir.TypeMapper do
   def from_postgres(name, opts \\ []) when is_binary(name) and is_list(opts) do
     array_dimensions = Keyword.get(opts, :array_dimensions, 0)
 
+    with {:ok, type} <- base_type(name, Keyword.get(opts, :kind)) do
+      {:ok, wrap_lists(type, array_dimensions)}
+    end
+  end
+
+  defp base_type(_name, "e"), do: {:ok, :string}
+
+  defp base_type(name, _kind) do
     case Map.fetch(@base_types, name) do
-      {:ok, type} -> {:ok, wrap_lists(type, array_dimensions)}
+      {:ok, type} -> {:ok, type}
       :error -> {:error, %UnsupportedPostgresType{name: name}}
     end
   end
@@ -77,7 +85,10 @@ defmodule Squirrelixir.TypeMapper do
   end
 
   def normalize_type(%{postgres: name} = descriptor) when is_binary(name) do
-    from_postgres(name, array_dimensions: Map.get(descriptor, :array_dimensions, 0))
+    from_postgres(name,
+      array_dimensions: Map.get(descriptor, :array_dimensions, 0),
+      kind: Map.get(descriptor, :kind)
+    )
   end
 
   defp wrap_lists(type, 0), do: type

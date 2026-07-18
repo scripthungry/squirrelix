@@ -13,6 +13,7 @@ defmodule Squirrelixir.Postgres do
       pg_type.oid as oid,
       pg_type.typname as name,
       pg_type.typelem as elem,
+      pg_type.typtype as kind,
       0 as jumps
     from pg_type
     where pg_type.oid = $1::oid
@@ -21,13 +22,14 @@ defmodule Squirrelixir.Postgres do
       pg_type.oid as oid,
       pg_type.typname as name,
       pg_type.typelem as elem,
+      pg_type.typtype as kind,
       types.jumps + 1 as jumps
     from pg_type
     join types
       on pg_type.oid = types.elem
       and types.name != 'name'
   )
-  select types.name, types.jumps
+  select types.name, types.kind, types.jumps
   from types
   order by types.jumps desc
   limit 1
@@ -214,9 +216,9 @@ defmodule Squirrelixir.Postgres do
   end
 
   defp describe_oid(conn, oid) do
-    with {:ok, %Postgrex.Result{rows: [[name, array_dimensions]]}} <-
+    with {:ok, %Postgrex.Result{rows: [[name, kind, array_dimensions]]}} <-
            Postgrex.query(conn, @type_lookup_query, [oid]) do
-      TypeMapper.from_postgres(name, array_dimensions: array_dimensions)
+      TypeMapper.from_postgres(name, kind: kind, array_dimensions: array_dimensions)
     end
   end
 end
