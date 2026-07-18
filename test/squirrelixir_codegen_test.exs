@@ -14,9 +14,15 @@ defmodule SquirrelixirCodegenTest do
   test "generate_module emits formatted Elixir functions sorted by source file" do
     queries = [
       typed_query("z_last.sql", "z_last", "select * from users", []),
-      typed_query("a_first.sql", "find_user", "select * from users where id = $1", [
-        %Parameter{index: 1, name: "id", type: :integer}
-      ])
+      typed_query(
+        "a_first.sql",
+        "find_user",
+        "select * from users where id = $1",
+        [
+          %Parameter{index: 1, name: "id", type: :integer}
+        ],
+        [%Column{name: "name", type: :string, nullable?: false}]
+      )
     ]
 
     assert Codegen.generate_module(MyApp.Accounts.SQL, queries, version: "v-test") == """
@@ -27,14 +33,28 @@ defmodule SquirrelixirCodegenTest do
              > This module was generated automatically using Squirrelixir v-test.
              \"\"\"
 
-             @spec find_user(Postgrex.conn(), integer()) :: Postgrex.Result.t()
+             @spec find_user(Postgrex.conn(), integer()) :: [%{required(:name) => String.t()}]
              def find_user(connection, id) do
-               Postgrex.query!(connection, \"select * from users where id = $1\", [id])
+               connection
+               |> Postgrex.query!("select * from users where id = $1", [id])
+               |> decode_rows([:name])
              end
 
-             @spec z_last(Postgrex.conn()) :: Postgrex.Result.t()
+             @spec z_last(Postgrex.conn()) :: [%{required(:id) => integer()}]
              def z_last(connection) do
-               Postgrex.query!(connection, \"select * from users\", [])
+               connection
+               |> Postgrex.query!("select * from users", [])
+               |> decode_rows([:id])
+             end
+
+             defp decode_rows(%Postgrex.Result{rows: rows}, columns) do
+               Enum.map(rows, &row_to_map(&1, columns))
+             end
+
+             defp row_to_map(row, columns) do
+               columns
+               |> Enum.zip(row)
+               |> Map.new()
              end
            end
            """
@@ -61,7 +81,21 @@ defmodule SquirrelixirCodegenTest do
     code = Codegen.generate_module(MyApp.SQL, [query], version: "v-test")
 
     assert code =~ "def conflicting(connection, arg_1, arg_2, arg_3)"
-    assert code =~ ~s|Postgrex.query!(connection, "select $1, $2, $3", [arg_1, arg_2, arg_3])|
+    assert code =~ ~s|Postgrex.query!("select $1, $2, $3", [arg_1, arg_2, arg_3])|
+  end
+
+  test "generate_module includes nullable columns in row specs" do
+    query =
+      typed_query("find_user.sql", "find_user", "select * from users", [], [
+        %Column{name: "name", type: :string, nullable?: true},
+        %Column{name: "age", type: :integer, nullable?: false}
+      ])
+
+    code = Codegen.generate_module(MyApp.SQL, [query], version: "v-test")
+
+    assert code =~ "@spec find_user(Postgrex.conn()) ::"
+    assert code =~ "required(:name) => String.t() | nil"
+    assert code =~ "required(:age) => integer()"
   end
 
   test "generate_module output is classified as generated" do
@@ -94,6 +128,31 @@ defmodule SquirrelixirCodegenTest do
     assert Code.ensure_loaded?(Postgrex)
     assert [{Squirrelixir.GeneratedCompileTest.SQL, _bytecode}] = Code.compile_string(code)
     assert function_exported?(Squirrelixir.GeneratedCompileTest.SQL, :find_user, 2)
+  end
+
+  test "generated functions return decoded row maps" do
+    query =
+      typed_query(
+        "find_user.sql",
+        "find_user",
+        "select name from users where id = $1",
+        [
+          %Parameter{index: 1, name: "id", type: :integer}
+        ],
+        [%Column{name: "name", type: :string, nullable?: false}]
+      )
+
+    code =
+      Codegen.generate_module(Squirrelixir.GeneratedRuntimeTest.SQL, [query],
+        version: "v-test",
+        postgrex: PostgrexMock
+      )
+
+    [{module, _bytecode}] = Code.compile_string(code)
+
+    assert module.find_user({PostgrexMock, self()}, 123) == [%{name: "Ada"}]
+
+    assert_received {:query!, "select name from users where id = $1", [123]}
   end
 
   test "write_directory writes a generated module next to the sql directory" do
@@ -285,7 +344,7 @@ defmodule SquirrelixirCodegenTest do
            }
   end
 
-  defp typed_query(file, name, content, params) do
+  defp typed_query(file, name, content, params, returns \\ nil) do
     %TypedQuery{
       file: file,
       starting_line: 1,
@@ -293,7 +352,7 @@ defmodule SquirrelixirCodegenTest do
       comment: [],
       content: content,
       params: params,
-      returns: [%Column{name: "id", type: :integer, nullable?: false}]
+      returns: returns || [%Column{name: "id", type: :integer, nullable?: false}]
     }
   end
 
@@ -311,5 +370,13 @@ defmodule SquirrelixirCodegenTest do
     """)
 
     path
+  end
+end
+
+defmodule PostgrexMock do
+  def query!({_module, owner}, sql, params) do
+    send(owner, {:query!, sql, params})
+
+    %Postgrex.Result{columns: ["name"], rows: [["Ada"]]}
   end
 end

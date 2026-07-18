@@ -42,6 +42,7 @@ defmodule Squirrelixir.Codegen do
   @spec generate_module(module(), [TypedQuery.t()], keyword()) :: String.t()
   def generate_module(module, queries, opts \\ []) when is_atom(module) and is_list(queries) do
     version = Keyword.fetch!(opts, :version)
+    postgrex_module = Keyword.get(opts, :postgrex, Postgrex)
 
     source = """
     defmodule #{inspect(module)} do
@@ -51,7 +52,8 @@ defmodule Squirrelixir.Codegen do
       > This module was generated automatically using Squirrelixir #{version}.
       \"\"\"
 
-    #{queries |> Enum.sort_by(& &1.file) |> Enum.map_join("\n\n", &function_source/1)}
+    #{queries |> Enum.sort_by(& &1.file) |> Enum.map_join("\n\n", &function_source(&1, postgrex_module))}
+    #{decode_helpers(queries)}
     end
     """
 
@@ -159,16 +161,35 @@ defmodule Squirrelixir.Codegen do
     }
   end
 
-  defp function_source(%TypedQuery{} = query) do
+  defp function_source(%TypedQuery{} = query, postgrex_module) do
     args = argument_names(query.params)
     all_args = ["connection" | args]
     params = Enum.join(args, ", ")
 
     """
       #{doc_source(query)}
-      @spec #{query.name}(Postgrex.conn()#{spec_args(query.params)}) :: Postgrex.Result.t()
+      @spec #{query.name}(Postgrex.conn()#{spec_args(query.params)}) :: #{return_spec(query.returns)}
       def #{query.name}(#{Enum.join(all_args, ", ")}) do
-        Postgrex.query!(connection, #{inspect(query.content)}, [#{params}])
+        connection
+        |> #{inspect(postgrex_module)}.query!(#{inspect(query.content)}, [#{params}])
+        |> decode_rows(#{inspect(return_column_names(query.returns))})
+      end
+    """
+  end
+
+  defp decode_helpers([]), do: ""
+
+  defp decode_helpers(_queries) do
+    """
+
+      defp decode_rows(%Postgrex.Result{rows: rows}, columns) do
+        Enum.map(rows, &row_to_map(&1, columns))
+      end
+
+      defp row_to_map(row, columns) do
+        columns
+        |> Enum.zip(row)
+        |> Map.new()
       end
     """
   end
@@ -220,6 +241,25 @@ defmodule Squirrelixir.Codegen do
     params
     |> Enum.map(&type_spec(&1.type))
     |> Enum.map_join("", &", #{&1}")
+  end
+
+  defp return_spec([]), do: "[map()]"
+
+  defp return_spec(columns) do
+    columns
+    |> Enum.map_join(", ", &column_spec/1)
+    |> then(&"[%{#{&1}}]")
+  end
+
+  defp column_spec(column) do
+    type = type_spec(column.type)
+    type = if column.nullable?, do: "#{type} | nil", else: type
+
+    "required(#{inspect(String.to_atom(column.name))}) => #{type}"
+  end
+
+  defp return_column_names(columns) do
+    Enum.map(columns, &String.to_atom(&1.name))
   end
 
   defp type_spec(:integer), do: "integer()"
