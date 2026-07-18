@@ -57,6 +57,11 @@ defmodule Squirrelixir do
     do_tokenize(rest, :line_comment, [], tokens)
   end
 
+  defp do_tokenize([?# | rest], :normal, current, tokens) do
+    tokens = maybe_push(current, tokens)
+    do_tokenize(rest, :line_comment, [], tokens)
+  end
+
   defp do_tokenize([char | rest], :line_comment, current, tokens) do
     if char == ?\n do
       do_tokenize(rest, :normal, current, tokens)

@@ -31,6 +31,24 @@ defmodule SquirrelixirCompatibilityTest do
     assert Squirrelixir.compare_code_snippets(@generated_code, actual_code) == :same
   end
 
+  test "if Elixir code snippets differ by comments they are the same" do
+    expected_code = """
+    defmodule Generated do
+      def all(connection), do: connection
+    end
+    """
+
+    actual_code = """
+    # Generated query module
+    defmodule Generated do
+      # Runs the query
+      def all(connection), do: connection
+    end
+    """
+
+    assert Squirrelixir.compare_code_snippets(expected_code, actual_code) == :same
+  end
+
   test "comparing different snippets of code" do
     actual_code = String.replace(@generated_code, "Ok(1)", "Ok(2)")
 
