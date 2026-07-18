@@ -84,6 +84,24 @@ defmodule SquirrelixirCodegenTest do
     assert code =~ ~s|Postgrex.query!("select $1, $2, $3", [arg_1, arg_2, arg_3])|
   end
 
+  test "generate_module avoids Elixir reserved argument names" do
+    query =
+      typed_query("reserved.sql", "reserved", "select $1, $2, $3", [
+        %Parameter{index: 1, name: "fn", type: :string},
+        %Parameter{index: 2, name: "end", type: :string},
+        %Parameter{index: 3, name: "type", type: :string}
+      ])
+
+    code =
+      Codegen.generate_module(Squirrelixir.GeneratedReservedNamesTest.SQL, [query],
+        version: "v-test"
+      )
+
+    assert code =~ "def reserved(connection, fn_, end_, type)"
+    assert code =~ ~s|Postgrex.query!("select $1, $2, $3", [fn_, end_, type])|
+    assert [{Squirrelixir.GeneratedReservedNamesTest.SQL, _bytecode}] = Code.compile_string(code)
+  end
+
   test "generate_module includes nullable columns in row specs" do
     query =
       typed_query("find_user.sql", "find_user", "select * from users", [], [
