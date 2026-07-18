@@ -1,0 +1,65 @@
+defmodule SquirrelixirOutputTest do
+  use ExUnit.Case, async: true
+
+  alias Squirrelixir.Error.CannotOverwriteFile
+  alias Squirrelixir.Error.CannotWriteFile
+  alias Squirrelixir.Output
+
+  @generated_content """
+  //// > 🐿️ This module was generated automatically using Squirrelixir
+  defmodule Generated do
+  end
+  """
+
+  test "safe_write writes a new file and creates parent directories" do
+    path = Path.join(tmp_dir(), "nested/sql.ex")
+
+    assert Output.safe_write(path, @generated_content) == :ok
+    assert File.read!(path) == @generated_content
+  end
+
+  test "safe_write overwrites likely generated files" do
+    path = write_file("sql.ex", @generated_content)
+
+    assert Output.safe_write(path, "new generated content") == :ok
+    assert File.read!(path) == "new generated content"
+  end
+
+  test "safe_write overwrites empty files" do
+    path = write_file("sql.ex", "  \n\t")
+
+    assert Output.safe_write(path, "new content") == :ok
+    assert File.read!(path) == "new content"
+  end
+
+  test "safe_write refuses to overwrite human-written files" do
+    path = write_file("sql.ex", "defmodule HandWritten do\nend\n")
+
+    assert Output.safe_write(path, @generated_content) ==
+             {:error, %CannotOverwriteFile{file: path}}
+
+    assert File.read!(path) == "defmodule HandWritten do\nend\n"
+  end
+
+  test "safe_write returns a write error when target cannot be written" do
+    path = tmp_dir()
+
+    assert {:error, %CannotWriteFile{file: ^path, reason: :eisdir}} =
+             Output.safe_write(path, @generated_content)
+  end
+
+  defp write_file(file_name, content) do
+    dir = tmp_dir()
+    path = Path.join(dir, file_name)
+    File.write!(path, content)
+    path
+  end
+
+  defp tmp_dir do
+    path =
+      Path.join(System.tmp_dir!(), "squirrelixir-output-#{System.unique_integer([:positive])}")
+
+    File.mkdir_p!(path)
+    path
+  end
+end

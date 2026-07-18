@@ -12,3 +12,17 @@ defmodule Squirrelixir.Error.QueryFileHasInvalidName do
   @type reason :: :empty | {:invalid_grapheme, non_neg_integer(), String.t()}
   @type t :: %__MODULE__{file: String.t(), reason: reason(), suggested_name: String.t() | nil}
 end
+
+defmodule Squirrelixir.Error.CannotOverwriteFile do
+  @enforce_keys [:file]
+  defstruct [:file]
+
+  @type t :: %__MODULE__{file: String.t()}
+end
+
+defmodule Squirrelixir.Error.CannotWriteFile do
+  @enforce_keys [:file, :reason]
+  defstruct [:file, :reason]
+
+  @type t :: %__MODULE__{file: String.t(), reason: File.posix()}
+end
