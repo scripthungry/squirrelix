@@ -97,26 +97,46 @@ defmodule Squirrelixir.Postgres do
            content
          ) do
       %{"table" => table, "alias" => alias} ->
-        tables = table_entries(table, alias, false)
-        {:ok, Enum.reduce(left_join_tables(content), tables, &Map.merge(&2, &1))}
+        tables =
+          table_entries(table, alias, primary_table_nullable?(content), include_primary?: true)
+
+        {:ok, Enum.reduce(join_tables(content), tables, &Map.merge(&2, &1))}
 
       nil ->
         :error
     end
   end
 
-  defp left_join_tables(content) do
-    ~r/\bleft\s+join\s+(?<table>[a-zA-Z_][a-zA-Z0-9_\.]*)(?:\s+(?:as\s+)?(?<alias>[a-zA-Z_][a-zA-Z0-9_]*))?/i
-    |> Regex.scan(content, capture: :all_names)
-    |> Enum.map(fn [alias, table] -> table_entries(table, alias, true) end)
+  defp primary_table_nullable?(content) do
+    Regex.match?(~r/\b(?:right|full)\s+(?:outer\s+)?join\b/i, content)
   end
 
-  defp table_entries(table, alias, nullable?) do
+  defp join_tables(content) do
+    ~r/\b(left|right|full)\s+(?:outer\s+)?join\s+([a-zA-Z_][a-zA-Z0-9_\.]*)(?:\s+(?:as\s+)?([a-zA-Z_][a-zA-Z0-9_]*))?/i
+    |> Regex.scan(content)
+    |> Enum.map(fn [_match, join_type, table, alias] ->
+      table_entries(table, alias, joined_table_nullable?(join_type), include_primary?: false)
+    end)
+  end
+
+  defp joined_table_nullable?(join_type) when join_type in ["left", "full"], do: true
+  defp joined_table_nullable?(_join_type), do: false
+
+  defp table_entries(table, alias, nullable?, opts) do
     table_info = %{table: table, nullable?: nullable?}
 
-    [{table_name(table), table_info}, {:primary, table_info}, {table, table_info}]
+    [{table_name(table), table_info}, {table, table_info}]
+    |> maybe_add_primary(table_info, opts)
     |> maybe_add_alias(alias, table_info)
     |> Map.new()
+  end
+
+  defp maybe_add_primary(entries, table_info, opts) do
+    if Keyword.get(opts, :include_primary?, false) do
+      [{:primary, table_info} | entries]
+    else
+      entries
+    end
   end
 
   defp maybe_add_alias(entries, alias, _table_info) when alias in ["", nil], do: entries

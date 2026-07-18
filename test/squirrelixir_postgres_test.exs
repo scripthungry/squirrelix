@@ -107,17 +107,7 @@ defmodule SquirrelixirPostgresTest do
   end
 
   test "describe keeps left joined columns nullable", %{conn: conn} do
-    Postgrex.query!(
-      conn,
-      "create temporary table squirrelixir_teams (id integer not null, name text not null)",
-      []
-    )
-
-    Postgrex.query!(
-      conn,
-      "create temporary table squirrelixir_members (team_id integer not null, name text not null)",
-      []
-    )
+    create_join_tables(conn)
 
     query =
       query("""
@@ -131,6 +121,46 @@ defmodule SquirrelixirPostgresTest do
               params: [],
               returns: [
                 %Column{name: "team_name", type: :string, nullable?: false},
+                %Column{name: "member_name", type: :string, nullable?: true}
+              ]
+            ]} = Postgres.describe(conn, query)
+  end
+
+  test "describe keeps right joined base columns nullable", %{conn: conn} do
+    create_join_tables(conn)
+
+    query =
+      query("""
+      select teams.name as team_name, members.name as member_name
+      from squirrelixir_teams teams
+      right join squirrelixir_members members on members.team_id = teams.id
+      """)
+
+    assert {:ok,
+            [
+              params: [],
+              returns: [
+                %Column{name: "team_name", type: :string, nullable?: true},
+                %Column{name: "member_name", type: :string, nullable?: false}
+              ]
+            ]} = Postgres.describe(conn, query)
+  end
+
+  test "describe keeps full joined columns nullable", %{conn: conn} do
+    create_join_tables(conn)
+
+    query =
+      query("""
+      select teams.name as team_name, members.name as member_name
+      from squirrelixir_teams teams
+      full join squirrelixir_members members on members.team_id = teams.id
+      """)
+
+    assert {:ok,
+            [
+              params: [],
+              returns: [
+                %Column{name: "team_name", type: :string, nullable?: true},
                 %Column{name: "member_name", type: :string, nullable?: true}
               ]
             ]} = Postgres.describe(conn, query)
@@ -169,6 +199,23 @@ defmodule SquirrelixirPostgresTest do
 
   defp query(content) do
     %Query{file: "query.sql", starting_line: 1, name: "query", comment: [], content: content}
+  end
+
+  defp create_join_tables(conn) do
+    Postgrex.query!(conn, "drop table if exists squirrelixir_members", [])
+    Postgrex.query!(conn, "drop table if exists squirrelixir_teams", [])
+
+    Postgrex.query!(
+      conn,
+      "create temporary table squirrelixir_teams (id integer not null, name text not null)",
+      []
+    )
+
+    Postgrex.query!(
+      conn,
+      "create temporary table squirrelixir_members (team_id integer not null, name text not null)",
+      []
+    )
   end
 
   defp tmp_project(app) do
