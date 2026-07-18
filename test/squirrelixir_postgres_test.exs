@@ -55,6 +55,38 @@ defmodule SquirrelixirPostgresTest do
             ]} = Postgres.describe(conn, query)
   end
 
+  test "describe infers common scalar result types", %{conn: conn} do
+    query =
+      query("""
+      select
+        true::bool as active,
+        1.5::float8 as score,
+        1.5::numeric as amount,
+        '{"a": 1}'::jsonb as payload,
+        '00000000-0000-0000-0000-000000000001'::uuid as public_id,
+        'abc'::bytea as bytes,
+        '2024-01-02'::date as happened_on,
+        '03:04:05'::time as happened_at,
+        '2024-01-02 03:04:05'::timestamp as recorded_at
+      """)
+
+    assert {:ok,
+            [
+              params: [],
+              returns: [
+                %Column{name: "active", type: :boolean},
+                %Column{name: "score", type: :float},
+                %Column{name: "amount", type: :decimal},
+                %Column{name: "payload", type: :map},
+                %Column{name: "public_id", type: :uuid},
+                %Column{name: "bytes", type: :binary},
+                %Column{name: "happened_on", type: :date},
+                %Column{name: "happened_at", type: :time},
+                %Column{name: "recorded_at", type: :naive_datetime}
+              ]
+            ]} = Postgres.describe(conn, query)
+  end
+
   test "describe marks not-null table columns as non-nullable", %{conn: conn} do
     Postgrex.query!(
       conn,
