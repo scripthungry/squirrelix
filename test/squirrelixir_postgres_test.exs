@@ -126,6 +126,26 @@ defmodule SquirrelixirPostgresTest do
             ]} = Postgres.describe(conn, query)
   end
 
+  test "describe keeps unaliased left joined columns nullable", %{conn: conn} do
+    create_join_tables(conn)
+
+    query =
+      query("""
+      select squirrelixir_teams.name as team_name, squirrelixir_members.name as member_name
+      from squirrelixir_teams
+      left join squirrelixir_members using(name)
+      """)
+
+    assert {:ok,
+            [
+              params: [],
+              returns: [
+                %Column{name: "team_name", type: :string, nullable?: false},
+                %Column{name: "member_name", type: :string, nullable?: true}
+              ]
+            ]} = Postgres.describe(conn, query)
+  end
+
   test "describe keeps right joined base columns nullable", %{conn: conn} do
     create_join_tables(conn)
 
