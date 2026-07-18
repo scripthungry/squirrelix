@@ -3,6 +3,8 @@ defmodule SquirrelixirCliCompatibilityTest do
 
   alias Squirrelixir.CLI
   alias Squirrelixir.ConnectionOptions
+  alias Squirrelixir.Query
+  alias Squirrelixir.QueryDirectory
 
   test "parse_connection_url accepts postgres and postgresql schemes" do
     assert {:ok,
@@ -135,6 +137,25 @@ defmodule SquirrelixirCliCompatibilityTest do
                Path.join(tmp, "test/support/sql/test_query.sql")
              ]
            }
+  end
+
+  test "query_directories loads discovered SQL files into query directories" do
+    tmp =
+      Path.join(System.tmp_dir!(), "squirrelixir-cli-#{System.unique_integer([:positive])}")
+
+    File.mkdir_p!(Path.join(tmp, "lib/accounts/sql"))
+    File.write!(Path.join(tmp, "mix.exs"), "defmodule Temp.MixProject do\nend\n")
+    File.write!(Path.join(tmp, "lib/accounts/sql/find_user.sql"), "select 1")
+
+    accounts_dir = Path.join(tmp, "lib/accounts/sql")
+
+    assert [
+             %QueryDirectory{
+               directory: ^accounts_dir,
+               queries: [%Query{name: "find_user", content: "select 1"}],
+               errors: []
+             }
+           ] = CLI.query_directories(tmp)
   end
 
   test "directory_to_output_file maps sql directory to sibling sql.ex" do

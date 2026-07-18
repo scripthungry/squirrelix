@@ -5,6 +5,7 @@ defmodule Squirrelixir.CLI do
 
   alias Squirrelixir.ConnectionOptions
   alias Squirrelixir.Project
+  alias Squirrelixir.QueryDirectory
 
   @default_host "localhost"
   @default_user "postgres"
@@ -61,6 +62,13 @@ defmodule Squirrelixir.CLI do
     |> Project.source_roots()
     |> Enum.map(&walk/1)
     |> Enum.reduce(%{}, &Map.merge/2)
+  end
+
+  @spec query_directories(Path.t()) :: [QueryDirectory.t()]
+  def query_directories(root) when is_binary(root) do
+    root
+    |> query_files()
+    |> QueryDirectory.from_discovered_files()
   end
 
   @spec directory_to_output_file(String.t()) :: String.t()
