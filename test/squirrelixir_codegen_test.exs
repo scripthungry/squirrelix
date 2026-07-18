@@ -2,6 +2,7 @@ defmodule SquirrelixirCodegenTest do
   use ExUnit.Case, async: true
 
   alias Squirrelixir.Column
+  alias Squirrelixir.CodegenSummary
   alias Squirrelixir.Parameter
   alias Squirrelixir.TypedQueryDirectory
   alias Squirrelixir.TypedQuery
@@ -137,12 +138,56 @@ defmodule SquirrelixirCodegenTest do
     ]
 
     assert Codegen.write_directories(root, directories, version: "v-test") == [
-             {accounts_dir, :ok},
-             {billing_dir, :ok}
+             {accounts_dir, :ok, 1},
+             {billing_dir, :ok, 1}
            ]
 
     assert File.read!(Path.join(root, "lib/accounts/sql.ex")) =~ "def account(connection)"
     assert File.read!(Path.join(root, "lib/billing/sql.ex")) =~ "def invoice(connection)"
+  end
+
+  test "summarize_write_outcomes counts generated queries and collects errors" do
+    root = tmp_project(:acorn_counter)
+    accounts_dir = Path.join(root, "lib/accounts/sql")
+    invalid_dir = Path.join(root, "priv/sql")
+
+    File.mkdir_p!(accounts_dir)
+    File.mkdir_p!(invalid_dir)
+
+    outcomes =
+      Codegen.write_directories(
+        root,
+        [
+          %TypedQueryDirectory{
+            directory: accounts_dir,
+            queries: [
+              typed_query(Path.join(accounts_dir, "account.sql"), "account", "select 1", []),
+              typed_query(Path.join(accounts_dir, "accounts.sql"), "accounts", "select 2", [])
+            ]
+          },
+          %TypedQueryDirectory{
+            directory: invalid_dir,
+            queries: [
+              typed_query(Path.join(invalid_dir, "invalid.sql"), "invalid", "select 3", [])
+            ]
+          }
+        ],
+        version: "v-test"
+      )
+
+    assert Codegen.summarize_write_outcomes(outcomes) == %CodegenSummary{
+             generated_count: 2,
+             errors: [{invalid_dir, :invalid_sql_directory}],
+             status: :error
+           }
+  end
+
+  test "summarize_write_outcomes reports no queries" do
+    assert Codegen.summarize_write_outcomes([]) == %CodegenSummary{
+             generated_count: 0,
+             errors: [],
+             status: :empty
+           }
   end
 
   defp typed_query(file, name, content, params) do

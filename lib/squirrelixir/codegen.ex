@@ -1,3 +1,18 @@
+defmodule Squirrelixir.CodegenSummary do
+  @moduledoc """
+  Summary of a generated query-module write pass.
+  """
+
+  @enforce_keys [:generated_count, :errors, :status]
+  defstruct [:generated_count, :errors, :status]
+
+  @type t :: %__MODULE__{
+          generated_count: non_neg_integer(),
+          errors: [{Path.t(), term()}],
+          status: :empty | :ok | :error
+        }
+end
+
 defmodule Squirrelixir.Codegen do
   @moduledoc """
   Generates Elixir modules for typed SQL queries.
@@ -46,15 +61,36 @@ defmodule Squirrelixir.Codegen do
   end
 
   @spec write_directories(Path.t(), [TypedQueryDirectory.t()], keyword()) :: [
-          {Path.t(), :ok | {:error, :invalid_sql_directory | struct()}}
+          {Path.t(), :ok | {:error, :invalid_sql_directory | struct()}, non_neg_integer()}
         ]
   def write_directories(root, directories, opts \\ [])
       when is_binary(root) and is_list(directories) and is_list(opts) do
     directories
     |> Enum.sort_by(& &1.directory)
     |> Enum.map(fn %TypedQueryDirectory{directory: directory, queries: queries} ->
-      {directory, write_directory(root, directory, queries, opts)}
+      {directory, write_directory(root, directory, queries, opts), length(queries)}
     end)
+  end
+
+  @spec summarize_write_outcomes([{Path.t(), :ok | {:error, term()}, non_neg_integer()}]) ::
+          Squirrelixir.CodegenSummary.t()
+  def summarize_write_outcomes(outcomes) when is_list(outcomes) do
+    {generated_count, errors} =
+      Enum.reduce(outcomes, {0, []}, fn
+        {_directory, :ok, query_count}, {generated_count, errors} ->
+          {generated_count + query_count, errors}
+
+        {directory, {:error, error}, _query_count}, {generated_count, errors} ->
+          {generated_count, [{directory, error} | errors]}
+      end)
+
+    errors = Enum.reverse(errors)
+
+    %Squirrelixir.CodegenSummary{
+      generated_count: generated_count,
+      errors: errors,
+      status: summary_status(generated_count, errors)
+    }
   end
 
   defp function_source(%TypedQuery{} = query) do
@@ -128,4 +164,8 @@ defmodule Squirrelixir.Codegen do
   defp type_spec(:map), do: "map()"
   defp type_spec({:list, type}), do: "[#{type_spec(type)}]"
   defp type_spec(_type), do: "term()"
+
+  defp summary_status(0, []), do: :empty
+  defp summary_status(_generated_count, []), do: :ok
+  defp summary_status(_generated_count, [_ | _]), do: :error
 end
