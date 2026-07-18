@@ -1,4 +1,8 @@
 defmodule Squirrelixir.ConnectionOptions do
+  @moduledoc """
+  PostgreSQL connection options used by Squirrelixir.
+  """
+
   @enforce_keys [:host, :port, :user, :password, :database, :timeout_seconds]
   defstruct [:host, :port, :user, :password, :database, :timeout_seconds]
 

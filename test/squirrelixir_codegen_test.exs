@@ -1,12 +1,12 @@
 defmodule SquirrelixirCodegenTest do
   use ExUnit.Case, async: true
 
-  alias Squirrelixir.Column
-  alias Squirrelixir.CodegenSummary
-  alias Squirrelixir.Parameter
-  alias Squirrelixir.TypedQueryDirectory
-  alias Squirrelixir.TypedQuery
   alias Squirrelixir.Codegen
+  alias Squirrelixir.CodegenSummary
+  alias Squirrelixir.Column
+  alias Squirrelixir.Parameter
+  alias Squirrelixir.TypedQuery
+  alias Squirrelixir.TypedQueryDirectory
 
   test "generate_module emits formatted Elixir functions sorted by source file" do
     queries = [

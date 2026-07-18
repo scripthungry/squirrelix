@@ -18,8 +18,8 @@ defmodule Squirrelixir.Codegen do
   Generates Elixir modules for typed SQL queries.
   """
 
-  alias Squirrelixir.Parameter
   alias Squirrelixir.Output
+  alias Squirrelixir.Parameter
   alias Squirrelixir.Project
   alias Squirrelixir.TypedQuery
   alias Squirrelixir.TypedQueryDirectory
@@ -50,13 +50,15 @@ defmodule Squirrelixir.Codegen do
           :ok | {:error, :invalid_sql_directory | struct()}
   def write_directory(root, sql_directory, queries, opts \\ [])
       when is_binary(root) and is_binary(sql_directory) and is_list(queries) and is_list(opts) do
-    with {:ok, module} <- Project.module_for_sql_directory(root, sql_directory) do
-      content = generate_module(module, queries, opts)
-      output_file = sql_directory |> Path.dirname() |> Path.join("sql.ex")
+    case Project.module_for_sql_directory(root, sql_directory) do
+      {:ok, module} ->
+        content = generate_module(module, queries, opts)
+        output_file = sql_directory |> Path.dirname() |> Path.join("sql.ex")
 
-      Output.safe_write(output_file, content)
-    else
-      :error -> {:error, :invalid_sql_directory}
+        Output.safe_write(output_file, content)
+
+      :error ->
+        {:error, :invalid_sql_directory}
     end
   end
 

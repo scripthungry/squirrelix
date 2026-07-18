@@ -92,12 +92,10 @@ defmodule Squirrelixir.Query do
         {:error, :empty}
 
       [first | rest] ->
-        cond do
-          not first_identifier_grapheme?(first) ->
-            {:error, {:invalid_grapheme, 0, first}}
-
-          true ->
-            validate_identifier_rest(rest, 1, name)
+        if first_identifier_grapheme?(first) do
+          validate_identifier_rest(rest, 1, name)
+        else
+          {:error, {:invalid_grapheme, 0, first}}
         end
     end
   end

@@ -111,13 +111,11 @@ defmodule Squirrelixir do
   defp do_tokenize([char | rest], :normal, current, tokens) do
     char_string = <<char::utf8>>
 
-    cond do
-      identifier_char?(char) ->
-        do_tokenize(rest, :normal, [char | current], tokens)
-
-      true ->
-        tokens = maybe_push(current, tokens)
-        do_tokenize(rest, :normal, [], [char_string | tokens])
+    if identifier_char?(char) do
+      do_tokenize(rest, :normal, [char | current], tokens)
+    else
+      tokens = maybe_push(current, tokens)
+      do_tokenize(rest, :normal, [], [char_string | tokens])
     end
   end
 

@@ -85,8 +85,7 @@ defmodule Squirrelixir.CLI do
           {:ok, entries} ->
             entries
             |> Enum.map(&Path.join(from, &1))
-            |> Enum.filter(&File.regular?/1)
-            |> Enum.filter(&(Path.extname(&1) == ".sql"))
+            |> Enum.filter(&(File.regular?(&1) and Path.extname(&1) == ".sql"))
             |> Enum.sort()
 
           {:error, _reason} ->
