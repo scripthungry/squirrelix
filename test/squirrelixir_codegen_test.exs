@@ -98,6 +98,16 @@ defmodule SquirrelixirCodegenTest do
     assert code =~ "required(:age) => integer()"
   end
 
+  test "generate_module maps utc datetimes to DateTime specs" do
+    query =
+      typed_query("events.sql", "events", "select now()", [], [
+        %Column{name: "occurred_at", type: :utc_datetime, nullable?: false}
+      ])
+
+    assert Codegen.generate_module(MyApp.SQL, [query], version: "v-test") =~
+             "required(:occurred_at) => DateTime.t()"
+  end
+
   test "generate_module output is classified as generated" do
     query = typed_query("all.sql", "all", "select * from users", [])
 

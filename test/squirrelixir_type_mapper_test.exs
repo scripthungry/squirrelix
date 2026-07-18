@@ -17,6 +17,7 @@ defmodule SquirrelixirTypeMapperTest do
     assert TypeMapper.from_postgres("date") == {:ok, :date}
     assert TypeMapper.from_postgres("time") == {:ok, :time}
     assert TypeMapper.from_postgres("timestamp") == {:ok, :naive_datetime}
+    assert TypeMapper.from_postgres("timestamptz") == {:ok, :utc_datetime}
   end
 
   test "from_postgres wraps array types as lists" do

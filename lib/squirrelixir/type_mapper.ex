@@ -25,7 +25,8 @@ defmodule Squirrelixir.TypeMapper do
     "bytea" => :binary,
     "date" => :date,
     "time" => :time,
-    "timestamp" => :naive_datetime
+    "timestamp" => :naive_datetime,
+    "timestamptz" => :utc_datetime
   }
 
   @elixir_types MapSet.new([
@@ -39,7 +40,8 @@ defmodule Squirrelixir.TypeMapper do
                   :binary,
                   :date,
                   :time,
-                  :naive_datetime
+                  :naive_datetime,
+                  :utc_datetime
                 ])
 
   @type elixir_type :: atom() | {:list, elixir_type()}

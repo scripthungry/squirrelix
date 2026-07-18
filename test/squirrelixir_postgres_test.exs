@@ -43,6 +43,18 @@ defmodule SquirrelixirPostgresTest do
             ]} = Postgres.describe(conn, query)
   end
 
+  test "describe infers timestamp with time zone as utc datetime", %{conn: conn} do
+    query = query("select now() as occurred_at")
+
+    assert {:ok,
+            [
+              params: [],
+              returns: [
+                %Column{name: "occurred_at", type: :utc_datetime, nullable?: true}
+              ]
+            ]} = Postgres.describe(conn, query)
+  end
+
   test "describe marks not-null table columns as non-nullable", %{conn: conn} do
     Postgrex.query!(
       conn,

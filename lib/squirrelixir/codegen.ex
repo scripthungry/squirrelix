@@ -310,6 +310,7 @@ defmodule Squirrelixir.Codegen do
   defp type_spec(:date), do: "Date.t()"
   defp type_spec(:time), do: "Time.t()"
   defp type_spec(:naive_datetime), do: "NaiveDateTime.t()"
+  defp type_spec(:utc_datetime), do: "DateTime.t()"
   defp type_spec({:list, type}), do: "[#{type_spec(type)}]"
   defp type_spec(_type), do: "term()"
 
