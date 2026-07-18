@@ -45,6 +45,20 @@ defmodule SquirrelixirCodegenTest do
              "def search(connection, arg_1)"
   end
 
+  test "generate_module deconflicts argument names" do
+    query =
+      typed_query("conflicting.sql", "conflicting", "select $1, $2, $3", [
+        %Parameter{index: 1, name: "connection", type: :string},
+        %Parameter{index: 2, name: "connection", type: :string},
+        %Parameter{index: 3, name: "arg_1", type: :string}
+      ])
+
+    code = Codegen.generate_module(MyApp.SQL, [query], version: "v-test")
+
+    assert code =~ "def conflicting(connection, arg_1, arg_2, arg_3)"
+    assert code =~ ~s|Postgrex.query!(connection, "select $1, $2, $3", [arg_1, arg_2, arg_3])|
+  end
+
   test "generate_module output is classified as generated" do
     query = typed_query("all.sql", "all", "select * from users", [])
 
@@ -115,13 +129,7 @@ defmodule SquirrelixirCodegenTest do
   end
 
   defp tmp_project(app) do
-    path =
-      Path.join(
-        System.tmp_dir!(),
-        "squirrelixir-codegen-#{System.os_time(:nanosecond)}-#{System.unique_integer([:positive])}"
-      )
-
-    File.mkdir_p!(path)
+    path = Squirrelixir.TestSupport.tmp_dir!("squirrelixir-codegen")
 
     File.write!(Path.join(path, "mix.exs"), """
     defmodule TempProject.MixProject do

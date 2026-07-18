@@ -161,9 +161,6 @@ defmodule SquirrelixirCliCompatibilityTest do
   end
 
   defp tmp_dir(prefix) do
-    Path.join(
-      System.tmp_dir!(),
-      "#{prefix}-#{System.os_time(:nanosecond)}-#{System.unique_integer([:positive])}"
-    )
+    Squirrelixir.TestSupport.tmp_dir!(prefix)
   end
 end

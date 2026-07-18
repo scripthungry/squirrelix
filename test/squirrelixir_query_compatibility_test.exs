@@ -63,8 +63,7 @@ defmodule SquirrelixirQueryCompatibilityTest do
   end
 
   defp write_temp_sql(file_name, content) do
-    dir = Path.join(System.tmp_dir!(), "squirrelixir-query-#{System.unique_integer([:positive])}")
-    File.mkdir_p!(dir)
+    dir = Squirrelixir.TestSupport.tmp_dir!("squirrelixir-query")
     path = Path.join(dir, file_name)
     File.write!(path, content)
     path

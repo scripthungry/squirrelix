@@ -49,13 +49,6 @@ defmodule SquirrelixirQueryDirectoryTest do
   end
 
   defp tmp_dir do
-    path =
-      Path.join(
-        System.tmp_dir!(),
-        "squirrelixir-query-directory-#{System.unique_integer([:positive])}"
-      )
-
-    File.mkdir_p!(path)
-    path
+    Squirrelixir.TestSupport.tmp_dir!("squirrelixir-query-directory")
   end
 end

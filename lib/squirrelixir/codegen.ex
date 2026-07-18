@@ -45,7 +45,7 @@ defmodule Squirrelixir.Codegen do
   end
 
   defp function_source(%TypedQuery{} = query) do
-    args = Enum.map(query.params, &argument_name/1)
+    args = argument_names(query.params)
     all_args = ["connection" | args]
     params = Enum.join(args, ", ")
 
@@ -58,8 +58,36 @@ defmodule Squirrelixir.Codegen do
     """
   end
 
-  defp argument_name(%Parameter{name: nil, index: index}), do: "arg_#{index}"
-  defp argument_name(%Parameter{name: name}) when is_binary(name), do: name
+  defp argument_names(params) do
+    params
+    |> Enum.reduce({[], MapSet.new(["connection"])}, fn param, {names, used} ->
+      name = unique_argument_name(preferred_argument_name(param), used, param.index)
+      {[name | names], MapSet.put(used, name)}
+    end)
+    |> elem(0)
+    |> Enum.reverse()
+  end
+
+  defp preferred_argument_name(%Parameter{name: nil, index: index}), do: "arg_#{index}"
+  defp preferred_argument_name(%Parameter{name: name}) when is_binary(name), do: name
+
+  defp unique_argument_name(name, used, fallback_index) do
+    if MapSet.member?(used, name) do
+      fallback_argument_name(fallback_index, used)
+    else
+      name
+    end
+  end
+
+  defp fallback_argument_name(index, used) do
+    name = "arg_#{index}"
+
+    if MapSet.member?(used, name) do
+      fallback_argument_name(index + 1, used)
+    else
+      name
+    end
+  end
 
   defp doc_source(%TypedQuery{comment: []}), do: ""
 
