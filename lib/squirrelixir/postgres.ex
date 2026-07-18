@@ -4,6 +4,10 @@ defmodule Squirrelixir.Postgres do
   """
 
   alias Squirrelixir.Column
+  alias Squirrelixir.Error.MissingPostgresColumn
+  alias Squirrelixir.Error.MissingPostgresTable
+  alias Squirrelixir.Error.PostgresInferenceError
+  alias Squirrelixir.Error.PostgresSyntaxError
   alias Squirrelixir.Query
   alias Squirrelixir.TypeMapper
 
@@ -68,8 +72,72 @@ defmodule Squirrelixir.Postgres do
   end
 
   defp prepare(conn, query) do
-    Postgrex.prepare(conn, "", query.content)
+    case Postgrex.prepare(conn, "", query.content) do
+      {:ok, prepared_query} -> {:ok, prepared_query}
+      {:error, %Postgrex.Error{} = error} -> {:error, postgres_error(query, error)}
+    end
   end
+
+  defp postgres_error(query, %Postgrex.Error{postgres: %{code: :syntax_error} = postgres}) do
+    %PostgresSyntaxError{
+      file: query.file,
+      starting_line: query.starting_line,
+      content: query.content,
+      message: postgres.message,
+      position: parse_position(postgres)
+    }
+  end
+
+  defp postgres_error(query, %Postgrex.Error{postgres: %{code: :undefined_table} = postgres}) do
+    %MissingPostgresTable{
+      file: query.file,
+      starting_line: query.starting_line,
+      content: query.content,
+      message: postgres.message,
+      table: quoted_identifier(postgres.message),
+      position: parse_position(postgres)
+    }
+  end
+
+  defp postgres_error(query, %Postgrex.Error{postgres: %{code: :undefined_column} = postgres}) do
+    %MissingPostgresColumn{
+      file: query.file,
+      starting_line: query.starting_line,
+      content: query.content,
+      message: postgres.message,
+      column: quoted_identifier(postgres.message),
+      position: parse_position(postgres)
+    }
+  end
+
+  defp postgres_error(query, %Postgrex.Error{postgres: postgres}) do
+    %PostgresInferenceError{
+      file: query.file,
+      starting_line: query.starting_line,
+      content: query.content,
+      message: Map.get(postgres, :message, "Postgres rejected query inference"),
+      code: Map.get(postgres, :code),
+      position: parse_position(postgres)
+    }
+  end
+
+  defp parse_position(%{position: position}) when is_binary(position) do
+    case Integer.parse(position) do
+      {value, ""} -> value
+      _invalid -> nil
+    end
+  end
+
+  defp parse_position(_postgres), do: nil
+
+  defp quoted_identifier(message) when is_binary(message) do
+    case Regex.run(~r/"([^"]+)"/, message) do
+      [_match, identifier] -> identifier
+      nil -> nil
+    end
+  end
+
+  defp quoted_identifier(_message), do: nil
 
   defp describe_returns(conn, prepared_query, query) do
     columns = prepared_query.columns || []

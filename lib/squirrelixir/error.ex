@@ -113,3 +113,74 @@ defmodule Squirrelixir.Error.UnsupportedPostgresType do
 
   @type t :: %__MODULE__{name: String.t()}
 end
+
+defmodule Squirrelixir.Error.PostgresSyntaxError do
+  @moduledoc """
+  Error returned when Postgres rejects query syntax during inference.
+  """
+
+  @enforce_keys [:file, :starting_line, :content, :message]
+  defstruct [:file, :starting_line, :content, :message, :position]
+
+  @type t :: %__MODULE__{
+          file: String.t(),
+          starting_line: pos_integer(),
+          content: String.t(),
+          message: String.t(),
+          position: pos_integer() | nil
+        }
+end
+
+defmodule Squirrelixir.Error.MissingPostgresTable do
+  @moduledoc """
+  Error returned when query inference references a table Postgres cannot find.
+  """
+
+  @enforce_keys [:file, :starting_line, :content, :message]
+  defstruct [:file, :starting_line, :content, :message, :table, :position]
+
+  @type t :: %__MODULE__{
+          file: String.t(),
+          starting_line: pos_integer(),
+          content: String.t(),
+          message: String.t(),
+          table: String.t() | nil,
+          position: pos_integer() | nil
+        }
+end
+
+defmodule Squirrelixir.Error.MissingPostgresColumn do
+  @moduledoc """
+  Error returned when query inference references a column Postgres cannot find.
+  """
+
+  @enforce_keys [:file, :starting_line, :content, :message]
+  defstruct [:file, :starting_line, :content, :message, :column, :position]
+
+  @type t :: %__MODULE__{
+          file: String.t(),
+          starting_line: pos_integer(),
+          content: String.t(),
+          message: String.t(),
+          column: String.t() | nil,
+          position: pos_integer() | nil
+        }
+end
+
+defmodule Squirrelixir.Error.PostgresInferenceError do
+  @moduledoc """
+  Error returned when Postgres rejects query inference for an unclassified reason.
+  """
+
+  @enforce_keys [:file, :starting_line, :content, :message]
+  defstruct [:file, :starting_line, :content, :message, :code, :position]
+
+  @type t :: %__MODULE__{
+          file: String.t(),
+          starting_line: pos_integer(),
+          content: String.t(),
+          message: String.t(),
+          code: atom() | nil,
+          position: pos_integer() | nil
+        }
+end

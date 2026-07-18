@@ -5,6 +5,9 @@ defmodule SquirrelixirPostgresTest do
 
   alias Squirrelixir.CodegenSummary
   alias Squirrelixir.Column
+  alias Squirrelixir.Error.MissingPostgresColumn
+  alias Squirrelixir.Error.MissingPostgresTable
+  alias Squirrelixir.Error.PostgresSyntaxError
   alias Squirrelixir.Parameter
   alias Squirrelixir.Postgres
   alias Squirrelixir.Query
@@ -245,6 +248,47 @@ defmodule SquirrelixirPostgresTest do
               params: [%Parameter{name: nil, type: :string}],
               returns: [%Column{name: "name", type: :string, nullable?: true}]
             }} = Squirrelixir.TypedQuery.from_query(query, metadata)
+  end
+
+  test "describe returns a structured syntax error", %{conn: conn} do
+    query = query("select from")
+
+    assert {:error,
+            %PostgresSyntaxError{
+              file: "query.sql",
+              starting_line: 1,
+              content: "select from",
+              message: "syntax error at end of input",
+              position: 12
+            }} = Postgres.describe(conn, query)
+  end
+
+  test "describe returns a structured missing table error", %{conn: conn} do
+    query = query("select * from squirrelixir_missing_table")
+
+    assert {:error,
+            %MissingPostgresTable{
+              file: "query.sql",
+              starting_line: 1,
+              content: "select * from squirrelixir_missing_table",
+              message: "relation \"squirrelixir_missing_table\" does not exist",
+              table: "squirrelixir_missing_table",
+              position: 15
+            }} = Postgres.describe(conn, query)
+  end
+
+  test "describe returns a structured missing column error", %{conn: conn} do
+    query = query("select missing_column from pg_type")
+
+    assert {:error,
+            %MissingPostgresColumn{
+              file: "query.sql",
+              starting_line: 1,
+              content: "select missing_column from pg_type",
+              message: "column \"missing_column\" does not exist",
+              column: "missing_column",
+              position: 8
+            }} = Postgres.describe(conn, query)
   end
 
   test "describer can generate modules from a live Postgres connection", %{conn: conn} do
