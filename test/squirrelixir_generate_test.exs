@@ -46,6 +46,25 @@ defmodule SquirrelixirGenerateTest do
     refute File.exists?(Path.join(root, "lib/accounts/sql.ex"))
   end
 
+  test "generate reports missing metadata without writing generated modules" do
+    root = tmp_project(:acorn_counter)
+    sql_directory = Path.join(root, "lib/accounts/sql")
+    File.mkdir_p!(sql_directory)
+
+    query_file = Path.join(sql_directory, "find_account.sql")
+    File.write!(query_file, "select name from accounts")
+
+    assert %CodegenSummary{
+             generated_count: 0,
+             errors: [
+               {^sql_directory, [%Squirrelixir.Error.MissingQueryMetadata{file: ^query_file}]}
+             ],
+             status: :error
+           } = Squirrelixir.generate(root, %{}, version: "v-test")
+
+    refute File.exists?(Path.join(root, "lib/accounts/sql.ex"))
+  end
+
   test "check discovers SQL files and reports generated modules are current" do
     root = tmp_project(:acorn_counter)
     sql_directory = Path.join(root, "lib/accounts/sql")

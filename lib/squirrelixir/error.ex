@@ -69,3 +69,14 @@ defmodule Squirrelixir.Error.DuplicateReturnColumns do
           names: [String.t()]
         }
 end
+
+defmodule Squirrelixir.Error.MissingQueryMetadata do
+  @moduledoc """
+  Error returned when no parameter and return metadata is available for a query.
+  """
+
+  @enforce_keys [:file]
+  defstruct [:file]
+
+  @type t :: %__MODULE__{file: String.t()}
+end

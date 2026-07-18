@@ -3,6 +3,7 @@ defmodule SquirrelixirTypedQueryTest do
 
   alias Squirrelixir.Column
   alias Squirrelixir.Error.DuplicateReturnColumns
+  alias Squirrelixir.Error.MissingQueryMetadata
   alias Squirrelixir.Parameter
   alias Squirrelixir.Query
   alias Squirrelixir.QueryDirectory
@@ -107,5 +108,27 @@ defmodule SquirrelixirTypedQueryTest do
              queries: [%TypedQuery{name: "first", params: [%Parameter{name: "id"}]}],
              errors: [^parse_error, %DuplicateReturnColumns{names: ["duplicate"]}]
            } = TypedQueryDirectory.from_query_directory(query_directory, metadata)
+  end
+
+  test "directory_from_query_directory reports missing query metadata" do
+    query = %Query{
+      file: "missing_metadata.sql",
+      starting_line: 1,
+      name: "missing_metadata",
+      comment: [],
+      content: "select 1"
+    }
+
+    query_directory = %QueryDirectory{
+      directory: "lib/accounts/sql",
+      queries: [query],
+      errors: []
+    }
+
+    assert %TypedQueryDirectory{
+             directory: "lib/accounts/sql",
+             queries: [],
+             errors: [%MissingQueryMetadata{file: "missing_metadata.sql"}]
+           } = TypedQueryDirectory.from_query_directory(query_directory, %{})
   end
 end

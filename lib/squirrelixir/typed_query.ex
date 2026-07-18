@@ -102,6 +102,7 @@ defmodule Squirrelixir.TypedQueryDirectory do
   Typed queries grouped by the SQL directory they came from.
   """
 
+  alias Squirrelixir.Error.MissingQueryMetadata
   alias Squirrelixir.QueryDirectory
   alias Squirrelixir.TypedQuery
 
@@ -115,12 +116,7 @@ defmodule Squirrelixir.TypedQueryDirectory do
     {typed_queries, errors} =
       query_directory.queries
       |> Enum.reduce({[], query_directory.errors}, fn query, {typed_queries, errors} ->
-        query_metadata = Map.fetch!(metadata, query.file)
-
-        case TypedQuery.from_query(query, query_metadata) do
-          {:ok, typed_query} -> {[typed_query | typed_queries], errors}
-          {:error, error} -> {typed_queries, errors ++ [error]}
-        end
+        convert_query(query, metadata, typed_queries, errors)
       end)
 
     %__MODULE__{
@@ -128,5 +124,22 @@ defmodule Squirrelixir.TypedQueryDirectory do
       queries: Enum.reverse(typed_queries),
       errors: errors
     }
+  end
+
+  defp convert_query(query, metadata, typed_queries, errors) do
+    case Map.fetch(metadata, query.file) do
+      {:ok, query_metadata} ->
+        typed_query_from_metadata(query, query_metadata, typed_queries, errors)
+
+      :error ->
+        {typed_queries, errors ++ [%MissingQueryMetadata{file: query.file}]}
+    end
+  end
+
+  defp typed_query_from_metadata(query, query_metadata, typed_queries, errors) do
+    case TypedQuery.from_query(query, query_metadata) do
+      {:ok, typed_query} -> {[typed_query | typed_queries], errors}
+      {:error, error} -> {typed_queries, errors ++ [error]}
+    end
   end
 end
