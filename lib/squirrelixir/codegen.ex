@@ -13,6 +13,21 @@ defmodule Squirrelixir.CodegenSummary do
         }
 end
 
+defmodule Squirrelixir.CodegenCheckSummary do
+  @moduledoc """
+  Summary of a generated query-module check pass.
+  """
+
+  @enforce_keys [:checked_count, :errors, :status]
+  defstruct [:checked_count, :errors, :status]
+
+  @type t :: %__MODULE__{
+          checked_count: non_neg_integer(),
+          errors: [{Path.t(), term()}],
+          status: :empty | :ok | :error
+        }
+end
+
 defmodule Squirrelixir.Codegen do
   @moduledoc """
   Generates Elixir modules for typed SQL queries.
@@ -62,6 +77,22 @@ defmodule Squirrelixir.Codegen do
     end
   end
 
+  @spec check_directory(Path.t(), Path.t(), [TypedQuery.t()], keyword()) ::
+          :ok | {:error, :invalid_sql_directory | struct()}
+  def check_directory(root, sql_directory, queries, opts \\ [])
+      when is_binary(root) and is_binary(sql_directory) and is_list(queries) and is_list(opts) do
+    case Project.module_for_sql_directory(root, sql_directory) do
+      {:ok, module} ->
+        content = generate_module(module, queries, opts)
+        output_file = sql_directory |> Path.dirname() |> Path.join("sql.ex")
+
+        Output.check_file(output_file, content)
+
+      :error ->
+        {:error, :invalid_sql_directory}
+    end
+  end
+
   @spec write_directories(Path.t(), [TypedQueryDirectory.t()], keyword()) :: [
           {Path.t(), :ok | {:error, :invalid_sql_directory | struct()}, non_neg_integer()}
         ]
@@ -71,6 +102,18 @@ defmodule Squirrelixir.Codegen do
     |> Enum.sort_by(& &1.directory)
     |> Enum.map(fn %TypedQueryDirectory{directory: directory, queries: queries} ->
       {directory, write_directory(root, directory, queries, opts), length(queries)}
+    end)
+  end
+
+  @spec check_directories(Path.t(), [TypedQueryDirectory.t()], keyword()) :: [
+          {Path.t(), :ok | {:error, :invalid_sql_directory | struct()}, non_neg_integer()}
+        ]
+  def check_directories(root, directories, opts \\ [])
+      when is_binary(root) and is_list(directories) and is_list(opts) do
+    directories
+    |> Enum.sort_by(& &1.directory)
+    |> Enum.map(fn %TypedQueryDirectory{directory: directory, queries: queries} ->
+      {directory, check_directory(root, directory, queries, opts), length(queries)}
     end)
   end
 
@@ -92,6 +135,27 @@ defmodule Squirrelixir.Codegen do
       generated_count: generated_count,
       errors: errors,
       status: summary_status(generated_count, errors)
+    }
+  end
+
+  @spec summarize_check_outcomes([{Path.t(), :ok | {:error, term()}, non_neg_integer()}]) ::
+          Squirrelixir.CodegenCheckSummary.t()
+  def summarize_check_outcomes(outcomes) when is_list(outcomes) do
+    {checked_count, errors} =
+      Enum.reduce(outcomes, {0, []}, fn
+        {_directory, :ok, query_count}, {checked_count, errors} ->
+          {checked_count + query_count, errors}
+
+        {directory, {:error, error}, _query_count}, {checked_count, errors} ->
+          {checked_count, [{directory, error} | errors]}
+      end)
+
+    errors = Enum.reverse(errors)
+
+    %Squirrelixir.CodegenCheckSummary{
+      checked_count: checked_count,
+      errors: errors,
+      status: summary_status(checked_count, errors)
     }
   end
 

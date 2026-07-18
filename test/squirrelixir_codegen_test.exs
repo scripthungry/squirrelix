@@ -2,8 +2,11 @@ defmodule SquirrelixirCodegenTest do
   use ExUnit.Case, async: true
 
   alias Squirrelixir.Codegen
+  alias Squirrelixir.CodegenCheckSummary
   alias Squirrelixir.CodegenSummary
   alias Squirrelixir.Column
+  alias Squirrelixir.Error.CannotReadFile
+  alias Squirrelixir.Error.OutdatedFile
   alias Squirrelixir.Parameter
   alias Squirrelixir.TypedQuery
   alias Squirrelixir.TypedQueryDirectory
@@ -118,6 +121,37 @@ defmodule SquirrelixirCodegenTest do
              {:error, :invalid_sql_directory}
   end
 
+  test "check_directory returns ok when the generated output is current" do
+    root = tmp_project(:acorn_counter)
+    sql_directory = Path.join(root, "lib/accounts/sql")
+    File.mkdir_p!(sql_directory)
+
+    query = typed_query(Path.join(sql_directory, "find_user.sql"), "find_user", "select 1", [])
+
+    assert Codegen.write_directory(root, sql_directory, [query], version: "v-test") == :ok
+    assert Codegen.check_directory(root, sql_directory, [query], version: "v-test") == :ok
+  end
+
+  test "check_directory returns read and outdated errors" do
+    root = tmp_project(:acorn_counter)
+    sql_directory = Path.join(root, "lib/accounts/sql")
+    File.mkdir_p!(sql_directory)
+
+    query = typed_query(Path.join(sql_directory, "find_user.sql"), "find_user", "select 1", [])
+    output_file = Path.join(root, "lib/accounts/sql.ex")
+
+    assert Codegen.check_directory(root, sql_directory, [query], version: "v-test") ==
+             {:error, %CannotReadFile{file: output_file, reason: :enoent}}
+
+    File.write!(
+      output_file,
+      Codegen.generate_module(AcornCounter.Accounts.SQL, [], version: "v-test")
+    )
+
+    assert Codegen.check_directory(root, sql_directory, [query], version: "v-test") ==
+             {:error, %OutdatedFile{file: output_file}}
+  end
+
   test "write_directories writes each typed query directory and returns outcomes" do
     root = tmp_project(:acorn_counter)
     accounts_dir = Path.join(root, "lib/accounts/sql")
@@ -144,6 +178,34 @@ defmodule SquirrelixirCodegenTest do
 
     assert File.read!(Path.join(root, "lib/accounts/sql.ex")) =~ "def account(connection)"
     assert File.read!(Path.join(root, "lib/billing/sql.ex")) =~ "def invoice(connection)"
+  end
+
+  test "check_directories checks each typed query directory and returns outcomes" do
+    root = tmp_project(:acorn_counter)
+    accounts_dir = Path.join(root, "lib/accounts/sql")
+    missing_dir = Path.join(root, "lib/missing/sql")
+
+    File.mkdir_p!(accounts_dir)
+    File.mkdir_p!(missing_dir)
+
+    directories = [
+      %TypedQueryDirectory{
+        directory: accounts_dir,
+        queries: [typed_query(Path.join(accounts_dir, "account.sql"), "account", "select 1", [])]
+      },
+      %TypedQueryDirectory{
+        directory: missing_dir,
+        queries: [typed_query(Path.join(missing_dir, "missing.sql"), "missing", "select 2", [])]
+      }
+    ]
+
+    assert Codegen.write_directory(root, accounts_dir, hd(directories).queries, version: "v-test") ==
+             :ok
+
+    assert [
+             {^accounts_dir, :ok, 1},
+             {^missing_dir, {:error, %CannotReadFile{}}, 1}
+           ] = Codegen.check_directories(root, directories, version: "v-test")
   end
 
   test "summarize_write_outcomes counts generated queries and collects errors" do
@@ -185,6 +247,25 @@ defmodule SquirrelixirCodegenTest do
   test "summarize_write_outcomes reports no queries" do
     assert Codegen.summarize_write_outcomes([]) == %CodegenSummary{
              generated_count: 0,
+             errors: [],
+             status: :empty
+           }
+  end
+
+  test "summarize_check_outcomes counts checked queries and collects errors" do
+    assert Codegen.summarize_check_outcomes([
+             {"lib/accounts/sql", :ok, 2},
+             {"lib/billing/sql", {:error, :missing}, 1}
+           ]) == %CodegenCheckSummary{
+             checked_count: 2,
+             errors: [{"lib/billing/sql", :missing}],
+             status: :error
+           }
+  end
+
+  test "summarize_check_outcomes reports no queries" do
+    assert Codegen.summarize_check_outcomes([]) == %CodegenCheckSummary{
+             checked_count: 0,
              errors: [],
              status: :empty
            }

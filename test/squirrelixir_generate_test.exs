@@ -1,6 +1,7 @@
 defmodule SquirrelixirGenerateTest do
   use ExUnit.Case, async: true
 
+  alias Squirrelixir.CodegenCheckSummary
   alias Squirrelixir.CodegenSummary
 
   test "generate discovers SQL files, writes generated modules, and returns a summary" do
@@ -41,6 +42,54 @@ defmodule SquirrelixirGenerateTest do
              errors: [{^sql_directory, [_error]}],
              status: :error
            } = Squirrelixir.generate(root, %{}, version: "v-test")
+
+    refute File.exists?(Path.join(root, "lib/accounts/sql.ex"))
+  end
+
+  test "check discovers SQL files and reports generated modules are current" do
+    root = tmp_project(:acorn_counter)
+    sql_directory = Path.join(root, "lib/accounts/sql")
+    File.mkdir_p!(sql_directory)
+
+    query_file = Path.join(sql_directory, "find_account.sql")
+    File.write!(query_file, "select name from accounts where id = $1")
+
+    metadata = %{
+      query_file => [
+        params: [:integer],
+        returns: [%{name: "name", type: :string, nullable?: false}]
+      ]
+    }
+
+    assert Squirrelixir.generate(root, metadata, version: "v-test").status == :ok
+
+    assert Squirrelixir.check(root, metadata, version: "v-test") == %CodegenCheckSummary{
+             checked_count: 1,
+             errors: [],
+             status: :ok
+           }
+  end
+
+  test "check reports missing generated modules without writing them" do
+    root = tmp_project(:acorn_counter)
+    sql_directory = Path.join(root, "lib/accounts/sql")
+    File.mkdir_p!(sql_directory)
+
+    query_file = Path.join(sql_directory, "find_account.sql")
+    File.write!(query_file, "select name from accounts")
+
+    metadata = %{
+      query_file => [
+        params: [],
+        returns: [%{name: "name", type: :string, nullable?: false}]
+      ]
+    }
+
+    assert %CodegenCheckSummary{
+             checked_count: 0,
+             errors: [{^sql_directory, %Squirrelixir.Error.CannotReadFile{reason: :enoent}}],
+             status: :error
+           } = Squirrelixir.check(root, metadata, version: "v-test")
 
     refute File.exists?(Path.join(root, "lib/accounts/sql.ex"))
   end
