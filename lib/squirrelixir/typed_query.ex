@@ -30,6 +30,7 @@ defmodule Squirrelixir.TypedQuery do
 
   alias Squirrelixir.Column
   alias Squirrelixir.Error.DuplicateReturnColumns
+  alias Squirrelixir.Error.MissingQueryMetadataField
   alias Squirrelixir.Parameter
   alias Squirrelixir.Query
   alias Squirrelixir.SQL
@@ -44,31 +45,42 @@ defmodule Squirrelixir.TypedQuery do
           returns: [Column.t()]
         }
 
-  @spec from_query(Query.t(), keyword()) :: {:ok, t()} | {:error, DuplicateReturnColumns.t()}
+  @spec from_query(Query.t(), keyword()) ::
+          {:ok, t()} | {:error, DuplicateReturnColumns.t() | MissingQueryMetadataField.t()}
   def from_query(%Query{} = query, opts) when is_list(opts) do
-    returns = opts |> Keyword.fetch!(:returns) |> Enum.map(&column/1)
+    with {:ok, params} <- fetch_metadata_field(query, opts, :params),
+         {:ok, returns} <- fetch_metadata_field(query, opts, :returns) do
+      returns = Enum.map(returns, &column/1)
 
-    case duplicate_column_names(returns) do
-      [] ->
-        {:ok,
-         %__MODULE__{
-           file: query.file,
-           starting_line: query.starting_line,
-           name: query.name,
-           comment: query.comment,
-           content: query.content,
-           params: parameters(query.content, Keyword.fetch!(opts, :params)),
-           returns: returns
-         }}
+      case duplicate_column_names(returns) do
+        [] ->
+          {:ok,
+           %__MODULE__{
+             file: query.file,
+             starting_line: query.starting_line,
+             name: query.name,
+             comment: query.comment,
+             content: query.content,
+             params: parameters(query.content, params),
+             returns: returns
+           }}
 
-      names ->
-        {:error,
-         %DuplicateReturnColumns{
-           file: query.file,
-           starting_line: query.starting_line,
-           content: query.content,
-           names: names
-         }}
+        names ->
+          {:error,
+           %DuplicateReturnColumns{
+             file: query.file,
+             starting_line: query.starting_line,
+             content: query.content,
+             names: names
+           }}
+      end
+    end
+  end
+
+  defp fetch_metadata_field(query, opts, field) do
+    case Keyword.fetch(opts, field) do
+      {:ok, value} -> {:ok, value}
+      :error -> {:error, %MissingQueryMetadataField{file: query.file, field: field}}
     end
   end
 

@@ -4,6 +4,7 @@ defmodule SquirrelixirTypedQueryTest do
   alias Squirrelixir.Column
   alias Squirrelixir.Error.DuplicateReturnColumns
   alias Squirrelixir.Error.MissingQueryMetadata
+  alias Squirrelixir.Error.MissingQueryMetadataField
   alias Squirrelixir.Parameter
   alias Squirrelixir.Query
   alias Squirrelixir.QueryDirectory
@@ -62,6 +63,22 @@ defmodule SquirrelixirTypedQueryTest do
                  %{name: "duplicate", type: :integer, nullable?: false}
                ]
              )
+  end
+
+  test "from_query rejects metadata missing required fields" do
+    query = %Query{
+      file: "incomplete.sql",
+      starting_line: 1,
+      name: "incomplete",
+      comment: [],
+      content: "select 1"
+    }
+
+    assert TypedQuery.from_query(query, params: []) ==
+             {:error, %MissingQueryMetadataField{file: "incomplete.sql", field: :returns}}
+
+    assert TypedQuery.from_query(query, returns: []) ==
+             {:error, %MissingQueryMetadataField{file: "incomplete.sql", field: :params}}
   end
 
   test "directory_from_query_directory converts typed queries and preserves errors" do
@@ -130,5 +147,29 @@ defmodule SquirrelixirTypedQueryTest do
              queries: [],
              errors: [%MissingQueryMetadata{file: "missing_metadata.sql"}]
            } = TypedQueryDirectory.from_query_directory(query_directory, %{})
+  end
+
+  test "directory_from_query_directory preserves incomplete metadata errors" do
+    query = %Query{
+      file: "incomplete.sql",
+      starting_line: 1,
+      name: "incomplete",
+      comment: [],
+      content: "select 1"
+    }
+
+    query_directory = %QueryDirectory{
+      directory: "lib/accounts/sql",
+      queries: [query],
+      errors: []
+    }
+
+    assert %TypedQueryDirectory{
+             queries: [],
+             errors: [%MissingQueryMetadataField{file: "incomplete.sql", field: :returns}]
+           } =
+             TypedQueryDirectory.from_query_directory(query_directory, %{
+               query.file => [params: []]
+             })
   end
 end

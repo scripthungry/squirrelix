@@ -80,3 +80,14 @@ defmodule Squirrelixir.Error.MissingQueryMetadata do
 
   @type t :: %__MODULE__{file: String.t()}
 end
+
+defmodule Squirrelixir.Error.MissingQueryMetadataField do
+  @moduledoc """
+  Error returned when query metadata is missing a required field.
+  """
+
+  @enforce_keys [:file, :field]
+  defstruct [:file, :field]
+
+  @type t :: %__MODULE__{file: String.t(), field: :params | :returns}
+end
