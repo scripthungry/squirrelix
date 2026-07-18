@@ -25,7 +25,13 @@ defmodule Squirrelixir.SQL do
     [@left_equality, @right_equality]
     |> Enum.flat_map(&Regex.scan(&1, stripped_sql, capture: :all_names))
     |> Enum.reduce(%{}, fn [identifier, index], names ->
-      Map.put_new(names, String.to_integer(index), normalize_identifier(identifier))
+      name = normalize_identifier(identifier)
+
+      if valid_identifier?(name) do
+        Map.put_new(names, String.to_integer(index), name)
+      else
+        names
+      end
     end)
   end
 
@@ -51,6 +57,10 @@ defmodule Squirrelixir.SQL do
     |> String.replace(~r/[^A-Za-z0-9_]+/, "_")
     |> String.trim("_")
     |> String.downcase()
+  end
+
+  defp valid_identifier?(identifier) do
+    String.match?(identifier, ~r/\A[a-z_][A-Za-z0-9_]*\z/)
   end
 
   defp strip_comments_and_strings(sql) do

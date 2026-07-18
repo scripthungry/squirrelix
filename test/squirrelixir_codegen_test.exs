@@ -116,6 +116,19 @@ defmodule SquirrelixirCodegenTest do
     assert code =~ ~s|Postgrex.query!("select $1, $2, $3", [arg_1, arg_2, arg_3])|
   end
 
+  test "generate_module avoids invalid argument names" do
+    query =
+      typed_query("invalid_names.sql", "invalid_names", "select $1, $2", [
+        %Parameter{index: 1, name: "123_invalid", type: :string},
+        %Parameter{index: 2, name: "has-dash", type: :string}
+      ])
+
+    code = Codegen.generate_module(MyApp.SQL, [query], version: "v-test")
+
+    assert code =~ "def invalid_names(connection, arg_1, arg_2)"
+    assert code =~ ~s|Postgrex.query!("select $1, $2", [arg_1, arg_2])|
+  end
+
   test "generate_module includes nullable columns in row specs" do
     query =
       typed_query("find_user.sql", "find_user", "select * from users", [], [

@@ -56,6 +56,12 @@ defmodule SquirrelixirSQLTest do
     assert SQL.infer_parameter_names(sql) == %{1 => "email"}
   end
 
+  test "infer_parameter_names ignores invalid inferred identifiers" do
+    sql = ~s|select * from users where "123 invalid" = $1 and email = $2|
+
+    assert SQL.infer_parameter_names(sql) == %{2 => "email"}
+  end
+
   test "infer_parameter_names leaves unmatched parameters unnamed" do
     assert SQL.infer_parameter_names("select * from users where $1 is null") == %{}
   end

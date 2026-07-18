@@ -253,6 +253,9 @@ defmodule Squirrelixir.Codegen do
 
   defp safe_argument_name(name, index) do
     cond do
+      not valid_argument_name?(name) ->
+        "arg_#{index}"
+
       MapSet.member?(@sql_literal_argument_names, name) ->
         "arg_#{index}"
 
@@ -262,6 +265,10 @@ defmodule Squirrelixir.Codegen do
       true ->
         name
     end
+  end
+
+  defp valid_argument_name?(name) do
+    String.match?(name, ~r/\A[a-z_][A-Za-z0-9_]*\z/)
   end
 
   defp unique_argument_name(name, used, fallback_index) do
