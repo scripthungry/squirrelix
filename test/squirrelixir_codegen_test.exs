@@ -102,6 +102,20 @@ defmodule SquirrelixirCodegenTest do
     assert [{Squirrelixir.GeneratedReservedNamesTest.SQL, _bytecode}] = Code.compile_string(code)
   end
 
+  test "generate_module avoids SQL literal argument names" do
+    query =
+      typed_query("literals.sql", "literals", "select $1, $2, $3", [
+        %Parameter{index: 1, name: "true", type: :boolean},
+        %Parameter{index: 2, name: "false", type: :boolean},
+        %Parameter{index: 3, name: "null", type: :string}
+      ])
+
+    code = Codegen.generate_module(MyApp.SQL, [query], version: "v-test")
+
+    assert code =~ "def literals(connection, arg_1, arg_2, arg_3)"
+    assert code =~ ~s|Postgrex.query!("select $1, $2, $3", [arg_1, arg_2, arg_3])|
+  end
+
   test "generate_module includes nullable columns in row specs" do
     query =
       typed_query("find_user.sql", "find_user", "select * from users", [], [

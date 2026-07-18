@@ -37,6 +37,8 @@ defmodule Squirrelixir.Codegen do
     after and catch cond do else end false fn for if in nil not or receive rescue true try unless when with
   ))
 
+  @sql_literal_argument_names MapSet.new(~w(false nil null true))
+
   alias Squirrelixir.Output
   alias Squirrelixir.Parameter
   alias Squirrelixir.Project
@@ -238,7 +240,7 @@ defmodule Squirrelixir.Codegen do
   defp argument_names(params) do
     params
     |> Enum.reduce({[], MapSet.new(["connection"])}, fn param, {names, used} ->
-      name = param |> preferred_argument_name() |> safe_argument_name()
+      name = param |> preferred_argument_name() |> safe_argument_name(param.index)
       name = unique_argument_name(name, used, param.index)
       {[name | names], MapSet.put(used, name)}
     end)
@@ -249,11 +251,16 @@ defmodule Squirrelixir.Codegen do
   defp preferred_argument_name(%Parameter{name: nil, index: index}), do: "arg_#{index}"
   defp preferred_argument_name(%Parameter{name: name}) when is_binary(name), do: name
 
-  defp safe_argument_name(name) do
-    if MapSet.member?(@reserved_argument_names, name) do
-      "#{name}_"
-    else
-      name
+  defp safe_argument_name(name, index) do
+    cond do
+      MapSet.member?(@sql_literal_argument_names, name) ->
+        "arg_#{index}"
+
+      MapSet.member?(@reserved_argument_names, name) ->
+        "#{name}_"
+
+      true ->
+        name
     end
   end
 
