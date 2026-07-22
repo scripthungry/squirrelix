@@ -1,6 +1,6 @@
 defmodule Squirrelixir.TypeMapper do
   @moduledoc """
-  Maps Postgres type names into Squirrelixir's Elixir type metadata.
+  Maps Postgres type names into Squirrelixir's Elixir type metadata and typespecs.
   """
 
   alias Squirrelixir.Error.UnsupportedPostgresType
@@ -51,21 +51,13 @@ defmodule Squirrelixir.TypeMapper do
                 ])
 
   @type elixir_type :: atom() | {:list, elixir_type()}
-  @type enum_reason ::
-          :no_variants
-          | {:invalid_name, String.t()}
-          | {:invalid_variants, [String.t()]}
 
   @spec hint_for(String.t()) :: String.t() | nil
   def hint_for(name) when is_binary(name), do: Map.get(@type_hints, name)
 
-  @spec validate_enum(String.t(), [String.t()]) :: :ok | {:error, enum_reason()}
-  def validate_enum(raw_name, variants) when is_binary(raw_name) and is_list(variants) do
-    case type_identifier(pascal_case(raw_name)) do
-      {:ok, _} -> validate_variants(variants)
-      {:error, _} -> {:error, {:invalid_name, raw_name}}
-    end
-  end
+  @spec validate_enum(String.t(), [String.t()]) :: :ok | {:error, :no_variants}
+  def validate_enum(_name, []), do: {:error, :no_variants}
+  def validate_enum(_name, [_ | _]), do: :ok
 
   @spec from_postgres(String.t(), keyword()) ::
           {:ok, elixir_type()} | {:error, UnsupportedPostgresType.t()}
@@ -75,6 +67,39 @@ defmodule Squirrelixir.TypeMapper do
     with {:ok, type} <- base_type(name, Keyword.get(opts, :kind), Keyword.get(opts, :base)) do
       {:ok, wrap_lists(type, array_dimensions)}
     end
+  end
+
+  @spec typespec(elixir_type()) :: String.t()
+  def typespec(:integer), do: "integer()"
+  def typespec(:string), do: "String.t()"
+  def typespec(:boolean), do: "boolean()"
+  def typespec(:float), do: "float()"
+  def typespec(:decimal), do: "Decimal.t()"
+  def typespec(:binary), do: "binary()"
+  def typespec(:map), do: "map()"
+  def typespec(:uuid), do: "String.t()"
+  def typespec(:date), do: "Date.t()"
+  def typespec(:time), do: "Time.t()"
+  def typespec(:naive_datetime), do: "NaiveDateTime.t()"
+  def typespec(:utc_datetime), do: "DateTime.t()"
+  def typespec({:list, type}), do: "[#{typespec(type)}]"
+  def typespec(_type), do: "term()"
+
+  @spec column_typespec(atom(), elixir_type(), boolean()) :: String.t()
+  def column_typespec(name, type, nullable?) do
+    spec = if nullable?, do: "#{typespec(type)} | nil", else: typespec(type)
+    "required(#{inspect(name)}) => #{spec}"
+  end
+
+  @spec return_typespec([] | [{atom(), elixir_type(), boolean()}]) :: String.t()
+  def return_typespec([]), do: ":ok"
+
+  def return_typespec(columns) when is_list(columns) do
+    columns
+    |> Enum.map_join(", ", fn {name, type, nullable?} ->
+      column_typespec(name, type, nullable?)
+    end)
+    |> then(&"[%{#{&1}}]")
   end
 
   defp base_type(_name, "e", _base), do: {:ok, :string}
@@ -123,75 +148,4 @@ defmodule Squirrelixir.TypeMapper do
 
   defp wrap_lists(type, 0), do: type
   defp wrap_lists(type, count), do: wrap_lists({:list, type}, count - 1)
-
-  defp validate_variants(variants) do
-    {valid?, invalid} =
-      Enum.reduce(variants, {[], []}, fn variant, {valid, invalid} ->
-        case type_identifier(pascal_case(variant)) do
-          {:ok, _} -> {[variant | valid], invalid}
-          {:error, _} -> {valid, [variant | invalid]}
-        end
-      end)
-
-    cond do
-      invalid != [] ->
-        {:error, {:invalid_variants, Enum.reverse(invalid)}}
-
-      valid? == [] ->
-        {:error, :no_variants}
-
-      true ->
-        :ok
-    end
-  end
-
-  defp type_identifier(name) do
-    case String.graphemes(name) do
-      [] ->
-        {:error, :empty}
-
-      [first | rest] ->
-        if uppercase_letter?(first) do
-          validate_type_identifier_rest(rest, 1)
-        else
-          {:error, {:invalid_grapheme, 0, first}}
-        end
-    end
-  end
-
-  defp validate_type_identifier_rest([], _position), do: {:ok, :valid}
-
-  defp validate_type_identifier_rest([grapheme | rest], position) do
-    if type_identifier_grapheme?(grapheme) do
-      validate_type_identifier_rest(rest, position + 1)
-    else
-      {:error, {:invalid_grapheme, position, grapheme}}
-    end
-  end
-
-  defp pascal_case(string) do
-    string
-    |> snake_case()
-    |> Macro.camelize()
-  end
-
-  defp snake_case(string) do
-    string
-    |> String.replace(~r/([a-z0-9])([A-Z])/, "\\1_\\2")
-    |> String.replace(~r/[^A-Za-z0-9]+/, "_")
-    |> String.downcase()
-  end
-
-  defp type_identifier_grapheme?(grapheme) do
-    lowercase_letter?(grapheme) or uppercase_letter?(grapheme) or digit?(grapheme)
-  end
-
-  defp uppercase_letter?(<<char::utf8>>), do: char >= ?A and char <= ?Z
-  defp uppercase_letter?(_), do: false
-
-  defp lowercase_letter?(<<char::utf8>>), do: char >= ?a and char <= ?z
-  defp lowercase_letter?(_), do: false
-
-  defp digit?(<<char::utf8>>), do: char >= ?0 and char <= ?9
-  defp digit?(_), do: false
 end

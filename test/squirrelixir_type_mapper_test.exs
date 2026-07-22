@@ -55,22 +55,35 @@ defmodule SquirrelixirTypeMapperTest do
     assert TypeMapper.hint_for("point") == nil
   end
 
-  test "validate_enum accepts snake_case enum names and variants" do
+  test "validate_enum accepts any enum name and variant strings" do
     assert :ok = TypeMapper.validate_enum("squirrel_mood", ["happy", "sleepy"])
-  end
-
-  test "validate_enum rejects enum names that cannot become type identifiers" do
-    assert {:error, {:invalid_name, "1 invalid enum"}} =
-             TypeMapper.validate_enum("1 invalid enum", ["value"])
-  end
-
-  test "validate_enum rejects enum variants that cannot become type identifiers" do
-    assert {:error, {:invalid_variants, ["1 invalid value"]}} =
-             TypeMapper.validate_enum("invalid_variant", ["1 invalid value"])
+    assert :ok = TypeMapper.validate_enum("1 invalid enum", ["value"])
+    assert :ok = TypeMapper.validate_enum("invalid_variant", ["1 invalid value"])
   end
 
   test "validate_enum rejects enums with no variants" do
     assert {:error, :no_variants} = TypeMapper.validate_enum("no_variants", [])
+  end
+
+  test "typespec maps internal types to Elixir stdlib typespecs" do
+    assert TypeMapper.typespec(:integer) == "integer()"
+    assert TypeMapper.typespec(:string) == "String.t()"
+    assert TypeMapper.typespec(:decimal) == "Decimal.t()"
+    assert TypeMapper.typespec(:date) == "Date.t()"
+    assert TypeMapper.typespec(:time) == "Time.t()"
+    assert TypeMapper.typespec(:naive_datetime) == "NaiveDateTime.t()"
+    assert TypeMapper.typespec(:utc_datetime) == "DateTime.t()"
+    assert TypeMapper.typespec(:uuid) == "String.t()"
+    assert TypeMapper.typespec({:list, :string}) == "[String.t()]"
+  end
+
+  test "return_typespec builds map types with required keys" do
+    assert TypeMapper.return_typespec([]) == ":ok"
+
+    assert TypeMapper.return_typespec([
+             {:name, :string, true},
+             {:age, :integer, false}
+           ]) == "[%{required(:name) => String.t() | nil, required(:age) => integer()}]"
   end
 
   test "normalize_type accepts Elixir atoms and Postgres descriptors" do

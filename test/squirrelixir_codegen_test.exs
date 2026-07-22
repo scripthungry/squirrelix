@@ -18,6 +18,7 @@ defmodule SquirrelixirCodegenTest do
   alias Squirrelixir.Parameter
   alias Squirrelixir.TypedQuery
   alias Squirrelixir.TypedQueryDirectory
+  alias Squirrelixir.TypeMapper
 
   test "generate_module emits formatted Elixir functions sorted by source file" do
     queries = [
@@ -141,6 +142,27 @@ defmodule SquirrelixirCodegenTest do
 
     assert code =~ "def shadow_encoder(connection, uuid_encoder_1)"
     assert code =~ "encode_param(uuid_encoder_1, :string)"
+  end
+
+  test "generate_module includes Elixir-native row specs via TypeMapper" do
+    query =
+      typed_query("find_user.sql", "find_user", "select * from users", [], [
+        %Column{name: "name", type: :string, nullable?: true},
+        %Column{name: "age", type: :integer, nullable?: false}
+      ])
+
+    code = Codegen.generate_module(MyApp.SQL, [query], version: "v-test")
+    spec = typespec_fragment(code, "find_user")
+
+    assert spec =~ "required(:name) => String.t() | nil"
+    assert spec =~ "required(:age) => integer()"
+
+    assert String.replace(spec, ~r/\s+/, "") ==
+             String.replace(
+               TypeMapper.return_typespec([{:name, :string, true}, {:age, :integer, false}]),
+               ~r/\s+/,
+               ""
+             )
   end
 
   test "generate_module includes nullable columns in row specs" do

@@ -38,6 +38,7 @@ defmodule Squirrelixir.Codegen do
   alias Squirrelixir.Project
   alias Squirrelixir.TypedQuery
   alias Squirrelixir.TypedQueryDirectory
+  alias Squirrelixir.TypeMapper
 
   @spec generate_module(module(), [TypedQuery.t()], keyword()) :: String.t()
   def generate_module(module, queries, opts \\ []) when is_atom(module) and is_list(queries) do
@@ -168,7 +169,7 @@ defmodule Squirrelixir.Codegen do
 
     """
       #{doc_source(query)}
-      @spec #{query.name}(Postgrex.conn()#{spec_args(query.params)}) :: #{return_spec(query.returns)}
+      @spec #{query.name}(Postgrex.conn()#{spec_args(query.params)}) :: #{return_typespec(query.returns)}
       def #{query.name}(#{Enum.join(all_args, ", ")}) do
         connection
         |> #{inspect(postgrex_module)}.query!(#{sql_string_literal(query.content)}, #{encoded_params})
@@ -475,39 +476,17 @@ defmodule Squirrelixir.Codegen do
 
   defp spec_args(params) do
     params
-    |> Enum.map(&type_spec(&1.type))
+    |> Enum.map(&TypeMapper.typespec(&1.type))
     |> Enum.map_join("", &", #{&1}")
   end
 
-  defp return_spec([]), do: ":ok"
-
-  defp return_spec(columns) do
+  defp return_typespec(columns) do
     columns
-    |> Enum.map_join(", ", &column_spec/1)
-    |> then(&"[%{#{&1}}]")
+    |> Enum.map(fn column ->
+      {String.to_atom(column.name), column.type, column.nullable?}
+    end)
+    |> TypeMapper.return_typespec()
   end
-
-  defp column_spec(column) do
-    type = type_spec(column.type)
-    type = if column.nullable?, do: "#{type} | nil", else: type
-
-    "required(#{inspect(String.to_atom(column.name))}) => #{type}"
-  end
-
-  defp type_spec(:integer), do: "integer()"
-  defp type_spec(:string), do: "String.t()"
-  defp type_spec(:boolean), do: "boolean()"
-  defp type_spec(:float), do: "float()"
-  defp type_spec(:decimal), do: "Decimal.t()"
-  defp type_spec(:binary), do: "binary()"
-  defp type_spec(:map), do: "map()"
-  defp type_spec(:uuid), do: "String.t()"
-  defp type_spec(:date), do: "Date.t()"
-  defp type_spec(:time), do: "Time.t()"
-  defp type_spec(:naive_datetime), do: "NaiveDateTime.t()"
-  defp type_spec(:utc_datetime), do: "DateTime.t()"
-  defp type_spec({:list, type}), do: "[#{type_spec(type)}]"
-  defp type_spec(_type), do: "term()"
 
   defp generated_function_doc(%TypedQuery{name: name, file: file}) do
     """

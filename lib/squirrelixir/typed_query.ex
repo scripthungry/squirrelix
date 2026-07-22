@@ -6,7 +6,8 @@ defmodule Squirrelixir.Parameter do
   @enforce_keys [:index, :type]
   defstruct [:index, :name, :type]
 
-  @type t :: %__MODULE__{index: pos_integer(), name: String.t() | nil, type: atom()}
+  @type type :: Squirrelixir.TypeMapper.elixir_type()
+  @type t :: %__MODULE__{index: pos_integer(), name: String.t() | nil, type: type()}
 end
 
 defmodule Squirrelixir.Column do
@@ -17,7 +18,8 @@ defmodule Squirrelixir.Column do
   @enforce_keys [:name, :type, :nullable?]
   defstruct [:name, :type, :nullable?]
 
-  @type t :: %__MODULE__{name: String.t(), type: atom(), nullable?: boolean()}
+  @type type :: Squirrelixir.TypeMapper.elixir_type()
+  @type t :: %__MODULE__{name: String.t(), type: type(), nullable?: boolean()}
 end
 
 defmodule Squirrelixir.Error.QueryHasInvalidColumn do

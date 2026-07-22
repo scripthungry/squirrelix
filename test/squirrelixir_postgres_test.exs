@@ -73,30 +73,34 @@ defmodule SquirrelixirPostgresTest do
     end)
   end
 
-  test "describe rejects enums with invalid names", %{conn: conn} do
+  test "describe infers enums with quoted names and numeric variants as strings", %{conn: conn} do
     Postgrex.query!(conn, "drop type if exists \"1 invalid enum\"", [])
     Postgrex.query!(conn, ~s/create type "1 invalid enum" as enum ('value')/, [])
 
     query = query(~s/select 'value'::"1 invalid enum" as res/)
 
-    assert {:error,
-            %QueryHasInvalidEnum{
-              enum_name: "1 invalid enum",
-              reason: {:invalid_name, "1 invalid enum"}
-            }} = Postgres.describe(conn, query)
+    assert {:ok,
+            [
+              params: [],
+              returns: [
+                %Column{name: "res", type: :string, nullable?: false}
+              ]
+            ]} = Postgres.describe(conn, query)
   end
 
-  test "describe rejects enums with invalid variants", %{conn: conn} do
+  test "describe infers enums with non-identifier variant labels as strings", %{conn: conn} do
     Postgrex.query!(conn, "drop type if exists invalid_variant", [])
     Postgrex.query!(conn, "create type invalid_variant as enum ('1 invalid value')", [])
 
     query = query("select '1 invalid value'::invalid_variant as res")
 
-    assert {:error,
-            %QueryHasInvalidEnum{
-              enum_name: "invalid_variant",
-              reason: {:invalid_variants, ["1 invalid value"]}
-            }} = Postgres.describe(conn, query)
+    assert {:ok,
+            [
+              params: [],
+              returns: [
+                %Column{name: "res", type: :string, nullable?: false}
+              ]
+            ]} = Postgres.describe(conn, query)
   end
 
   test "describe rejects enums with no variants", %{conn: conn} do

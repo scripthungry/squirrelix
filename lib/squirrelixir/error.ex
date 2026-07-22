@@ -116,16 +116,13 @@ end
 
 defmodule Squirrelixir.Error.QueryHasInvalidEnum do
   @moduledoc """
-  Error returned when a Postgres enum cannot be represented in generated Elixir code.
+  Error returned when a Postgres enum has no variants.
   """
 
   @enforce_keys [:file, :starting_line, :content, :enum_name, :reason]
   defstruct [:file, :starting_line, :content, :enum_name, :reason]
 
-  @type reason ::
-          :no_variants
-          | {:invalid_name, String.t()}
-          | {:invalid_variants, [String.t()]}
+  @type reason :: :no_variants
 
   @type t :: %__MODULE__{
           file: String.t(),

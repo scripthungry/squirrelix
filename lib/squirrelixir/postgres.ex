@@ -376,23 +376,17 @@ defmodule Squirrelixir.Postgres do
            TypeMapper.from_postgres(name, kind: "e", array_dimensions: array_dimensions) do
       {:ok, type}
     else
-      {:error, reason} ->
-        if invalid_enum_reason?(reason) do
-          {:error, invalid_enum_error(query, name, reason)}
-        else
-          {:error, reason}
-        end
+      {:error, :no_variants} ->
+        {:error, invalid_enum_error(query, name, :no_variants)}
+
+      {:error, error} ->
+        {:error, error}
     end
   end
 
   defp resolve_postgres_type(_conn, _oid, name, kind, array_dimensions, _query) do
     TypeMapper.from_postgres(name, kind: kind, array_dimensions: array_dimensions)
   end
-
-  defp invalid_enum_reason?(:no_variants), do: true
-  defp invalid_enum_reason?({:invalid_name, _}), do: true
-  defp invalid_enum_reason?({:invalid_variants, _}), do: true
-  defp invalid_enum_reason?(_), do: false
 
   defp enum_variants(conn, oid) do
     case Postgrex.query(conn, @enum_variants_query, [oid]) do
