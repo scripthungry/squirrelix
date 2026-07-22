@@ -5,6 +5,7 @@ defmodule SquirrelixirTypedQueryTest do
   alias Squirrelixir.Error.DuplicateReturnColumns
   alias Squirrelixir.Error.MissingQueryMetadata
   alias Squirrelixir.Error.MissingQueryMetadataField
+  alias Squirrelixir.Error.QueryHasInvalidColumn
   alias Squirrelixir.Parameter
   alias Squirrelixir.Query
   alias Squirrelixir.QueryDirectory
@@ -127,6 +128,145 @@ defmodule SquirrelixirTypedQueryTest do
                  %{name: "duplicate", type: :integer, nullable?: false}
                ]
              )
+  end
+
+  test "from_query rejects multiple duplicate return column names" do
+    query = %Query{
+      file: "duplicate.sql",
+      starting_line: 1,
+      name: "duplicate",
+      comment: [],
+      content:
+        "select 1 as duplicate_1, 2 as duplicate_2, 3 as not_duplicate, 4 as duplicate_1, 5 as duplicate_2"
+    }
+
+    assert {:error, %DuplicateReturnColumns{names: ["duplicate_1", "duplicate_2"]}} =
+             TypedQuery.from_query(query,
+               params: [],
+               returns: [
+                 %{name: "duplicate_1", type: :integer, nullable?: false},
+                 %{name: "duplicate_2", type: :integer, nullable?: false},
+                 %{name: "not_duplicate", type: :integer, nullable?: false},
+                 %{name: "duplicate_1", type: :integer, nullable?: false},
+                 %{name: "duplicate_2", type: :integer, nullable?: false}
+               ]
+             )
+  end
+
+  test "from_query rejects invalid return column names" do
+    query = %Query{
+      file: "invalid_column.sql",
+      starting_line: 1,
+      name: "invalid_column",
+      comment: [],
+      content: ~s|select name as "not a gleam name" from squirrel|
+    }
+
+    assert {:error,
+            %QueryHasInvalidColumn{
+              file: "invalid_column.sql",
+              starting_line: 1,
+              content: ~s|select name as "not a gleam name" from squirrel|,
+              column_name: "not a gleam name",
+              suggested_name: "not_a_gleam_name",
+              reason: {:invalid_grapheme, 3, " "}
+            }} =
+             TypedQuery.from_query(query,
+               params: [],
+               returns: [%{name: "not a gleam name", type: :string, nullable?: false}]
+             )
+  end
+
+  test "from_query infers multiple parameter names" do
+    query = %Query{
+      file: "multiple.sql",
+      starting_line: 1,
+      name: "multiple",
+      comment: [],
+      content: """
+      with squirrel_user as (select 1 as squirrel_user_id, 'Louis' as name)
+      select name
+      from squirrel_user
+      where $1 = squirrel_user_id
+      and squirrel_user.name = $2
+      """
+    }
+
+    assert {:ok,
+            %TypedQuery{
+              params: [
+                %Parameter{index: 1, name: "squirrel_user_id", type: :integer},
+                %Parameter{index: 2, name: "squirrel_user_name", type: :string}
+              ]
+            }} =
+             TypedQuery.from_query(query,
+               params: [:integer, :string],
+               returns: [%{name: "name", type: :string, nullable?: false}]
+             )
+  end
+
+  test "resolve_parameter_names renames arguments that would shadow decoder helpers" do
+    params = [%Parameter{index: 1, name: "uuid_decoder", type: :string}]
+
+    assert TypedQuery.resolve_parameter_names(params) == ["uuid_decoder_1"]
+  end
+
+  test "resolve_parameter_names deconflicts duplicate inferred names" do
+    params = [
+      %Parameter{index: 1, name: "number", type: :integer},
+      %Parameter{index: 2, name: "number", type: :integer}
+    ]
+
+    assert TypedQuery.resolve_parameter_names(params) == ["number", "number_1"]
+  end
+
+  test "resolve_parameter_names deconflicts fallback argument names" do
+    params = [
+      %Parameter{index: 1, name: nil, type: :integer},
+      %Parameter{index: 2, name: "arg_1", type: :integer}
+    ]
+
+    assert TypedQuery.resolve_parameter_names(params) == ["arg_1", "arg_1_1"]
+  end
+
+  test "resolve_parameter_names preserves very long argument names" do
+    long_name = "this_is_a_very_very_very_long_parameter_name_test_aa"
+    params = [%Parameter{index: 1, name: long_name, type: :integer}]
+
+    assert TypedQuery.resolve_parameter_names(params) == [long_name]
+  end
+
+  test "resolve_parameter_names avoids Elixir reserved argument names" do
+    params = [
+      %Parameter{index: 1, name: "type", type: :integer},
+      %Parameter{index: 2, name: "fn", type: :integer}
+    ]
+
+    assert TypedQuery.resolve_parameter_names(params) == ["type", "fn_"]
+  end
+
+  test "from_query resolves parameter names end-to-end for duplicate inferred names" do
+    query = %Query{
+      file: "duplicate_params.sql",
+      starting_line: 1,
+      name: "duplicate_params",
+      comment: [],
+      content: """
+      with wibble as (select 1 as number)
+      select *
+      from wibble
+      where $1 = number
+      and $2 = number
+      """
+    }
+
+    assert {:ok, %TypedQuery{params: params}} =
+             TypedQuery.from_query(query,
+               params: [:integer, :integer],
+               returns: [%{name: "number", type: :integer, nullable?: false}]
+             )
+
+    assert TypedQuery.resolve_parameter_names(params) == ["number", "number_1"]
   end
 
   test "from_query rejects metadata missing required fields" do

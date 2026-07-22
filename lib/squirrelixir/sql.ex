@@ -18,6 +18,24 @@ defmodule Squirrelixir.SQL do
                       "=" <> @horizontal_space <> "(?<identifier>" <> @identifier <> ")"
                   )
 
+  @spec valid_identifier?(String.t()) :: boolean()
+  def valid_identifier?(identifier) when is_binary(identifier) do
+    String.match?(identifier, ~r/\A[a-z_][A-Za-z0-9_]*\z/)
+  end
+
+  @spec similar_identifier(String.t()) :: String.t() | nil
+  def similar_identifier(identifier) when is_binary(identifier) do
+    proposal =
+      identifier
+      |> snake_identifier()
+      |> String.graphemes()
+      |> Enum.drop_while(&(&1 == "_" or digit?(&1)))
+      |> Enum.filter(&identifier_grapheme?/1)
+      |> Enum.join()
+
+    if proposal == "", do: nil, else: proposal
+  end
+
   @spec infer_parameter_names(String.t()) :: %{pos_integer() => String.t()}
   def infer_parameter_names(sql) when is_binary(sql) do
     stripped_sql = strip_comments_and_strings(sql)
@@ -59,9 +77,15 @@ defmodule Squirrelixir.SQL do
     |> String.downcase()
   end
 
-  defp valid_identifier?(identifier) do
-    String.match?(identifier, ~r/\A[a-z_][A-Za-z0-9_]*\z/)
+  defp identifier_grapheme?(grapheme) do
+    grapheme == "_" or lowercase_letter?(grapheme) or digit?(grapheme)
   end
+
+  defp lowercase_letter?(<<char::utf8>>), do: char in ?a..?z
+  defp lowercase_letter?(_), do: false
+
+  defp digit?(<<char::utf8>>), do: char in ?0..?9
+  defp digit?(_), do: false
 
   defp strip_comments_and_strings(sql) do
     sql

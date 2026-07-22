@@ -76,4 +76,46 @@ defmodule SquirrelixirSQLTest do
   test "infer_parameter_names leaves unmatched parameters unnamed" do
     assert SQL.infer_parameter_names("select * from users where $1 is null") == %{}
   end
+
+  test "infer_parameter_names infers multiple arguments from one query" do
+    sql = """
+    with squirrel_user as (select 1 as squirrel_user_id, 'Louis' as name)
+    select name
+    from squirrel_user
+    where $1 = squirrel_user_id
+    and squirrel_user.name = $2
+    """
+
+    assert SQL.infer_parameter_names(sql) == %{1 => "squirrel_user_id", 2 => "squirrel_user_name"}
+  end
+
+  test "infer_parameter_names infers quoted keyword-like column names" do
+    sql = ~s|with wibble as (select 1 as "type") select * from wibble where $1 = "type"|
+
+    assert SQL.infer_parameter_names(sql) == %{1 => "type"}
+  end
+
+  test "infer_parameter_names preserves very long argument names" do
+    long_name = "this_is_a_very_very_very_long_parameter_name_test_aa"
+
+    sql = """
+    with wibble as (select 1 as #{long_name})
+    select *
+    from wibble
+    where $1 = #{long_name}
+    """
+
+    assert SQL.infer_parameter_names(sql) == %{1 => long_name}
+  end
+
+  test "valid_identifier? accepts lowercase identifiers" do
+    assert SQL.valid_identifier?("squirrel_user_name")
+    refute SQL.valid_identifier?("123_invalid")
+    refute SQL.valid_identifier?("NotValid")
+  end
+
+  test "similar_identifier proposes snake_case alternatives" do
+    assert SQL.similar_identifier("not a gleam name") == "not_a_gleam_name"
+    assert SQL.similar_identifier("123 invalid") == "invalid"
+  end
 end
