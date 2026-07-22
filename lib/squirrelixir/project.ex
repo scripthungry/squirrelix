@@ -1,23 +1,29 @@
 defmodule Squirrelixir.Project do
   @moduledoc """
-  Helpers for locating and reading an Elixir project.
+  Locates an Elixir Mix project and derives module names for generated SQL code.
+
+  Functions return standard `{:ok, value}` / `{:error, reason}` tuples. Reasons are
+  plain atoms (`:not_found`, `:invalid_mixfile`, `:invalid_sql_directory`) rather than
+  Gleam-style tagged error values.
   """
 
-  @spec root(Path.t()) :: {:ok, Path.t()} | :error
+  @type error_reason :: :not_found | :invalid_mixfile | :invalid_sql_directory
+
+  @spec root(Path.t()) :: {:ok, Path.t()} | {:error, :not_found}
   def root(start_path \\ File.cwd!()) when is_binary(start_path) do
     start_path
     |> Path.expand()
     |> do_root()
   end
 
-  @spec app(Path.t()) :: {:ok, atom()} | :error
+  @spec app(Path.t()) :: {:ok, atom()} | {:error, :invalid_mixfile}
   def app(root) when is_binary(root) do
     with {:ok, content} <- File.read(Path.join(root, "mix.exs")),
          {:ok, ast} <- Code.string_to_quoted(content),
          {:ok, app} <- extract_app(ast) do
       {:ok, app}
     else
-      _ -> :error
+      _ -> {:error, :invalid_mixfile}
     end
   end
 
@@ -30,13 +36,16 @@ defmodule Squirrelixir.Project do
     ]
   end
 
-  @spec module_for_sql_directory(Path.t(), Path.t()) :: {:ok, module()} | :error
+  @spec module_for_sql_directory(Path.t(), Path.t()) ::
+          {:ok, module()} | {:error, :invalid_sql_directory}
   def module_for_sql_directory(root, sql_directory)
       when is_binary(root) and is_binary(sql_directory) do
     with {:ok, app} <- app(root),
          {:ok, relative_segments} <- relative_sql_segments(root, sql_directory) do
       module_parts = [app_module_part(app) | Enum.map(relative_segments, &Macro.camelize/1)]
       {:ok, Module.concat(module_parts ++ ["SQL"])}
+    else
+      _ -> {:error, :invalid_sql_directory}
     end
   end
 
@@ -46,7 +55,7 @@ defmodule Squirrelixir.Project do
         {:ok, path}
 
       Path.dirname(path) == path ->
-        :error
+        {:error, :not_found}
 
       true ->
         path
@@ -69,7 +78,7 @@ defmodule Squirrelixir.Project do
       end)
 
     case app do
-      nil -> :error
+      nil -> {:error, :invalid_mixfile}
       app when is_atom(app) -> {:ok, app}
     end
   end
@@ -79,7 +88,7 @@ defmodule Squirrelixir.Project do
     sql_directory = Path.expand(sql_directory)
 
     source_roots(root)
-    |> Enum.find_value(:error, fn source_root ->
+    |> Enum.find_value({:error, :invalid_sql_directory}, fn source_root ->
       source_root = Path.expand(source_root)
       relative_path = Path.relative_to(sql_directory, source_root)
 

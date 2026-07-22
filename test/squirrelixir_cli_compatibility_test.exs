@@ -31,7 +31,8 @@ defmodule SquirrelixirCliCompatibilityTest do
   end
 
   test "parse_connection_url rejects unknown scheme" do
-    assert :error = CLI.parse_connection_url("mysql://user:pass@db:3306/my_db")
+    assert {:error, :invalid_url} =
+             CLI.parse_connection_url("mysql://user:pass@db:3306/my_db")
   end
 
   test "parse_connection_url applies upstream defaults" do
@@ -89,7 +90,7 @@ defmodule SquirrelixirCliCompatibilityTest do
              }
   end
 
-  test "walk finds only sql directories and sql files" do
+  test "discover_sql_directories finds only sql directories and sql files" do
     tmp = tmp_dir("squirrelixir")
 
     File.mkdir_p!(tmp)
@@ -108,7 +109,7 @@ defmodule SquirrelixirCliCompatibilityTest do
       ]
     }
 
-    assert CLI.walk(Path.join(tmp, "src")) == expected
+    assert CLI.discover_sql_directories(Path.join(tmp, "src")) == expected
   end
 
   test "query_files discovers sql files under conventional Elixir project roots" do

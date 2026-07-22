@@ -1,6 +1,6 @@
 defmodule Squirrelixir.Query do
   @moduledoc """
-  Query file parsing helpers reimplemented from Squirrel.
+  Parses Squirrel SQL query files into Elixir structs.
   """
 
   @enforce_keys [:file, :starting_line, :name, :comment, :content]
@@ -8,6 +8,7 @@ defmodule Squirrelixir.Query do
 
   alias Squirrelixir.Error.CannotReadFile
   alias Squirrelixir.Error.QueryFileHasInvalidName
+  alias Squirrelixir.SQL
 
   @type t :: %__MODULE__{
           file: String.t(),
@@ -17,7 +18,8 @@ defmodule Squirrelixir.Query do
           content: String.t()
         }
 
-  @spec from_file(String.t()) :: {:ok, t()} | {:error, struct()}
+  @spec from_file(String.t()) ::
+          {:ok, t()} | {:error, CannotReadFile.t() | QueryFileHasInvalidName.t()}
   def from_file(file) when is_binary(file) do
     with {:ok, content} <- read_query_file(file),
          {:ok, name} <- query_name(file) do
@@ -45,7 +47,7 @@ defmodule Squirrelixir.Query do
       |> Path.basename()
       |> Path.rootname()
 
-    case value_identifier(file_name) do
+    case parse_query_name(file_name) do
       {:ok, name} ->
         {:ok, name}
 
@@ -54,7 +56,7 @@ defmodule Squirrelixir.Query do
          %QueryFileHasInvalidName{
            file: file,
            reason: reason,
-           suggested_name: similar_value_identifier(file_name)
+           suggested_name: SQL.similar_identifier(file_name)
          }}
     end
   end
@@ -86,26 +88,26 @@ defmodule Squirrelixir.Query do
     end
   end
 
-  defp value_identifier(name) do
+  defp parse_query_name(name) do
     case String.graphemes(name) do
       [] ->
         {:error, :empty}
 
       [first | rest] ->
-        if first_identifier_grapheme?(first) do
-          validate_identifier_rest(rest, 1, name)
+        if first == "_" or lowercase_letter?(first) do
+          validate_query_name_rest(rest, 1, name)
         else
           {:error, {:invalid_grapheme, 0, first}}
         end
     end
   end
 
-  defp validate_identifier_rest([], _position, name), do: {:ok, name}
+  defp validate_query_name_rest([], _position, name), do: {:ok, name}
 
-  defp validate_identifier_rest([grapheme | rest], position, name) do
+  defp validate_query_name_rest([grapheme | rest], position, name) do
     cond do
       identifier_grapheme?(grapheme) ->
-        validate_identifier_rest(rest, position + 1, name)
+        validate_query_name_rest(rest, position + 1, name)
 
       grapheme in ["?", "!"] and rest == [] ->
         {:ok, name}
@@ -115,32 +117,8 @@ defmodule Squirrelixir.Query do
     end
   end
 
-  defp similar_value_identifier(string) do
-    proposal =
-      string
-      |> String.trim()
-      |> snake_case()
-      |> String.graphemes()
-      |> Enum.drop_while(&(&1 == "_" or digit?(&1)))
-      |> Enum.filter(&identifier_grapheme?/1)
-      |> Enum.join()
-
-    if proposal == "", do: nil, else: proposal
-  end
-
-  defp snake_case(string) do
-    string
-    |> String.replace(~r/([a-z0-9])([A-Z])/, "\\1_\\2")
-    |> String.replace(~r/[^A-Za-z0-9]+/, "_")
-    |> String.downcase()
-  end
-
   defp identifier_grapheme?(grapheme) do
     grapheme == "_" or lowercase_letter?(grapheme) or digit?(grapheme)
-  end
-
-  defp first_identifier_grapheme?(grapheme) do
-    grapheme == "_" or lowercase_letter?(grapheme)
   end
 
   defp lowercase_letter?(<<char::utf8>>) do

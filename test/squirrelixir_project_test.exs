@@ -19,7 +19,7 @@ defmodule SquirrelixirProjectTest do
 
     File.mkdir_p!(nested)
 
-    assert Project.root(nested) == :error
+    assert Project.root(nested) == {:error, :not_found}
   end
 
   test "app reads the Mix application name" do
@@ -33,7 +33,7 @@ defmodule SquirrelixirProjectTest do
     root = tmp_dir()
     File.write!(Path.join(root, "mix.exs"), "not valid elixir")
 
-    assert Project.app(root) == :error
+    assert Project.app(root) == {:error, :invalid_mixfile}
   end
 
   test "source_roots returns conventional Elixir source roots" do
@@ -66,7 +66,8 @@ defmodule SquirrelixirProjectTest do
     root = tmp_dir()
     File.write!(Path.join(root, "mix.exs"), mixfile(:acorn_counter))
 
-    assert Project.module_for_sql_directory(root, Path.join(root, "priv/sql")) == :error
+    assert Project.module_for_sql_directory(root, Path.join(root, "priv/sql")) ==
+             {:error, :invalid_sql_directory}
   end
 
   defp tmp_dir do

@@ -8,7 +8,7 @@ end
 
 defmodule Squirrelixir.Inference do
   @moduledoc """
-  Converts parsed query directories into typed query directories using a describer.
+  Converts parsed query directories into typed query directories using a describer callback.
   """
 
   alias Squirrelixir.Error

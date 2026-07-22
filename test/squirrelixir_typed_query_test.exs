@@ -159,22 +159,65 @@ defmodule SquirrelixirTypedQueryTest do
       starting_line: 1,
       name: "invalid_column",
       comment: [],
-      content: ~s|select name as "not a gleam name" from squirrel|
+      content: ~s|select name as "not a valid name" from squirrel|
     }
 
     assert {:error,
             %QueryHasInvalidColumn{
               file: "invalid_column.sql",
               starting_line: 1,
-              content: ~s|select name as "not a gleam name" from squirrel|,
-              column_name: "not a gleam name",
-              suggested_name: "not_a_gleam_name",
+              content: ~s|select name as "not a valid name" from squirrel|,
+              column_name: "not a valid name",
+              suggested_name: "not_a_valid_name",
               reason: {:invalid_grapheme, 3, " "}
             }} =
              TypedQuery.from_query(query,
                params: [],
-               returns: [%{name: "not a gleam name", type: :string, nullable?: false}]
+               returns: [%{name: "not a valid name", type: :string, nullable?: false}]
              )
+  end
+
+  test "from_query invalid column errors format with query context" do
+    query = %Query{
+      file: "invalid_column.sql",
+      starting_line: 1,
+      name: "invalid_column",
+      comment: [],
+      content: ~s|select name as "not a valid name" from squirrel|
+    }
+
+    assert {:error, error} =
+             TypedQuery.from_query(query,
+               params: [],
+               returns: [%{name: "not a valid name", type: :string, nullable?: false}]
+             )
+
+    formatted = Squirrelixir.Error.format(error)
+    assert formatted =~ "Invalid query"
+    assert formatted =~ "invalid_column.sql"
+    assert formatted =~ "Suggested name: not_a_valid_name"
+  end
+
+  test "from_query duplicate column errors format with query context" do
+    query = %Query{
+      file: "duplicate.sql",
+      starting_line: 1,
+      name: "duplicate",
+      comment: [],
+      content: "select 1 as duplicate, 2 as duplicate"
+    }
+
+    assert {:error, error} =
+             TypedQuery.from_query(query,
+               params: [],
+               returns: [
+                 %{name: "duplicate", type: :integer, nullable?: false},
+                 %{name: "duplicate", type: :integer, nullable?: false}
+               ]
+             )
+
+    formatted = Squirrelixir.Error.format(error)
+    assert formatted =~ "Duplicate return columns: duplicate"
   end
 
   test "from_query infers multiple parameter names" do

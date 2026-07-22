@@ -23,6 +23,17 @@ defmodule Squirrelixir.SQL do
     String.match?(identifier, ~r/\A[a-z_][A-Za-z0-9_]*\z/)
   end
 
+  @type identifier_reason :: :empty | {:invalid_grapheme, non_neg_integer(), String.t()}
+
+  @spec identifier_error(String.t()) :: identifier_reason() | nil
+  def identifier_error(identifier) when is_binary(identifier) do
+    cond do
+      identifier == "" -> :empty
+      valid_identifier?(identifier) -> nil
+      true -> identifier_grapheme_error(identifier)
+    end
+  end
+
   @spec similar_identifier(String.t()) :: String.t() | nil
   def similar_identifier(identifier) when is_binary(identifier) do
     proposal =
@@ -72,9 +83,34 @@ defmodule Squirrelixir.SQL do
     identifier
     |> String.trim(~s/"/)
     |> String.replace(~r/""/, ~s/"/)
+    |> String.replace(~r/([a-z0-9])([A-Z])/, "\\1_\\2")
     |> String.replace(~r/[^A-Za-z0-9_]+/, "_")
     |> String.trim("_")
     |> String.downcase()
+  end
+
+  defp identifier_grapheme_error(name) do
+    case String.graphemes(name) do
+      [] ->
+        :empty
+
+      [first | rest] ->
+        if first == "_" or lowercase_letter?(first) do
+          invalid_grapheme_in_rest(rest, 1, name)
+        else
+          {:invalid_grapheme, 0, first}
+        end
+    end
+  end
+
+  defp invalid_grapheme_in_rest([], _position, _name), do: {:invalid_grapheme, 0, ""}
+
+  defp invalid_grapheme_in_rest([grapheme | rest], position, name) do
+    if identifier_grapheme?(grapheme) do
+      invalid_grapheme_in_rest(rest, position + 1, name)
+    else
+      {:invalid_grapheme, position, grapheme}
+    end
   end
 
   defp identifier_grapheme?(grapheme) do

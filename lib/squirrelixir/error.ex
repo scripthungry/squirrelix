@@ -70,6 +70,25 @@ defmodule Squirrelixir.Error.DuplicateReturnColumns do
         }
 end
 
+defmodule Squirrelixir.Error.QueryHasInvalidColumn do
+  @moduledoc """
+  Error returned when a query result column name cannot become an Elixir identifier.
+  """
+
+  @enforce_keys [:file, :starting_line, :content, :column_name, :reason]
+  defstruct [:file, :starting_line, :content, :column_name, :reason, :suggested_name]
+
+  @type reason :: :empty | {:invalid_grapheme, non_neg_integer(), String.t()}
+  @type t :: %__MODULE__{
+          file: String.t(),
+          starting_line: pos_integer(),
+          content: String.t(),
+          column_name: String.t(),
+          reason: reason(),
+          suggested_name: String.t() | nil
+        }
+end
+
 defmodule Squirrelixir.Error.MissingQueryMetadata do
   @moduledoc """
   Error returned when no parameter and return metadata is available for a query.
@@ -228,11 +247,14 @@ defmodule Squirrelixir.Error do
   Formatting and normalization helpers for Squirrelixir errors.
   """
 
+  alias Squirrelixir.Error.DuplicateReturnColumns
   alias Squirrelixir.Error.MissingPostgresColumn
   alias Squirrelixir.Error.MissingPostgresConstraint
   alias Squirrelixir.Error.MissingPostgresTable
   alias Squirrelixir.Error.PostgresInferenceError
   alias Squirrelixir.Error.PostgresSyntaxError
+  alias Squirrelixir.Error.QueryFileHasInvalidName
+  alias Squirrelixir.Error.QueryHasInvalidColumn
   alias Squirrelixir.Query
 
   @spec normalize(struct()) :: struct()
@@ -312,22 +334,26 @@ defmodule Squirrelixir.Error do
     end)
   end
 
+  defp do_format(%QueryFileHasInvalidName{} = error), do: format_query_file_name_error(error)
+  defp do_format(%DuplicateReturnColumns{} = error), do: format_validation_query_error(error)
+  defp do_format(%QueryHasInvalidColumn{} = error), do: format_validation_query_error(error)
+
   defp do_format(error) do
-    if query_error?(error) do
-      format_query_error(error)
+    if postgres_query_error?(error) do
+      format_postgres_query_error(error)
     else
       "Error: #{inspect(error)}"
     end
   end
 
-  defp query_error?(%PostgresSyntaxError{}), do: true
-  defp query_error?(%MissingPostgresTable{}), do: true
-  defp query_error?(%MissingPostgresColumn{}), do: true
-  defp query_error?(%MissingPostgresConstraint{}), do: true
-  defp query_error?(%PostgresInferenceError{}), do: true
-  defp query_error?(_error), do: false
+  defp postgres_query_error?(%PostgresSyntaxError{}), do: true
+  defp postgres_query_error?(%MissingPostgresTable{}), do: true
+  defp postgres_query_error?(%MissingPostgresColumn{}), do: true
+  defp postgres_query_error?(%MissingPostgresConstraint{}), do: true
+  defp postgres_query_error?(%PostgresInferenceError{}), do: true
+  defp postgres_query_error?(_error), do: false
 
-  defp format_query_error(error) do
+  defp format_postgres_query_error(error) do
     title =
       case postgresql_code(error) do
         nil -> "Invalid query"
@@ -343,6 +369,61 @@ defmodule Squirrelixir.Error do
     |> Enum.reject(&(&1 == ""))
     |> Enum.join("\n")
   end
+
+  defp format_validation_query_error(error) do
+    [
+      "Error: Invalid query",
+      "",
+      code_block(error),
+      validation_message(error)
+    ]
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.join("\n")
+  end
+
+  defp format_query_file_name_error(%QueryFileHasInvalidName{} = error) do
+    lines = [
+      "Error: Invalid query file name",
+      "",
+      "File: #{error.file}",
+      identifier_reason_message(error.reason)
+    ]
+
+    lines =
+      case error.suggested_name do
+        nil -> lines
+        suggested_name -> lines ++ ["Suggested name: #{suggested_name}"]
+      end
+
+    Enum.join(lines, "\n")
+  end
+
+  defp validation_message(%DuplicateReturnColumns{names: names}) do
+    "Duplicate return columns: #{Enum.join(names, ", ")}"
+  end
+
+  defp validation_message(%QueryHasInvalidColumn{column_name: column_name, suggested_name: nil}) do
+    "Column name #{inspect(column_name)} is not a valid Elixir identifier"
+  end
+
+  defp validation_message(%QueryHasInvalidColumn{
+         column_name: column_name,
+         suggested_name: suggested_name
+       }) do
+    [
+      "Column name #{inspect(column_name)} is not a valid Elixir identifier",
+      "Suggested name: #{suggested_name}"
+    ]
+    |> Enum.join("\n")
+  end
+
+  defp identifier_reason_message(:empty), do: "Reason: the file name is empty"
+
+  defp identifier_reason_message({:invalid_grapheme, 0, grapheme}),
+    do: "Reason: cannot start with #{inspect(grapheme)}"
+
+  defp identifier_reason_message({:invalid_grapheme, position, grapheme}),
+    do: "Reason: invalid character #{inspect(grapheme)} at position #{position}"
 
   defp code_block(%{file: file, content: content, starting_line: starting_line} = error) do
     pointer = pointer_for(error)

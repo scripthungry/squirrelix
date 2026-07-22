@@ -100,6 +100,23 @@ defmodule MixTasksSquirrelixirTest do
     end
   end
 
+  test "mix squirrelixir.gen moduledoc documents metadata and infer options" do
+    {:docs_v1, _, _, _, module_doc, _, _} = Code.fetch_docs(Mix.Tasks.Squirrelixir.Gen)
+    moduledoc = module_doc["en"]
+
+    assert moduledoc =~ "--metadata"
+    assert moduledoc =~ "--infer"
+    assert moduledoc =~ "squirrelixir.exs"
+  end
+
+  test "mix squirrelixir.check moduledoc documents usage" do
+    {:docs_v1, _, _, _, module_doc, _, _} = Code.fetch_docs(Mix.Tasks.Squirrelixir.Check)
+    moduledoc = module_doc["en"]
+
+    assert moduledoc =~ "mix squirrelixir.check"
+    assert moduledoc =~ "--infer"
+  end
+
   defp tmp_project(app) do
     path = Squirrelixir.TestSupport.tmp_dir!("squirrelixir-mix-task")
 

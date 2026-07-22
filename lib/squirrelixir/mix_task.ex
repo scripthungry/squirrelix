@@ -45,13 +45,13 @@ defmodule Squirrelixir.MixTask do
 
   defp with_query_source!(opts, root, callback) do
     if opts[:infer] do
-      with_postgres_describer!(opts, callback)
+      with_postgres_inferrer!(opts, callback)
     else
       callback.(load_metadata!(opts, root))
     end
   end
 
-  defp with_postgres_describer!(opts, callback) do
+  defp with_postgres_inferrer!(opts, callback) do
     case Postgrex.start_link(connection_opts(opts)) do
       {:ok, conn} ->
         try do
@@ -83,7 +83,7 @@ defmodule Squirrelixir.MixTask do
   defp url_connection_opts!(url) do
     case CLI.parse_connection_url(url) do
       {:ok, connection_options} -> postgrex_connection_opts(connection_options)
-      :error -> Mix.raise("Invalid Postgres connection URL")
+      {:error, :invalid_url} -> Mix.raise("Invalid Postgres connection URL")
     end
   end
 

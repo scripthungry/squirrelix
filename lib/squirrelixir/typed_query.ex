@@ -6,8 +6,12 @@ defmodule Squirrelixir.Parameter do
   @enforce_keys [:index, :type]
   defstruct [:index, :name, :type]
 
-  @type type :: Squirrelixir.TypeMapper.elixir_type()
-  @type t :: %__MODULE__{index: pos_integer(), name: String.t() | nil, type: type()}
+  @type elixir_type :: Squirrelixir.TypeMapper.elixir_type()
+  @type t :: %__MODULE__{
+          index: pos_integer(),
+          name: String.t() | nil,
+          type: elixir_type()
+        }
 end
 
 defmodule Squirrelixir.Column do
@@ -18,26 +22,11 @@ defmodule Squirrelixir.Column do
   @enforce_keys [:name, :type, :nullable?]
   defstruct [:name, :type, :nullable?]
 
-  @type type :: Squirrelixir.TypeMapper.elixir_type()
-  @type t :: %__MODULE__{name: String.t(), type: type(), nullable?: boolean()}
-end
-
-defmodule Squirrelixir.Error.QueryHasInvalidColumn do
-  @moduledoc """
-  Error returned when a query result column name cannot become an Elixir identifier.
-  """
-
-  @enforce_keys [:file, :starting_line, :content, :column_name, :reason]
-  defstruct [:file, :starting_line, :content, :column_name, :reason, :suggested_name]
-
-  @type reason :: :empty | {:invalid_grapheme, non_neg_integer(), String.t()}
+  @type elixir_type :: Squirrelixir.TypeMapper.elixir_type()
   @type t :: %__MODULE__{
-          file: String.t(),
-          starting_line: pos_integer(),
-          content: String.t(),
-          column_name: String.t(),
-          reason: reason(),
-          suggested_name: String.t() | nil
+          name: String.t(),
+          type: elixir_type(),
+          nullable?: boolean()
         }
 end
 
@@ -63,6 +52,11 @@ defmodule Squirrelixir.TypedQuery do
   ))
 
   @sql_literal_argument_names MapSet.new(~w(false nil null true))
+
+  @runtime_helper_names MapSet.new(~w(
+    decode_command decode_rows decode_row decode_value decode_scalar
+    encode_value uuid_to_string uuid_from_string
+  ))
 
   @type t :: %__MODULE__{
           file: String.t(),
@@ -95,7 +89,7 @@ defmodule Squirrelixir.TypedQuery do
              name: query.name,
              comment: query.comment,
              content: query.content,
-             params: parameters(query.content, params),
+             params: build_parameters(query.content, params),
              returns: returns
            }}
 
@@ -130,7 +124,7 @@ defmodule Squirrelixir.TypedQuery do
     end
   end
 
-  defp parameters(sql, types) do
+  defp build_parameters(sql, types) do
     inferred_names = SQL.infer_parameter_names(sql)
 
     types
@@ -145,7 +139,7 @@ defmodule Squirrelixir.TypedQuery do
   end
 
   defp normalize_returns(returns, query) do
-    traverse(returns, &column(&1, query))
+    traverse(returns, &normalize_return_column(&1, query))
   end
 
   defp traverse(values, mapper) do
@@ -161,14 +155,14 @@ defmodule Squirrelixir.TypedQuery do
     end
   end
 
-  defp column(%Column{} = column, query) do
+  defp normalize_return_column(%Column{} = column, query) do
     with :ok <- validate_column_name(column.name, query),
          {:ok, type} <- TypeMapper.normalize_type(column.type) do
       {:ok, %Column{column | type: type}}
     end
   end
 
-  defp column(%{name: name, type: type, nullable?: nullable?}, query) do
+  defp normalize_return_column(%{name: name, type: type, nullable?: nullable?}, query) do
     with :ok <- validate_column_name(name, query),
          {:ok, type} <- TypeMapper.normalize_type(type) do
       {:ok, %Column{name: name, type: type, nullable?: nullable?}}
@@ -176,41 +170,9 @@ defmodule Squirrelixir.TypedQuery do
   end
 
   defp validate_column_name(name, query) do
-    case column_name_error(name) do
+    case SQL.identifier_error(name) do
       nil -> :ok
       reason -> {:error, invalid_column_error(query, name, reason)}
-    end
-  end
-
-  defp column_name_error(name) do
-    cond do
-      name == "" -> :empty
-      not SQL.valid_identifier?(name) -> column_name_grapheme_error(name)
-      true -> nil
-    end
-  end
-
-  defp column_name_grapheme_error(name) do
-    case String.graphemes(name) do
-      [] ->
-        :empty
-
-      [first | rest] ->
-        if first == "_" or lowercase_letter?(first) do
-          invalid_grapheme_in_rest(rest, 1, name)
-        else
-          {:invalid_grapheme, 0, first}
-        end
-    end
-  end
-
-  defp invalid_grapheme_in_rest([], _position, _name), do: {:invalid_grapheme, 0, ""}
-
-  defp invalid_grapheme_in_rest([grapheme | rest], position, name) do
-    if identifier_grapheme?(grapheme) do
-      invalid_grapheme_in_rest(rest, position + 1, name)
-    else
-      {:invalid_grapheme, position, grapheme}
     end
   end
 
@@ -248,7 +210,9 @@ defmodule Squirrelixir.TypedQuery do
   end
 
   defp shadowing_helper_name?(name) do
-    String.ends_with?(name, "decoder") or String.ends_with?(name, "encoder")
+    MapSet.member?(@runtime_helper_names, name) or
+      String.ends_with?(name, "decoder") or
+      String.ends_with?(name, "encoder")
   end
 
   defp rename_shadowed_name(name, used, tries \\ 1) do
@@ -268,16 +232,6 @@ defmodule Squirrelixir.TypedQuery do
       name
     end
   end
-
-  defp identifier_grapheme?(grapheme) do
-    grapheme == "_" or lowercase_letter?(grapheme) or digit?(grapheme)
-  end
-
-  defp lowercase_letter?(<<char::utf8>>), do: char in ?a..?z
-  defp lowercase_letter?(_), do: false
-
-  defp digit?(<<char::utf8>>), do: char in ?0..?9
-  defp digit?(_), do: false
 
   defp duplicate_column_names(columns) do
     columns

@@ -115,7 +115,15 @@ defmodule SquirrelixirSQLTest do
   end
 
   test "similar_identifier proposes snake_case alternatives" do
-    assert SQL.similar_identifier("not a gleam name") == "not_a_gleam_name"
+    assert SQL.similar_identifier("not a valid name") == "not_a_valid_name"
     assert SQL.similar_identifier("123 invalid") == "invalid"
+    assert SQL.similar_identifier("FindSquirrels") == "find_squirrels"
+  end
+
+  test "identifier_error reports invalid identifiers" do
+    assert SQL.identifier_error("valid_name") == nil
+    assert SQL.identifier_error("") == :empty
+    assert SQL.identifier_error("123 invalid") == {:invalid_grapheme, 0, "1"}
+    assert SQL.identifier_error("not a valid name") == {:invalid_grapheme, 3, " "}
   end
 end

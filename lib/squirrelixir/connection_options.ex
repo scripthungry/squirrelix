@@ -1,6 +1,10 @@
 defmodule Squirrelixir.ConnectionOptions do
   @moduledoc """
-  PostgreSQL connection options used by Squirrelixir.
+  PostgreSQL connection settings for Squirrelixir.
+
+  Squirrelixir uses a plain Elixir struct — not a Gleam-style opaque record.
+  Fields are regular struct keys you can pattern match on or convert to a
+  Postgrex/DBConnection keyword list when needed.
   """
 
   @enforce_keys [:host, :port, :user, :password, :database, :timeout_seconds]

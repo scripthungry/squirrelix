@@ -1,6 +1,10 @@
 defmodule Squirrelixir.CLI do
   @moduledoc """
-  CLI compatibility helpers reimplemented from Squirrel's core behavior.
+  Project discovery and PostgreSQL connection helpers.
+
+  This module mirrors upstream Squirrel CLI behaviour using Elixir data structures:
+  maps for discovered files, structs for connection options, and `{:ok, _}` /
+  `{:error, reason}` tuples for fallible operations.
   """
 
   alias Squirrelixir.ConnectionOptions
@@ -14,7 +18,10 @@ defmodule Squirrelixir.CLI do
   @default_port 5432
   @default_timeout 5
 
-  @spec parse_connection_url(String.t()) :: {:ok, ConnectionOptions.t()} | :error
+  @type discovered_sql_files :: %{Path.t() => [Path.t()]}
+
+  @spec parse_connection_url(String.t()) ::
+          {:ok, ConnectionOptions.t()} | {:error, :invalid_url}
   def parse_connection_url(raw) when is_binary(raw) do
     with %URI{} = uri <- URI.parse(raw),
          :ok <- check_scheme(uri.scheme),
@@ -32,7 +39,7 @@ defmodule Squirrelixir.CLI do
          timeout_seconds: timeout
        }}
     else
-      _ -> :error
+      _ -> {:error, :invalid_url}
     end
   end
 
@@ -51,16 +58,21 @@ defmodule Squirrelixir.CLI do
     }
   end
 
-  @spec walk(String.t()) :: %{String.t() => [String.t()]}
-  def walk(from) when is_binary(from) do
-    do_walk(from)
+  @doc """
+  Recursively finds `sql/` directories and their `.sql` files under `path`.
+
+  Returns a map of directory paths to sorted SQL file paths.
+  """
+  @spec discover_sql_directories(Path.t()) :: discovered_sql_files()
+  def discover_sql_directories(path) when is_binary(path) do
+    do_discover_sql_directories(path)
   end
 
-  @spec query_files(Path.t()) :: %{String.t() => [String.t()]}
+  @spec query_files(Path.t()) :: discovered_sql_files()
   def query_files(root) when is_binary(root) do
     root
     |> Project.source_roots()
-    |> Enum.map(&walk/1)
+    |> Enum.map(&discover_sql_directories/1)
     |> Enum.reduce(%{}, &Map.merge/2)
   end
 
@@ -78,13 +90,13 @@ defmodule Squirrelixir.CLI do
     |> Path.join("sql.ex")
   end
 
-  defp do_walk(from) do
-    if Path.basename(from) == "sql" do
+  defp do_discover_sql_directories(path) do
+    if Path.basename(path) == "sql" do
       files =
-        case File.ls(from) do
+        case File.ls(path) do
           {:ok, entries} ->
             entries
-            |> Enum.map(&Path.join(from, &1))
+            |> Enum.map(&Path.join(path, &1))
             |> Enum.filter(&(File.regular?(&1) and Path.extname(&1) == ".sql"))
             |> Enum.sort()
 
@@ -92,11 +104,11 @@ defmodule Squirrelixir.CLI do
             []
         end
 
-      %{from => files}
+      %{path => files}
     else
-      from
+      path
       |> list_directories()
-      |> Enum.map(&do_walk/1)
+      |> Enum.map(&do_discover_sql_directories/1)
       |> Enum.reduce(%{}, &Map.merge/2)
     end
   end

@@ -75,7 +75,7 @@ defmodule Squirrelixir.Codegen do
 
         Output.safe_write(output_file, content)
 
-      :error ->
+      {:error, :invalid_sql_directory} ->
         {:error, :invalid_sql_directory}
     end
   end
@@ -91,7 +91,7 @@ defmodule Squirrelixir.Codegen do
 
         Output.check_file(output_file, content)
 
-      :error ->
+      {:error, :invalid_sql_directory} ->
         {:error, :invalid_sql_directory}
     end
   end
@@ -169,7 +169,7 @@ defmodule Squirrelixir.Codegen do
 
     """
       #{doc_source(query)}
-      @spec #{query.name}(Postgrex.conn()#{spec_args(query.params)}) :: #{return_typespec(query.returns)}
+      #{row_type_source(query)}@spec #{query.name}(Postgrex.conn()#{spec_args(query.params)}) :: #{function_return_typespec(query)}
       def #{query.name}(#{Enum.join(all_args, ", ")}) do
         connection
         |> #{inspect(postgrex_module)}.query!(#{sql_string_literal(query.content)}, #{encoded_params})
@@ -184,7 +184,7 @@ defmodule Squirrelixir.Codegen do
     args
     |> Enum.zip(params)
     |> Enum.map(fn {name, %Parameter{type: type}} ->
-      "encode_param(#{name}, #{inspect(type, limit: :infinity)})"
+      "encode_value(#{name}, #{inspect(type, limit: :infinity)})"
     end)
     |> then(&"[#{Enum.join(&1, ", ")}]")
   end
@@ -250,7 +250,7 @@ defmodule Squirrelixir.Codegen do
           end
 
           defp decode_value(value, _type, true) when is_nil(value), do: nil
-          defp decode_value(value, type, _nullable?), do: decode_typed_value(value, type)
+          defp decode_value(value, type, _nullable?), do: decode_scalar(value, type)
 
           #{decode_type_clauses(types)}
         """
@@ -265,47 +265,47 @@ defmodule Squirrelixir.Codegen do
     types
     |> then(fn types ->
       []
-      |> add_type_clause(types, :integer, "defp decode_typed_value(value, :integer), do: value")
-      |> add_type_clause(types, :string, "defp decode_typed_value(value, :string), do: value")
-      |> add_type_clause(types, :boolean, "defp decode_typed_value(value, :boolean), do: value")
-      |> add_type_clause(types, :float, "defp decode_typed_value(value, :float), do: value")
-      |> add_type_clause(types, :decimal, "defp decode_typed_value(value, :decimal), do: value")
-      |> add_type_clause(types, :binary, "defp decode_typed_value(value, :binary), do: value")
-      |> add_type_clause(types, :date, "defp decode_typed_value(value, :date), do: value")
-      |> add_type_clause(types, :time, "defp decode_typed_value(value, :time), do: value")
+      |> add_type_clause(types, :integer, "defp decode_scalar(value, :integer), do: value")
+      |> add_type_clause(types, :string, "defp decode_scalar(value, :string), do: value")
+      |> add_type_clause(types, :boolean, "defp decode_scalar(value, :boolean), do: value")
+      |> add_type_clause(types, :float, "defp decode_scalar(value, :float), do: value")
+      |> add_type_clause(types, :decimal, "defp decode_scalar(value, :decimal), do: value")
+      |> add_type_clause(types, :binary, "defp decode_scalar(value, :binary), do: value")
+      |> add_type_clause(types, :date, "defp decode_scalar(value, :date), do: value")
+      |> add_type_clause(types, :time, "defp decode_scalar(value, :time), do: value")
       |> add_type_clause(
         types,
         :naive_datetime,
-        "defp decode_typed_value(value, :naive_datetime), do: value"
+        "defp decode_scalar(value, :naive_datetime), do: value"
       )
       |> add_type_clause(
         types,
         :utc_datetime,
-        "defp decode_typed_value(value, :utc_datetime), do: value"
+        "defp decode_scalar(value, :utc_datetime), do: value"
       )
       |> add_type_clause(
         types,
         :map,
         """
-        defp decode_typed_value(value, :map) when is_map(value), do: value
-        defp decode_typed_value(value, :map) when is_binary(value), do: JSON.decode!(value)
+        defp decode_scalar(value, :map) when is_map(value), do: value
+        defp decode_scalar(value, :map) when is_binary(value), do: JSON.decode!(value)
         """
       )
       |> add_type_clause(
         types,
         :uuid,
         """
-        defp decode_typed_value(value, :uuid) when is_binary(value) and byte_size(value) == 16,
+        defp decode_scalar(value, :uuid) when is_binary(value) and byte_size(value) == 16,
           do: uuid_to_string(value)
 
-        defp decode_typed_value(value, :uuid), do: value
+        defp decode_scalar(value, :uuid), do: value
         """
       )
       |> add_list_type_clauses(types)
     end)
     |> Enum.reverse()
     |> Kernel.++([
-      "defp decode_typed_value(value, _type), do: value"
+      "defp decode_scalar(value, _type), do: value"
     ])
     |> Enum.join("\n")
   end
@@ -326,7 +326,7 @@ defmodule Squirrelixir.Codegen do
         clauses
       else
         [
-          "defp decode_typed_value(value, {:list, #{inspect(type)}}) when is_list(value), do: Enum.map(value, &decode_typed_value(&1, #{inspect(type)}))"
+          "defp decode_scalar(value, {:list, #{inspect(type)}}) when is_list(value), do: Enum.map(value, &decode_scalar(&1, #{inspect(type)}))"
           | clauses
         ]
       end
@@ -352,40 +352,40 @@ defmodule Squirrelixir.Codegen do
     types
     |> then(fn types ->
       []
-      |> add_type_clause(types, :integer, "defp encode_param(value, :integer), do: value")
-      |> add_type_clause(types, :string, "defp encode_param(value, :string), do: value")
-      |> add_type_clause(types, :boolean, "defp encode_param(value, :boolean), do: value")
-      |> add_type_clause(types, :float, "defp encode_param(value, :float), do: value")
-      |> add_type_clause(types, :decimal, "defp encode_param(value, :decimal), do: value")
-      |> add_type_clause(types, :binary, "defp encode_param(value, :binary), do: value")
-      |> add_type_clause(types, :date, "defp encode_param(value, :date), do: value")
-      |> add_type_clause(types, :time, "defp encode_param(value, :time), do: value")
+      |> add_type_clause(types, :integer, "defp encode_value(value, :integer), do: value")
+      |> add_type_clause(types, :string, "defp encode_value(value, :string), do: value")
+      |> add_type_clause(types, :boolean, "defp encode_value(value, :boolean), do: value")
+      |> add_type_clause(types, :float, "defp encode_value(value, :float), do: value")
+      |> add_type_clause(types, :decimal, "defp encode_value(value, :decimal), do: value")
+      |> add_type_clause(types, :binary, "defp encode_value(value, :binary), do: value")
+      |> add_type_clause(types, :date, "defp encode_value(value, :date), do: value")
+      |> add_type_clause(types, :time, "defp encode_value(value, :time), do: value")
       |> add_type_clause(
         types,
         :naive_datetime,
-        "defp encode_param(value, :naive_datetime), do: value"
+        "defp encode_value(value, :naive_datetime), do: value"
       )
       |> add_type_clause(
         types,
         :utc_datetime,
-        "defp encode_param(value, :utc_datetime), do: value"
+        "defp encode_value(value, :utc_datetime), do: value"
       )
       |> add_type_clause(
         types,
         :map,
-        "defp encode_param(value, :map) when is_map(value), do: JSON.encode!(value)"
+        "defp encode_value(value, :map) when is_map(value), do: JSON.encode!(value)"
       )
       |> add_type_clause(
         types,
         :uuid,
-        "defp encode_param(value, :uuid), do: uuid_from_string(value)"
+        "defp encode_value(value, :uuid), do: uuid_from_string(value)"
       )
       |> add_list_encode_clauses(types)
     end)
     |> Enum.reverse()
     |> Kernel.++([
-      "defp encode_param(nil, _type), do: nil",
-      "defp encode_param(value, _type), do: value"
+      "defp encode_value(nil, _type), do: nil",
+      "defp encode_value(value, _type), do: value"
     ])
     |> Enum.join("\n")
   end
@@ -398,7 +398,7 @@ defmodule Squirrelixir.Codegen do
         clauses
       else
         [
-          "defp encode_param(value, {:list, #{inspect(type)}}) when is_list(value), do: Enum.map(value, &encode_param(&1, #{inspect(type)}))"
+          "defp encode_value(value, {:list, #{inspect(type)}}) when is_list(value), do: Enum.map(value, &encode_value(&1, #{inspect(type)}))"
           | clauses
         ]
       end
@@ -480,12 +480,18 @@ defmodule Squirrelixir.Codegen do
     |> Enum.map_join("", &", #{&1}")
   end
 
-  defp return_typespec(columns) do
-    columns
-    |> Enum.map(fn column ->
-      {String.to_atom(column.name), column.type, column.nullable?}
-    end)
-    |> TypeMapper.return_typespec()
+  defp row_type_source(%TypedQuery{returns: []}), do: ""
+
+  defp row_type_source(%TypedQuery{name: name, returns: returns}) do
+    """
+      @type #{name}_row :: #{TypeMapper.row_typespec(return_column_specs(returns))}
+    """
+  end
+
+  defp function_return_typespec(%TypedQuery{returns: []}), do: ":ok"
+
+  defp function_return_typespec(%TypedQuery{name: name, returns: _returns}) do
+    "[#{name}_row()]"
   end
 
   defp generated_function_doc(%TypedQuery{name: name, file: file}) do
