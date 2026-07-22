@@ -4,7 +4,6 @@ defmodule Squirrelixir.Postgres do
   """
 
   alias Squirrelixir.Column
-  alias Squirrelixir.Enum, as: SquirrelEnum
   alias Squirrelixir.Error.MissingPostgresColumn
   alias Squirrelixir.Error.MissingPostgresTable
   alias Squirrelixir.Error.PostgresInferenceError
@@ -372,7 +371,7 @@ defmodule Squirrelixir.Postgres do
 
   defp resolve_postgres_type(conn, oid, name, "e", array_dimensions, query) do
     with {:ok, variants} <- enum_variants(conn, oid),
-         :ok <- SquirrelEnum.validate(name, variants),
+         :ok <- TypeMapper.validate_enum(name, variants),
          {:ok, type} <-
            TypeMapper.from_postgres(name, kind: "e", array_dimensions: array_dimensions) do
       {:ok, type}
