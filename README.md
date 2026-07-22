@@ -152,5 +152,7 @@ See [ROADMAP.md](ROADMAP.md) for completed work and remaining compatibility slic
 
 Squirrelixir is licensed under the Apache License 2.0. See [LICENSE](LICENSE).
 
-Squirrelixir is a port of [Gleam Squirrel](https://github.com/giacomocavalieri/squirrel),
-which is also licensed under Apache 2.0.
+Squirrelixir is a port of [Gleam Squirrel](https://github.com/giacomocavalieri/squirrel)
+by Giacomo Cavalieri, also licensed under Apache 2.0. See the upstream
+[LICENSE](https://github.com/giacomocavalieri/squirrel/blob/main/LICENSE) and
+[NOTICE](NOTICE) for attribution.

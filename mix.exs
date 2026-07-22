@@ -53,7 +53,7 @@ defmodule Squirrelixir.MixProject do
         "GitHub" => @source_url,
         "Upstream Squirrel" => "https://github.com/giacomocavalieri/squirrel"
       },
-      files: ~w(lib mix.exs README.md LICENSE ROADMAP.md .formatter.exs)
+      files: ~w(lib mix.exs README.md LICENSE NOTICE ROADMAP.md .formatter.exs)
     ]
   end
 
