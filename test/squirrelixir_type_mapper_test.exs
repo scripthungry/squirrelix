@@ -47,7 +47,30 @@ defmodule SquirrelixirTypeMapperTest do
 
   test "from_postgres rejects unsupported types" do
     assert TypeMapper.from_postgres("point") ==
-             {:error, %UnsupportedPostgresType{name: "point"}}
+             {:error, %UnsupportedPostgresType{name: "point", hint: nil}}
+  end
+
+  test "hint_for returns timestamptz guidance from upstream Squirrel" do
+    assert TypeMapper.hint_for("timestamptz") =~ "time zone"
+    assert TypeMapper.hint_for("point") == nil
+  end
+
+  test "validate_enum accepts snake_case enum names and variants" do
+    assert :ok = TypeMapper.validate_enum("squirrel_mood", ["happy", "sleepy"])
+  end
+
+  test "validate_enum rejects enum names that cannot become type identifiers" do
+    assert {:error, {:invalid_name, "1 invalid enum"}} =
+             TypeMapper.validate_enum("1 invalid enum", ["value"])
+  end
+
+  test "validate_enum rejects enum variants that cannot become type identifiers" do
+    assert {:error, {:invalid_variants, ["1 invalid value"]}} =
+             TypeMapper.validate_enum("invalid_variant", ["1 invalid value"])
+  end
+
+  test "validate_enum rejects enums with no variants" do
+    assert {:error, :no_variants} = TypeMapper.validate_enum("no_variants", [])
   end
 
   test "normalize_type accepts Elixir atoms and Postgres descriptors" do
