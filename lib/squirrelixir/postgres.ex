@@ -4,10 +4,12 @@ defmodule Squirrelixir.Postgres do
   """
 
   alias Squirrelixir.Column
+  alias Squirrelixir.Enum, as: SquirrelEnum
   alias Squirrelixir.Error.MissingPostgresColumn
   alias Squirrelixir.Error.MissingPostgresTable
   alias Squirrelixir.Error.PostgresInferenceError
   alias Squirrelixir.Error.PostgresSyntaxError
+  alias Squirrelixir.Error.QueryHasInvalidEnum
   alias Squirrelixir.Query
   alias Squirrelixir.TypeMapper
 
@@ -55,10 +57,17 @@ defmodule Squirrelixir.Postgres do
     join pg_type
       on pg_type.oid = next_type.oid
   )
-  select types.name, types.kind, types.array_dimensions
+  select types.name, types.kind, types.array_dimensions, types.oid
   from types
   order by types.jumps desc
   limit 1
+  """
+
+  @enum_variants_query """
+  select enumlabel
+  from pg_enum
+  where enumtypid = $1::oid
+  order by enumsortorder asc
   """
 
   @spec describer(Postgrex.conn()) :: Squirrelixir.Inference.describer()
@@ -69,7 +78,7 @@ defmodule Squirrelixir.Postgres do
   @spec describe(Postgrex.conn(), Query.t()) :: {:ok, keyword()} | {:error, struct()}
   def describe(conn, %Query{} = query) do
     with {:ok, prepared_query} <- prepare(conn, query),
-         {:ok, params} <- describe_oids(conn, prepared_query.param_oids || []),
+         {:ok, params} <- describe_oids(conn, prepared_query.param_oids || [], query),
          {:ok, returns} <- describe_returns(conn, prepared_query, query) do
       {:ok, [params: params, returns: returns]}
     end
@@ -150,7 +159,7 @@ defmodule Squirrelixir.Postgres do
     {plan_available?, plan_nullables, column_sources} =
       infer_nullability(conn, query, prepared_query)
 
-    with {:ok, types} <- describe_oids(conn, result_oids) do
+    with {:ok, types} <- describe_oids(conn, result_oids, query) do
       returns =
         columns
         |> Enum.zip(types)
@@ -341,9 +350,9 @@ defmodule Squirrelixir.Postgres do
     end
   end
 
-  defp describe_oids(conn, oids) do
+  defp describe_oids(conn, oids, query) do
     Enum.reduce_while(oids, {:ok, []}, fn oid, {:ok, types} ->
-      case describe_oid(conn, oid) do
+      case describe_oid(conn, oid, query) do
         {:ok, type} -> {:cont, {:ok, [type | types]}}
         {:error, error} -> {:halt, {:error, error}}
       end
@@ -354,10 +363,55 @@ defmodule Squirrelixir.Postgres do
     end
   end
 
-  defp describe_oid(conn, oid) do
-    with {:ok, %Postgrex.Result{rows: [[name, kind, array_dimensions]]}} <-
+  defp describe_oid(conn, oid, query) do
+    with {:ok, %Postgrex.Result{rows: [[name, kind, array_dimensions, type_oid]]}} <-
            Postgrex.query(conn, @type_lookup_query, [oid]) do
-      TypeMapper.from_postgres(name, kind: kind, array_dimensions: array_dimensions)
+      resolve_postgres_type(conn, type_oid, name, kind, array_dimensions, query)
     end
+  end
+
+  defp resolve_postgres_type(conn, oid, name, "e", array_dimensions, query) do
+    with {:ok, variants} <- enum_variants(conn, oid),
+         :ok <- SquirrelEnum.validate(name, variants),
+         {:ok, type} <-
+           TypeMapper.from_postgres(name, kind: "e", array_dimensions: array_dimensions) do
+      {:ok, type}
+    else
+      {:error, reason} ->
+        if invalid_enum_reason?(reason) do
+          {:error, invalid_enum_error(query, name, reason)}
+        else
+          {:error, reason}
+        end
+    end
+  end
+
+  defp resolve_postgres_type(_conn, _oid, name, kind, array_dimensions, _query) do
+    TypeMapper.from_postgres(name, kind: kind, array_dimensions: array_dimensions)
+  end
+
+  defp invalid_enum_reason?(:no_variants), do: true
+  defp invalid_enum_reason?({:invalid_name, _}), do: true
+  defp invalid_enum_reason?({:invalid_variants, _}), do: true
+  defp invalid_enum_reason?(_), do: false
+
+  defp enum_variants(conn, oid) do
+    case Postgrex.query(conn, @enum_variants_query, [oid]) do
+      {:ok, %Postgrex.Result{rows: rows}} ->
+        {:ok, Enum.map(rows, fn [variant] -> variant end)}
+
+      {:error, error} ->
+        {:error, error}
+    end
+  end
+
+  defp invalid_enum_error(query, enum_name, reason) do
+    %QueryHasInvalidEnum{
+      file: query.file,
+      starting_line: query.starting_line,
+      content: query.content,
+      enum_name: enum_name,
+      reason: reason
+    }
   end
 end

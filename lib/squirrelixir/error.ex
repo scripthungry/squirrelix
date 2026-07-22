@@ -109,9 +109,31 @@ defmodule Squirrelixir.Error.UnsupportedPostgresType do
   """
 
   @enforce_keys [:name]
-  defstruct [:name]
+  defstruct [:name, :hint]
 
-  @type t :: %__MODULE__{name: String.t()}
+  @type t :: %__MODULE__{name: String.t(), hint: String.t() | nil}
+end
+
+defmodule Squirrelixir.Error.QueryHasInvalidEnum do
+  @moduledoc """
+  Error returned when a Postgres enum cannot be represented in generated Elixir code.
+  """
+
+  @enforce_keys [:file, :starting_line, :content, :enum_name, :reason]
+  defstruct [:file, :starting_line, :content, :enum_name, :reason]
+
+  @type reason ::
+          :no_variants
+          | {:invalid_name, String.t()}
+          | {:invalid_variants, [String.t()]}
+
+  @type t :: %__MODULE__{
+          file: String.t(),
+          starting_line: pos_integer(),
+          content: String.t(),
+          enum_name: String.t(),
+          reason: reason()
+        }
 end
 
 defmodule Squirrelixir.Error.PostgresSyntaxError do
