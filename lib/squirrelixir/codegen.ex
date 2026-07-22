@@ -58,7 +58,7 @@ defmodule Squirrelixir.Codegen do
       > This module was generated automatically using Squirrelixir #{version}.
       \"\"\"
 
-    #{queries |> Enum.sort_by(& &1.file) |> Enum.map_join("\n\n", &function_source(&1, postgrex_module))}
+    #{queries |> Enum.sort_by(& &1.file) |> Enum.map(&function_source(&1, postgrex_module)) |> join_function_sources()}
     #{decode_helpers(queries)}
     end
     """
@@ -177,7 +177,7 @@ defmodule Squirrelixir.Codegen do
       @spec #{query.name}(Postgrex.conn()#{spec_args(query.params)}) :: #{return_spec(query.returns)}
       def #{query.name}(#{Enum.join(all_args, ", ")}) do
         connection
-        |> #{inspect(postgrex_module)}.query!(#{inspect(query.content)}, [#{params}])
+        |> #{inspect(postgrex_module)}.query!(#{sql_string_literal(query.content)}, [#{params}])
         |> #{decode_call(query.returns)}
       end
     """
@@ -306,6 +306,17 @@ defmodule Squirrelixir.Codegen do
     end
   end
 
+  defp join_function_sources([]), do: ""
+
+  defp join_function_sources(sources) do
+    Enum.map_join(sources, "\n\n", &String.trim/1)
+  end
+
+  defp doc_source(%TypedQuery{comment: [], returns: [], params: params} = query)
+       when length(params) >= 8 do
+    generated_function_doc(query)
+  end
+
   defp doc_source(%TypedQuery{comment: []}), do: ""
 
   defp doc_source(%TypedQuery{comment: comments}) do
@@ -357,6 +368,23 @@ defmodule Squirrelixir.Codegen do
   defp type_spec(:utc_datetime), do: "DateTime.t()"
   defp type_spec({:list, type}), do: "[#{type_spec(type)}]"
   defp type_spec(_type), do: "term()"
+
+  defp generated_function_doc(%TypedQuery{name: name, file: file}) do
+    """
+      @doc \"\"\"
+      Runs the `#{name}` query defined in `#{Path.basename(file)}`.
+      \"\"\"
+    """
+  end
+
+  defp sql_string_literal(content) do
+    escaped =
+      content
+      |> String.replace("\\", "\\\\")
+      |> String.replace("\"", "\\\"")
+
+    "\"#{escaped}\""
+  end
 
   defp summary_status(0, []), do: :empty
   defp summary_status(_generated_count, []), do: :ok

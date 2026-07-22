@@ -477,6 +477,127 @@ defmodule SquirrelixirCodegenTest do
            }
   end
 
+  test "query with quoted string is properly escaped" do
+    query =
+      typed_query(
+        "query.sql",
+        "query",
+        ~s|select 1 as "result"|,
+        [],
+        [%Column{name: "result", type: :integer, nullable?: false}]
+      )
+
+    code =
+      Codegen.generate_module(Squirrelixir.GeneratedQuotedStringTest.SQL, [query],
+        version: "v-test",
+        postgrex: PostgrexQuotedStringMock
+      )
+
+    [{module, _bytecode}] = Code.compile_string(code)
+    assert module.query({PostgrexQuotedStringMock, self()}) == [%{result: 1}]
+    assert_received {:query!, ~s|select 1 as "result"|, []}
+  end
+
+  test "there is only one empty line between code generated for different queries" do
+    queries = [
+      typed_query("one.sql", "one", "select 1 as res", [], [
+        %Column{name: "res", type: :integer, nullable?: false}
+      ]),
+      typed_query("two.sql", "two", "select 2 as res", [], [
+        %Column{name: "res", type: :integer, nullable?: false}
+      ])
+    ]
+
+    code = Codegen.generate_module(MyApp.SQL, queries, version: "v-test")
+
+    assert code =~ ~r/end\n\n  @spec two\(Postgrex\.conn\(\)\)/
+    refute code =~ ~r/end\n\n\n  @spec two\(Postgrex\.conn\(\)\)/
+  end
+
+  test "query with many arguments returning nil" do
+    params = [
+      %Parameter{index: 1, name: nil, type: :string}
+      | for index <- 2..9 do
+          %Parameter{index: index, name: nil, type: {:list, :string}}
+        end
+    ]
+
+    content = """
+    \nwith a as (
+      select $1, *
+      from unnest(
+        $2::text[],
+        $3::text[],
+        $4::text[],
+        $5::text[],
+        $6::text[],
+        $7::text[],
+        $8::text[],
+        $9::text[]
+      )
+    )
+    select
+    """
+
+    query = typed_query("query.sql", "query", content, params, [])
+
+    code = Codegen.generate_module(MyApp.SQL, [query], version: "v-test")
+
+    assert code =~ "Runs the `query` query defined in `query.sql`."
+    assert code =~ ":: :ok"
+
+    assert code =~
+             "def query(connection, arg_1, arg_2, arg_3, arg_4, arg_5, arg_6, arg_7, arg_8, arg_9)"
+
+    assert code =~ "Postgrex.conn()"
+    assert code =~ "String.t()"
+
+    for _index <- 2..9 do
+      assert code =~ "[String.t()]"
+    end
+
+    assert code =~ "decode_command()"
+    assert [{_module, _bytecode}] = Code.compile_string(code)
+  end
+
+  test "fields appear in the order they have in the select list" do
+    query =
+      typed_query(
+        "query.sql",
+        "query",
+        "select true as first, 1 as second, 'wibble' as third",
+        [],
+        [
+          %Column{name: "first", type: :boolean, nullable?: false},
+          %Column{name: "second", type: :integer, nullable?: false},
+          %Column{name: "third", type: :string, nullable?: false}
+        ]
+      )
+
+    code = Codegen.generate_module(MyApp.SQL, [query], version: "v-test")
+
+    spec = typespec_fragment(code, "query")
+
+    assert spec =~ "required(:first) => boolean()"
+    assert spec =~ "required(:second) => integer()"
+    assert spec =~ "required(:third) => String.t()"
+
+    assert field_order(spec, :first) < field_order(spec, :second)
+    assert field_order(spec, :second) < field_order(spec, :third)
+    assert code =~ "decode_rows([:first, :second, :third])"
+  end
+
+  defp typespec_fragment(code, function_name) do
+    [_, spec] =
+      Regex.run(~r/@spec #{function_name}\([\s\S]*?\) :: ([\s\S]*?)\n  def /, code)
+
+    String.trim(spec)
+  end
+
+  defp field_order(spec, field) do
+    spec |> :binary.match("required(:#{field})") |> elem(0)
+  end
+
   defp typed_query(file, name, content, params, returns \\ nil) do
     %TypedQuery{
       file: file,
@@ -519,5 +640,13 @@ defmodule PostgrexCommandMock do
     send(owner, {:query!, sql, params})
 
     %Postgrex.Result{command: :insert, columns: nil, rows: nil, num_rows: 1}
+  end
+end
+
+defmodule PostgrexQuotedStringMock do
+  def query!({_module, owner}, sql, params) do
+    send(owner, {:query!, sql, params})
+
+    %Postgrex.Result{columns: ["result"], rows: [[1]]}
   end
 end
