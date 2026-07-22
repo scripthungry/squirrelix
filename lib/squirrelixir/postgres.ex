@@ -48,15 +48,6 @@ defmodule Squirrelixir.Postgres do
   limit 1
   """
 
-  @column_nullability_query """
-  select pg_attribute.attnotnull
-  from pg_attribute
-  where pg_attribute.attrelid = to_regclass($1)
-  and pg_attribute.attname = $2
-  and pg_attribute.attnum > 0
-  and not pg_attribute.attisdropped
-  """
-
   @spec describer(Postgrex.conn()) :: Squirrelixir.Inference.describer()
   def describer(conn) do
     &describe(conn, &1)
@@ -142,7 +133,7 @@ defmodule Squirrelixir.Postgres do
   defp describe_returns(conn, prepared_query, query) do
     columns = prepared_query.columns || []
     result_oids = prepared_query.result_oids || []
-    nullability = infer_nullability(conn, query.content, columns)
+    nullability = infer_nullability(conn, query, columns)
 
     with {:ok, types} <- describe_oids(conn, result_oids) do
       returns =
@@ -157,126 +148,126 @@ defmodule Squirrelixir.Postgres do
     end
   end
 
-  defp infer_nullability(conn, content, columns) do
-    with {:ok, tables} <- source_tables(content),
-         {:ok, source_columns} <- source_columns(content, columns) do
-      source_columns
-      |> Enum.with_index()
-      |> Enum.reduce(%{}, fn {source_column, index}, nullability ->
-        Map.put(nullability, index, nullable_source_column?(conn, tables, source_column))
-      end)
-    else
+  # -- Plan-based nullability inference (mirrors upstream Gleam squirrel) --
+
+  defp infer_nullability(conn, query, columns) do
+    case query_plan(conn, query) do
+      {:ok, plan} -> nullables_from_plan(plan, columns)
       :error -> %{}
     end
   end
 
-  defp source_tables(content) do
-    case Regex.named_captures(
-           ~r/\bfrom\s+(?<table>[a-zA-Z_][a-zA-Z0-9_\.]*)(?:\s+(?:as\s+)?(?<alias>[a-zA-Z_][a-zA-Z0-9_]*))?/i,
-           content
-         ) do
-      %{"table" => table, "alias" => alias} ->
-        tables =
-          table_entries(table, alias, primary_table_nullable?(content), include_primary?: true)
+  defp query_plan(conn, query) do
+    # EXPLAIN doesn't work with parameterized queries ($1, $2).
+    # Skip plan-based nullability for parameterized queries; fall back to default (all nullable).
+    if String.contains?(query.content, "$") do
+      :error
+    else
+      explain_query = "explain (format json, verbose) " <> query.content
 
-        {:ok, Enum.reduce(join_tables(content), tables, &Map.merge(&2, &1))}
+      case Postgrex.query(conn, explain_query, []) do
+        {:ok, %Postgrex.Result{rows: [[plan_json]]}} ->
+          # Postgrex JSON extension may auto-decode; handle both string and map
+          plan_data =
+            case plan_json do
+              s when is_binary(s) ->
+                case Jason.decode(s) do
+                  {:ok, data} -> data
+                  _ -> :error
+                end
+              data when is_list(data) -> data
+              data when is_map(data) -> data
+            end
 
-      nil ->
-        :error
+          case plan_data do
+            [%{"Plan" => root_plan} | _] ->
+              {:ok, parse_plan(root_plan)}
+            %{"Plan" => root_plan} ->
+              {:ok, parse_plan(root_plan)}
+            _ ->
+              :error
+          end
+
+        {:error, _} ->
+          :error
+      end
     end
   end
 
-  defp primary_table_nullable?(content) do
-    Regex.match?(~r/\b(?:right|full)\s+(?:outer\s+)?join\b/i, content)
+  defp parse_plan(plan_map) do
+    %{
+      join_type: Map.get(plan_map, "Join Type"),
+      output: Map.get(plan_map, "Output", []),
+      plans: plan_map |> Map.get("Plans", []) |> Enum.map(&parse_plan/1)
+    }
   end
 
-  defp join_tables(content) do
-    ~r/\b(left|right|full)\s+(?:outer\s+)?join\s+([a-zA-Z_][a-zA-Z0-9_\.]*)(?:\s+(?:as\s+)?([a-zA-Z_][a-zA-Z0-9_]*))?/i
-    |> Regex.scan(content)
-    |> Enum.map(fn [_match, join_type, table, alias] ->
-      table_entries(table, alias, joined_table_nullable?(join_type), include_primary?: false)
+  defp nullables_from_plan(plan, _columns) do
+    # Build a map from output expression string to column index
+    # from the root plan's output (these are the query-level column expressions)
+    outputs =
+      plan.output
+      |> Enum.with_index()
+      |> Enum.reduce(%{}, fn {expr, idx}, acc -> Map.put(acc, expr, idx) end)
+
+    do_nullables_from_plan(plan, outputs, MapSet.new())
+    |> MapSet.to_list()
+    |> Enum.reduce(%{}, fn idx, acc -> Map.put(acc, idx, true) end)
+  end
+
+  defp do_nullables_from_plan(plan, query_outputs, nullables) do
+    case {plan.join_type, plan.plans} do
+      # Full join → all outputs are nullable
+      {"Full Join", _} ->
+        plan_outputs_indices(plan, query_outputs)
+        |> MapSet.union(nullables)
+
+      # Right join → left (outer) side outputs are nullable
+      {"Right Join", [left, right]} ->
+        nullables =
+          plan_outputs_indices(left, query_outputs)
+          |> MapSet.union(nullables)
+
+        do_nullables_from_plan(right, query_outputs, nullables)
+
+      # Left join / Semi join → right (inner) side outputs are nullable
+      {"Left Join", [left, right]} ->
+        nullables =
+          plan_outputs_indices(right, query_outputs)
+          |> MapSet.union(nullables)
+
+        do_nullables_from_plan(left, query_outputs, nullables)
+
+      {"Semi Join", [left, right]} ->
+        nullables =
+          plan_outputs_indices(right, query_outputs)
+          |> MapSet.union(nullables)
+
+        do_nullables_from_plan(left, query_outputs, nullables)
+
+      # Inner join → recurse into children
+      {"Inner Join", plans} ->
+        Enum.reduce(plans, nullables, fn child, acc ->
+          do_nullables_from_plan(child, query_outputs, acc)
+        end)
+
+      # Leaf node or unexpected cardinality → recurse into children
+      {_join_type, plans} ->
+        Enum.reduce(plans, nullables, fn child, acc ->
+          do_nullables_from_plan(child, query_outputs, acc)
+        end)
+    end
+  end
+
+  defp plan_outputs_indices(plan, query_outputs) do
+    # Match this plan node's output expressions against the top-level query outputs.
+    # If a match is found, that column index is marked nullable.
+    Enum.reduce(plan.output, MapSet.new(), fn output, acc ->
+      case Map.fetch(query_outputs, output) do
+        {:ok, idx} -> MapSet.put(acc, idx)
+        :error -> acc
+      end
     end)
-  end
-
-  defp joined_table_nullable?(join_type) when join_type in ["left", "full"], do: true
-  defp joined_table_nullable?(_join_type), do: false
-
-  defp table_entries(table, alias, nullable?, opts) do
-    table_info = %{table: table, nullable?: nullable?}
-
-    [{table_name(table), table_info}, {table, table_info}]
-    |> maybe_add_primary(table_info, opts)
-    |> maybe_add_alias(alias, table_info)
-    |> Map.new()
-  end
-
-  defp maybe_add_primary(entries, table_info, opts) do
-    if Keyword.get(opts, :include_primary?, false) do
-      [{:primary, table_info} | entries]
-    else
-      entries
-    end
-  end
-
-  defp maybe_add_alias(entries, alias, _table_info) when alias in ["", nil], do: entries
-
-  defp maybe_add_alias(entries, alias, _table_info)
-       when alias in ~w(where join left right full inner outer on order group limit),
-       do: entries
-
-  defp maybe_add_alias(entries, alias, table_info), do: [{alias, table_info} | entries]
-
-  defp table_name(table) do
-    table
-    |> String.split(".")
-    |> List.last()
-  end
-
-  defp source_columns(content, columns) do
-    with [_match, select_list] <- Regex.run(~r/\A\s*select\s+(.+?)\s+from\s+/is, content),
-         source_columns when length(source_columns) == length(columns) <-
-           select_list |> String.split(",") |> Enum.map(&source_column/1),
-         true <- Enum.all?(source_columns, &match?({:ok, _column}, &1)) do
-      {:ok, Enum.map(source_columns, fn {:ok, column} -> column end)}
-    else
-      _error -> :error
-    end
-  end
-
-  defp source_column(select_expression) do
-    select_expression = String.trim(select_expression)
-
-    case Regex.run(
-           ~r/\A(?:([a-zA-Z_][a-zA-Z0-9_]*)\.)?([a-zA-Z_][a-zA-Z0-9_]*)(?:\s+(?:as\s+)?[a-zA-Z_][a-zA-Z0-9_]*)?\z/i,
-           select_expression
-         ) do
-      [_match, qualifier, column] when qualifier in ["", nil] -> {:ok, %{column: column}}
-      [_match, qualifier, column] -> {:ok, %{qualifier: qualifier, column: column}}
-      nil -> :error
-    end
-  end
-
-  defp nullable_source_column?(conn, tables, %{qualifier: qualifier, column: column}) do
-    case Map.fetch(tables, qualifier) do
-      {:ok, %{nullable?: true}} -> true
-      {:ok, %{table: table}} -> nullable_column?(conn, table, column)
-      :error -> true
-    end
-  end
-
-  defp nullable_source_column?(conn, tables, %{column: column}) do
-    case Map.fetch(tables, :primary) do
-      {:ok, %{nullable?: true}} -> true
-      {:ok, %{table: table}} -> nullable_column?(conn, table, column)
-      :error -> true
-    end
-  end
-
-  defp nullable_column?(conn, table, column) do
-    case Postgrex.query(conn, @column_nullability_query, [table, column]) do
-      {:ok, %Postgrex.Result{rows: [[true]]}} -> false
-      _other -> true
-    end
   end
 
   defp describe_oids(conn, oids) do

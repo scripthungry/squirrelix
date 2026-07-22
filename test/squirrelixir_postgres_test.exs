@@ -232,6 +232,56 @@ defmodule SquirrelixirPostgresTest do
             ]} = Postgres.describe(conn, query)
   end
 
+  @tag :cte
+  test "describe infers nullability for CTE queries", %{conn: conn} do
+    Postgrex.query!(conn, "drop table if exists squirrelixir_cte_users", [])
+    Postgrex.query!(conn, "create temporary table squirrelixir_cte_users (id integer not null, name text not null)", [])
+
+    query =
+      query("""
+      with cte as (
+        select id, name from squirrelixir_cte_users
+      )
+      select id, name from cte
+      """)
+
+    assert {:ok,
+            [
+              params: [],
+              returns: [
+                %Column{name: "id", type: :integer, nullable?: false},
+                %Column{name: "name", type: :string, nullable?: false}
+              ]
+            ]} = Postgres.describe(conn, query)
+  end
+
+  @tag :cte
+  test "describe infers nullability for CTE with left join", %{conn: conn} do
+    Postgrex.query!(conn, "drop table if exists squirrelixir_cte_users", [])
+    Postgrex.query!(conn, "drop table if exists squirrelixir_cte_members", [])
+    Postgrex.query!(conn, "create temporary table squirrelixir_cte_users (id integer not null, name text not null)", [])
+    Postgrex.query!(conn, "create temporary table squirrelixir_cte_members (team_id integer, name text)", [])
+
+    query =
+      query("""
+      with cte as (
+        select id, name from squirrelixir_cte_users
+      )
+      select c.id, m.name
+      from cte c
+      left join squirrelixir_cte_members m on m.team_id = c.id
+      """)
+
+    assert {:ok,
+            [
+              params: [],
+              returns: [
+                %Column{name: "id", type: :integer, nullable?: false},
+                %Column{name: "name", type: :string, nullable?: true}
+              ]
+            ]} = Postgres.describe(conn, query)
+  end
+
   test "describe output can be converted into a typed query", %{conn: conn} do
     query = %Query{
       file: "find_account.sql",
