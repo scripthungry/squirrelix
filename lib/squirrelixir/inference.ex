@@ -1,6 +1,9 @@
 defmodule Squirrelixir.Inference.Inferrer do
   @moduledoc """
   Behaviour for modules that infer SQL query parameters and returned columns.
+
+  The Mix task uses `Squirrelixir.Postgres.inferrer/1` when `--infer` is passed.
+  See the [Configuration guide](configuration.html) for connection options.
   """
 
   @callback infer(Squirrelixir.Query.t()) :: {:ok, keyword()} | {:error, struct()}
@@ -9,6 +12,10 @@ end
 defmodule Squirrelixir.Inference do
   @moduledoc """
   Converts parsed query directories into typed query directories using an inferrer callback.
+
+  Used by `Squirrelixir.generate/3` and `Squirrelixir.check/3` when the query source
+  is a function or `Squirrelixir.Inference.Inferrer` module rather than a metadata map.
+  See [Configuration](configuration.html) for metadata vs inference modes.
   """
 
   alias Squirrelixir.Error

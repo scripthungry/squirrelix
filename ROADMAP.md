@@ -50,7 +50,9 @@ Gleam records, custom enum ADTs, or opaque tagged error values.
 
 - **Package and docs**
   - [x] Hex package metadata, Apache-2.0 license, and ExDoc module grouping.
-  - [x] README quick start, types section, and API overview.
+  - [x] README mirroring Gleam Squirrel structure (motivation, installation, types, FAQ).
+  - [x] Guides: getting started, writing queries, types, and configuration.
+  - [x] ExDoc extras and module docs linking to guides.
 
 ## Remaining
 

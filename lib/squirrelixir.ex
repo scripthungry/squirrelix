@@ -2,27 +2,33 @@ defmodule Squirrelixir do
   @moduledoc """
   Elixir-native SQL query code generation for Mix projects.
 
-  See `README.md` for a quick start, type conventions, and query-source options.
-
   Squirrelixir discovers `.sql` files under conventional Elixir source roots
   (`lib/`, `test/`, `dev/`), then generates sibling `sql.ex` modules with
-  `@spec`-annotated functions.
+  `@spec`-annotated functions that execute through Postgrex.
+
+  ## Guides
+
+    * [Getting Started](getting_started.html) — installation, layout, first query
+    * [Writing Queries](writing_queries.html) — one query per file, comments, naming
+    * [Types](types.html) — Postgres to Elixir type mapping
+    * [Configuration](configuration.html) — inference, metadata, connection, CI
+
+  See also `README.md` for a full overview.
 
   ## Query sources
 
   Generation and checking accept a *query source* in one of two forms:
 
     * A metadata map — keys are query file paths, values are keyword lists with
-      `:params` and `:returns`. This is the Elixir equivalent of a static config
-      file (`squirrelixir.exs`).
+      `:params` and `:returns`. Load from `squirrelixir.exs` or pass a map to
+      `generate/3` and `check/3`.
     * An inferrer — a `(query -> {:ok, keyword()} | {:error, struct()})` function
       or a module implementing `Squirrelixir.Inference.Inferrer`. The Mix task
       uses this mode with `--infer` to ask Postgres for column and parameter types.
 
   Generated code uses stdlib types in `@spec` output: `String.t()` for Postgres
-  enums, `term()` for JSON/JSONB columns, `map()` with `required/1` and
-  `optional/1` for row shapes, and plain keyword options rather than Gleam
-  records or custom enum ADTs.
+  enums, `term()` for JSON/JSONB columns, `map()` with `required/1` for row
+  shapes, and plain maps at runtime rather than Gleam records or custom enum ADTs.
   """
 
   @generated_module_marker "> 🐿️ This module was generated automatically using"

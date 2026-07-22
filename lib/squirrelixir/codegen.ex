@@ -31,6 +31,10 @@ end
 defmodule Squirrelixir.Codegen do
   @moduledoc """
   Generates Elixir modules for typed SQL queries.
+
+  Produces per-query row `@type` definitions, `@spec`-annotated functions, and runtime
+  encode/decode helpers. See [Writing Queries](writing_queries.html) and
+  [Types](types.html) for conventions and type mapping.
   """
 
   alias Squirrelixir.Output

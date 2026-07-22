@@ -53,14 +53,24 @@ defmodule Squirrelixir.MixProject do
         "GitHub" => @source_url,
         "Upstream Squirrel" => "https://github.com/giacomocavalieri/squirrel"
       },
-      files: ~w(lib mix.exs README.md LICENSE NOTICE ROADMAP.md .formatter.exs)
+      files: ~w(lib mix.exs README.md LICENSE NOTICE ROADMAP.md guides .formatter.exs)
     ]
   end
 
   defp docs do
     [
       main: "Squirrelixir",
-      extras: ["README.md", "ROADMAP.md"],
+      extras: [
+        "README.md",
+        "ROADMAP.md",
+        "guides/getting_started.md",
+        "guides/writing_queries.md",
+        "guides/types.md",
+        "guides/configuration.md"
+      ],
+      groups_for_extras: [
+        Guides: Path.wildcard("guides/*.md")
+      ],
       source_url: @source_url,
       source_ref: "v#{@version}",
       groups_for_modules: [
