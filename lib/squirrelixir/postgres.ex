@@ -11,6 +11,19 @@ defmodule Squirrelixir.Postgres do
   alias Squirrelixir.Query
   alias Squirrelixir.TypeMapper
 
+  @column_nullability_query """
+  select a.attnotnull
+  from pg_attribute a
+  join pg_class c on a.attrelid = c.oid
+  join pg_namespace n on c.relnamespace = n.oid
+  where c.relname = $1
+    and a.attname = $2
+    and a.attnum > 0
+    and not a.attisdropped
+    and n.nspname = any(current_schemas(true))
+  limit 1
+  """
+
   @type_lookup_query """
   with recursive types(oid, name, elem, kind, base, array_dimensions, jumps) as (
     select
@@ -133,7 +146,7 @@ defmodule Squirrelixir.Postgres do
   defp describe_returns(conn, prepared_query, query) do
     columns = prepared_query.columns || []
     result_oids = prepared_query.result_oids || []
-    nullability = infer_nullability(conn, query, columns)
+    {plan_available?, plan_nullables, column_sources} = infer_nullability(conn, query)
 
     with {:ok, types} <- describe_oids(conn, result_oids) do
       returns =
@@ -141,7 +154,17 @@ defmodule Squirrelixir.Postgres do
         |> Enum.zip(types)
         |> Enum.with_index()
         |> Enum.map(fn {{name, type}, index} ->
-          %Column{name: name, type: type, nullable?: Map.get(nullability, index, true)}
+          nullable? =
+            column_nullable?(
+              conn,
+              name,
+              index,
+              plan_nullables,
+              column_sources,
+              plan_available?
+            )
+
+          %Column{name: name, type: type, nullable?: nullable?}
         end)
 
       {:ok, returns}
@@ -150,10 +173,13 @@ defmodule Squirrelixir.Postgres do
 
   # -- Plan-based nullability inference (mirrors upstream Gleam squirrel) --
 
-  defp infer_nullability(conn, query, columns) do
+  defp infer_nullability(conn, query) do
     case query_plan(conn, query) do
-      {:ok, plan} -> nullables_from_plan(plan, columns)
-      :error -> %{}
+      {:ok, plan} ->
+        {true, nullables_from_plan(plan), column_sources_from_plan(plan)}
+
+      :error ->
+        {false, MapSet.new(), []}
     end
   end
 
@@ -163,96 +189,78 @@ defmodule Squirrelixir.Postgres do
     if String.contains?(query.content, "$") do
       :error
     else
-      explain_query = "explain (format json, verbose) " <> query.content
+      explain_query = "explain (format json, verbose, generic_plan) " <> query.content
 
-      case Postgrex.query(conn, explain_query, []) do
-        {:ok, %Postgrex.Result{rows: [[plan_json]]}} ->
-          # Postgrex JSON extension may auto-decode; handle both string and map
-          plan_data =
-            case plan_json do
-              s when is_binary(s) ->
-                case Jason.decode(s) do
-                  {:ok, data} -> data
-                  _ -> :error
-                end
-              data when is_list(data) -> data
-              data when is_map(data) -> data
-            end
-
-          case plan_data do
-            [%{"Plan" => root_plan} | _] ->
-              {:ok, parse_plan(root_plan)}
-            %{"Plan" => root_plan} ->
-              {:ok, parse_plan(root_plan)}
-            _ ->
-              :error
-          end
-
-        {:error, _} ->
-          :error
+      with {:ok, %Postgrex.Result{rows: [[plan_json]]}} <- Postgrex.query(conn, explain_query, []),
+           {:ok, root_plan} <- decode_plan_json(plan_json) do
+        {:ok, parse_plan(root_plan)}
+      else
+        _ -> :error
       end
     end
   end
+
+  defp decode_plan_json(plan_json) when is_binary(plan_json) do
+    with {:ok, data} <- Jason.decode(plan_json) do
+      decode_plan_json(data)
+    end
+  end
+
+  defp decode_plan_json([%{"Plan" => root_plan} | _]), do: {:ok, root_plan}
+  defp decode_plan_json(%{"Plan" => root_plan}), do: {:ok, root_plan}
+  defp decode_plan_json(_), do: :error
 
   defp parse_plan(plan_map) do
     %{
       join_type: Map.get(plan_map, "Join Type"),
       output: Map.get(plan_map, "Output", []),
+      relation: Map.get(plan_map, "Relation Name"),
       plans: plan_map |> Map.get("Plans", []) |> Enum.map(&parse_plan/1)
     }
   end
 
-  defp nullables_from_plan(plan, _columns) do
-    # Build a map from output expression string to column index
-    # from the root plan's output (these are the query-level column expressions)
+  defp nullables_from_plan(plan) do
     outputs =
       plan.output
       |> Enum.with_index()
-      |> Enum.reduce(%{}, fn {expr, idx}, acc -> Map.put(acc, expr, idx) end)
+      |> Map.new(fn {expr, idx} -> {expr, idx} end)
 
     do_nullables_from_plan(plan, outputs, MapSet.new())
-    |> MapSet.to_list()
-    |> Enum.reduce(%{}, fn idx, acc -> Map.put(acc, idx, true) end)
   end
 
   defp do_nullables_from_plan(plan, query_outputs, nullables) do
     case {plan.join_type, plan.plans} do
-      # Full join → all outputs are nullable
-      {"Full Join", _} ->
+      {"Full", _} ->
         plan_outputs_indices(plan, query_outputs)
         |> MapSet.union(nullables)
 
-      # Right join → left (outer) side outputs are nullable
-      {"Right Join", [left, right]} ->
+      {"Right", [left, right]} ->
         nullables =
           plan_outputs_indices(left, query_outputs)
           |> MapSet.union(nullables)
 
         do_nullables_from_plan(right, query_outputs, nullables)
 
-      # Left join / Semi join → right (inner) side outputs are nullable
-      {"Left Join", [left, right]} ->
+      {"Left", [left, right]} ->
         nullables =
           plan_outputs_indices(right, query_outputs)
           |> MapSet.union(nullables)
 
         do_nullables_from_plan(left, query_outputs, nullables)
 
-      {"Semi Join", [left, right]} ->
+      {"Semi", [left, right]} ->
         nullables =
           plan_outputs_indices(right, query_outputs)
           |> MapSet.union(nullables)
 
         do_nullables_from_plan(left, query_outputs, nullables)
 
-      # Inner join → recurse into children
-      {"Inner Join", plans} ->
+      {"Inner", plans} ->
         Enum.reduce(plans, nullables, fn child, acc ->
           do_nullables_from_plan(child, query_outputs, acc)
         end)
 
-      # Leaf node or unexpected cardinality → recurse into children
-      {_join_type, plans} ->
+      {_, plans} ->
         Enum.reduce(plans, nullables, fn child, acc ->
           do_nullables_from_plan(child, query_outputs, acc)
         end)
@@ -260,14 +268,80 @@ defmodule Squirrelixir.Postgres do
   end
 
   defp plan_outputs_indices(plan, query_outputs) do
-    # Match this plan node's output expressions against the top-level query outputs.
-    # If a match is found, that column index is marked nullable.
     Enum.reduce(plan.output, MapSet.new(), fn output, acc ->
       case Map.fetch(query_outputs, output) do
         {:ok, idx} -> MapSet.put(acc, idx)
         :error -> acc
       end
     end)
+  end
+
+  defp column_sources_from_plan(plan) do
+    expr_to_source = collect_expr_sources(plan)
+
+    Enum.map(plan.output, fn expr ->
+      Map.get(expr_to_source, expr) || parse_qualified_expr(expr)
+    end)
+  end
+
+  defp collect_expr_sources(%{relation: relation, output: output, plans: plans})
+       when is_binary(relation) and relation != "" do
+    own =
+      output
+      |> Enum.map(fn expr -> {expr, {relation, column_from_expr(expr, relation)}} end)
+      |> Map.new()
+
+    Enum.reduce(plans, own, fn child, acc ->
+      Map.merge(acc, collect_expr_sources(child))
+    end)
+  end
+
+  defp collect_expr_sources(%{plans: plans}) do
+    Enum.reduce(plans, %{}, fn child, acc ->
+      Map.merge(acc, collect_expr_sources(child))
+    end)
+  end
+
+  defp parse_qualified_expr(expr) do
+    case String.split(expr, ".") do
+      [table, column] -> {table, column}
+      _ -> nil
+    end
+  end
+
+  defp column_from_expr(expr, default_table) do
+    case String.split(expr, ".") do
+      [_table, column] -> column
+      [column] -> column
+      _ -> default_table
+    end
+  end
+
+  defp column_nullable?(conn, name, index, plan_nullables, column_sources, plan_available?) do
+    cond do
+      String.ends_with?(name, "!") ->
+        false
+
+      String.ends_with?(name, "?") ->
+        true
+
+      MapSet.member?(plan_nullables, index) ->
+        true
+
+      true ->
+        case Enum.at(column_sources, index) do
+          {table, column} -> !column_has_not_null_constraint?(conn, table, column)
+          nil -> !plan_available?
+        end
+    end
+  end
+
+  defp column_has_not_null_constraint?(conn, table, column) do
+    case Postgrex.query(conn, @column_nullability_query, [table, column]) do
+      {:ok, %Postgrex.Result{rows: [[true]]}} -> true
+      {:ok, %Postgrex.Result{rows: [[false]]}} -> false
+      _ -> false
+    end
   end
 
   defp describe_oids(conn, oids) do

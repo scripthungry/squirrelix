@@ -96,7 +96,7 @@ defmodule SquirrelixirPostgresTest do
             [
               params: [],
               returns: [
-                %Column{name: "occurred_at", type: :utc_datetime, nullable?: true}
+                %Column{name: "occurred_at", type: :utc_datetime, nullable?: false}
               ]
             ]} = Postgres.describe(conn, query)
   end
