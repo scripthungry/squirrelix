@@ -33,12 +33,6 @@ defmodule Squirrelixir.Codegen do
   Generates Elixir modules for typed SQL queries.
   """
 
-  @reserved_argument_names MapSet.new(~w(
-    after and catch cond do else end false fn for if in nil not or receive rescue true try unless when with
-  ))
-
-  @sql_literal_argument_names MapSet.new(~w(false nil null true))
-
   alias Squirrelixir.Output
   alias Squirrelixir.Parameter
   alias Squirrelixir.Project
@@ -168,7 +162,7 @@ defmodule Squirrelixir.Codegen do
   end
 
   defp function_source(%TypedQuery{} = query, postgrex_module) do
-    args = argument_names(query.params)
+    args = TypedQuery.resolve_parameter_names(query.params)
     all_args = ["connection" | args]
     encoded_params = encode_params_call(args, query.params)
 
@@ -454,75 +448,6 @@ defmodule Squirrelixir.Codegen do
     Enum.map(columns, fn column ->
       {String.to_atom(column.name), column.type, column.nullable?}
     end)
-  end
-
-  defp argument_names(params) do
-    params
-    |> Enum.reduce({[], MapSet.new(["connection"])}, fn param, {names, used} ->
-      name = param |> preferred_argument_name() |> safe_argument_name(param.index, used)
-      name = unique_argument_name(name, used, param.index)
-      {[name | names], MapSet.put(used, name)}
-    end)
-    |> elem(0)
-    |> Enum.reverse()
-  end
-
-  defp preferred_argument_name(%Parameter{name: nil, index: index}), do: "arg_#{index}"
-  defp preferred_argument_name(%Parameter{name: name}) when is_binary(name), do: name
-
-  defp safe_argument_name(name, index, used) do
-    cond do
-      not valid_argument_name?(name) ->
-        "arg_#{index}"
-
-      MapSet.member?(@sql_literal_argument_names, name) ->
-        "arg_#{index}"
-
-      MapSet.member?(@reserved_argument_names, name) ->
-        "#{name}_"
-
-      shadowing_helper_name?(name) ->
-        rename_shadowed_name(name, used)
-
-      true ->
-        name
-    end
-  end
-
-  defp shadowing_helper_name?(name) do
-    String.ends_with?(name, "decoder") or String.ends_with?(name, "encoder")
-  end
-
-  defp rename_shadowed_name(name, used, tries \\ 1) do
-    candidate = "#{name}_#{tries}"
-
-    if MapSet.member?(used, candidate) do
-      rename_shadowed_name(name, used, tries + 1)
-    else
-      candidate
-    end
-  end
-
-  defp valid_argument_name?(name) do
-    String.match?(name, ~r/\A[a-z_][A-Za-z0-9_]*\z/)
-  end
-
-  defp unique_argument_name(name, used, fallback_index) do
-    if MapSet.member?(used, name) do
-      fallback_argument_name(fallback_index, used)
-    else
-      name
-    end
-  end
-
-  defp fallback_argument_name(index, used) do
-    name = "arg_#{index}"
-
-    if MapSet.member?(used, name) do
-      fallback_argument_name(index + 1, used)
-    else
-      name
-    end
   end
 
   defp join_function_sources([]), do: ""

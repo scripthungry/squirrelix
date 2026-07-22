@@ -63,10 +63,10 @@ defmodule SquirrelixirCodegenTest do
 
     code = Codegen.generate_module(MyApp.SQL, [query], version: "v-test")
 
-    assert code =~ "def conflicting(connection, arg_1, arg_2, arg_3)"
+    assert code =~ "def conflicting(connection, connection_1, connection_2, arg_1)"
+    assert code =~ "encode_param(connection_1, :string)"
+    assert code =~ "encode_param(connection_2, :string)"
     assert code =~ "encode_param(arg_1, :string)"
-    assert code =~ "encode_param(arg_2, :string)"
-    assert code =~ "encode_param(arg_3, :string)"
   end
 
   test "generate_module avoids Elixir reserved argument names" do
