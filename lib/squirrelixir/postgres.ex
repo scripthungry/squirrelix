@@ -49,7 +49,7 @@ defmodule Squirrelixir.Postgres do
     from types
     join lateral (
       values
-        (case when types.elem != 0 and types.name != 'name' then types.elem end, types.array_dimensions + 1),
+        (case when types.elem != 0 and types.name not in ('name', 'point') then types.elem end, types.array_dimensions + 1),
         (case when types.kind = 'd' then types.base end, types.array_dimensions)
     ) as next_type(oid, array_dimensions)
       on next_type.oid is not null

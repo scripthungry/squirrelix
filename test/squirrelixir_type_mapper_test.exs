@@ -80,4 +80,33 @@ defmodule SquirrelixirTypeMapperTest do
     assert TypeMapper.normalize_type(%{postgres: "text", array_dimensions: 1}) ==
              {:ok, {:list, :string}}
   end
+
+  describe "postgres string types and unsupported built-ins" do
+    test "from_postgres maps char-like Postgres types to string" do
+      for type <- ~w(char bpchar citext name) do
+        assert TypeMapper.from_postgres(type) == {:ok, :string}
+      end
+    end
+
+    test "from_postgres wraps name arrays as string lists" do
+      assert TypeMapper.from_postgres("name", array_dimensions: 1) == {:ok, {:list, :string}}
+    end
+
+    test "hint_for returns timestamptz guidance matching upstream Squirrel" do
+      hint = TypeMapper.hint_for("timestamptz")
+
+      assert hint =~ "timestamptz"
+      assert hint =~ "time zone"
+      assert hint =~ "error prone"
+      assert hint =~ "regular timestamps"
+    end
+
+    test "from_postgres rejects point and composite-like types" do
+      assert TypeMapper.from_postgres("point") ==
+               {:error, %UnsupportedPostgresType{name: "point", hint: nil}}
+
+      assert TypeMapper.from_postgres("squirrelixir_point") ==
+               {:error, %UnsupportedPostgresType{name: "squirrelixir_point", hint: nil}}
+    end
+  end
 end

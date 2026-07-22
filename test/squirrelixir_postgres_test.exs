@@ -9,6 +9,7 @@ defmodule SquirrelixirPostgresTest do
   alias Squirrelixir.Error.MissingPostgresTable
   alias Squirrelixir.Error.PostgresSyntaxError
   alias Squirrelixir.Error.QueryHasInvalidEnum
+  alias Squirrelixir.Error.UnsupportedPostgresType
   alias Squirrelixir.Parameter
   alias Squirrelixir.Postgres
   alias Squirrelixir.Query
@@ -576,5 +577,102 @@ defmodule SquirrelixirPostgresTest do
     """)
 
     path
+  end
+
+  describe "postgres string types and unsupported built-ins" do
+    setup %{conn: conn} do
+      Postgrex.query!(conn, "create extension if not exists citext", [])
+      :ok
+    end
+
+    test "describe infers char-like Postgres types as string", %{conn: conn} do
+      query =
+        query("""
+        select
+          'a'::char as char_value,
+          'label'::bpchar as bpchar_value,
+          'wibble'::citext as citext_value,
+          'pg_catalog'::name as name_value
+        """)
+
+      assert {:ok,
+              [
+                params: [],
+                returns: [
+                  %Column{name: "char_value", type: :string, nullable?: false},
+                  %Column{name: "bpchar_value", type: :string, nullable?: false},
+                  %Column{name: "citext_value", type: :string, nullable?: false},
+                  %Column{name: "name_value", type: :string, nullable?: false}
+                ]
+              ]} = Postgres.describe(conn, query)
+    end
+
+    test "describe infers char-like parameters as string", %{conn: conn} do
+      query =
+        query("""
+        select
+          $1::char as char_value,
+          $2::citext as citext_value,
+          $3::name as name_value
+        """)
+
+      assert {:ok,
+              [
+                params: [:string, :string, :string],
+                returns: [
+                  %Column{name: "char_value", type: :string, nullable?: false},
+                  %Column{name: "citext_value", type: :string, nullable?: false},
+                  %Column{name: "name_value", type: :string, nullable?: false}
+                ]
+              ]} = Postgres.describe(conn, query)
+    end
+
+    test "describe infers name arrays as string lists", %{conn: conn} do
+      query = query("select $1::name[] as names, '{}'::name[] as empty_names")
+
+      assert {:ok,
+              [
+                params: [{:list, :string}],
+                returns: [
+                  %Column{name: "names", type: {:list, :string}, nullable?: false},
+                  %Column{name: "empty_names", type: {:list, :string}, nullable?: false}
+                ]
+              ]} = Postgres.describe(conn, query)
+    end
+
+    test "describe infers timestamp with time zone as utc datetime", %{conn: conn} do
+      query = query("select $1::timestamptz as occurred_at, now() as current_at")
+
+      assert {:ok,
+              [
+                params: [:utc_datetime],
+                returns: [
+                  %Column{name: "occurred_at", type: :utc_datetime, nullable?: false},
+                  %Column{name: "current_at", type: :utc_datetime, nullable?: false}
+                ]
+              ]} = Postgres.describe(conn, query)
+    end
+
+    test "describe rejects point and composite Postgres types", %{conn: conn} do
+      Postgrex.query!(conn, "drop type if exists squirrelixir_point cascade", [])
+
+      Postgrex.query!(
+        conn,
+        "create type squirrelixir_point as (x double precision, y double precision)",
+        []
+      )
+
+      assert {:error, %UnsupportedPostgresType{name: "point", hint: nil}} =
+               Postgres.describe(conn, query("select point(1, 2) as location"))
+
+      assert {:error, %UnsupportedPostgresType{name: "point", hint: nil}} =
+               Postgres.describe(conn, query("select $1::point as location"))
+
+      assert {:error, %UnsupportedPostgresType{name: "squirrelixir_point", hint: nil}} =
+               Postgres.describe(
+                 conn,
+                 query("select '(1,2)'::squirrelixir_point as location")
+               )
+    end
   end
 end
