@@ -51,7 +51,13 @@ defmodule Squirrelixir.Codegen do
       This module contains generated query functions.
 
       > This module was generated automatically using Squirrelixir #{version}.
+
+      Runtime row decoding uses `column_spec/0` tuples `{name, type, nullable?}`
+      where `type` is an atom such as `:string` or a list wrapper such as
+      `{:list, :integer}`.
       \"\"\"
+
+      @typep column_spec :: {atom(), atom() | {:list, atom()}, boolean()}
 
     #{queries |> Enum.sort_by(& &1.file) |> Enum.map(&function_source(&1, postgrex_module)) |> join_function_sources()}
     #{decode_helpers(queries)}
@@ -237,20 +243,23 @@ defmodule Squirrelixir.Codegen do
 
       [
         """
-          defp decode_rows(%Postgrex.Result{rows: rows}, columns) do
-            Enum.map(rows, &decode_row(&1, columns))
+          @spec decode_rows(Postgrex.Result.t(), [column_spec()]) :: [map()]
+          defp decode_rows(%Postgrex.Result{rows: rows}, column_specs) do
+            Enum.map(rows, &decode_row(&1, column_specs))
           end
 
-          defp decode_row(row, columns) do
-            columns
+          @spec decode_row(list(), [column_spec()]) :: map()
+          defp decode_row(row, column_specs) do
+            column_specs
             |> Enum.zip(row)
             |> Map.new(fn {{name, type, nullable?}, value} ->
-              {name, decode_value(value, type, nullable?)}
+              {name, decode_column_value(value, type, nullable?)}
             end)
           end
 
-          defp decode_value(value, _type, true) when is_nil(value), do: nil
-          defp decode_value(value, type, _nullable?), do: decode_scalar(value, type)
+          @spec decode_column_value(term(), atom() | {:list, atom()}, boolean()) :: term()
+          defp decode_column_value(value, _type, true) when is_nil(value), do: nil
+          defp decode_column_value(value, type, _nullable?), do: decode_scalar(value, type)
 
           #{decode_type_clauses(types)}
         """

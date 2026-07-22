@@ -75,6 +75,12 @@ defmodule SquirrelixirTypeMapperTest do
     assert TypeMapper.typespec(:utc_datetime) == "DateTime.t()"
     assert TypeMapper.typespec(:uuid) == "String.t()"
     assert TypeMapper.typespec({:list, :string}) == "[String.t()]"
+    assert TypeMapper.typespec(:map) == "term()"
+  end
+
+  test "typespec maps postgres enums to String.t()" do
+    assert TypeMapper.from_postgres("squirrel_mood", kind: "e") == {:ok, :string}
+    assert TypeMapper.typespec(:string) == "String.t()"
   end
 
   test "return_typespec builds map types with required keys" do

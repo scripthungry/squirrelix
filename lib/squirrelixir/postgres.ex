@@ -1,6 +1,6 @@
 defmodule Squirrelixir.Postgres do
   @moduledoc """
-  Postgrex-backed query describer for Squirrelixir inference.
+  Postgrex-backed query inferrer for Squirrelixir inference.
   """
 
   alias Squirrelixir.Column
@@ -69,13 +69,13 @@ defmodule Squirrelixir.Postgres do
   order by enumsortorder asc
   """
 
-  @spec describer(Postgrex.conn()) :: Squirrelixir.Inference.describer()
-  def describer(conn) do
-    &describe(conn, &1)
+  @spec inferrer(Postgrex.conn()) :: Squirrelixir.Inference.inferrer()
+  def inferrer(conn) do
+    &infer(conn, &1)
   end
 
-  @spec describe(Postgrex.conn(), Query.t()) :: {:ok, keyword()} | {:error, struct()}
-  def describe(conn, %Query{} = query) do
+  @spec infer(Postgrex.conn(), Query.t()) :: {:ok, keyword()} | {:error, struct()}
+  def infer(conn, %Query{} = query) do
     with {:ok, prepared_query} <- prepare(conn, query),
          {:ok, params} <- describe_oids(conn, prepared_query.param_oids || [], query),
          {:ok, returns} <- describe_returns(conn, prepared_query, query) do

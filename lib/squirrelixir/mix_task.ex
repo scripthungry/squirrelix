@@ -55,7 +55,7 @@ defmodule Squirrelixir.MixTask do
     case Postgrex.start_link(connection_opts(opts)) do
       {:ok, conn} ->
         try do
-          callback.(Postgres.describer(conn))
+          callback.(Postgres.inferrer(conn))
         after
           GenServer.stop(conn)
         end

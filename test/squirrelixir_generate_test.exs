@@ -29,7 +29,7 @@ defmodule SquirrelixirGenerateTest do
              "defmodule AcornCounter.Accounts.SQL do"
   end
 
-  test "generate accepts a query describer instead of static metadata" do
+  test "generate accepts a query inferrer instead of static metadata" do
     root = tmp_project(:acorn_counter)
     sql_directory = Path.join(root, "lib/accounts/sql")
     File.mkdir_p!(sql_directory)
@@ -39,7 +39,7 @@ defmodule SquirrelixirGenerateTest do
       "select name from accounts where id = $1"
     )
 
-    describer = fn _query ->
+    inferrer = fn _query ->
       {:ok,
        [
          params: [{:postgres, "int4"}],
@@ -47,7 +47,7 @@ defmodule SquirrelixirGenerateTest do
        ]}
     end
 
-    assert Squirrelixir.generate(root, describer, version: "v-test") == %CodegenSummary{
+    assert Squirrelixir.generate(root, inferrer, version: "v-test") == %CodegenSummary{
              generated_count: 1,
              errors: [],
              status: :ok

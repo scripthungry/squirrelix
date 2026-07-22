@@ -1,14 +1,14 @@
-defmodule Squirrelixir.Inference.Describer do
+defmodule Squirrelixir.Inference.Inferrer do
   @moduledoc """
-  Behaviour for modules that describe SQL query parameters and returned columns.
+  Behaviour for modules that infer SQL query parameters and returned columns.
   """
 
-  @callback describe(Squirrelixir.Query.t()) :: {:ok, keyword()} | {:error, struct()}
+  @callback infer(Squirrelixir.Query.t()) :: {:ok, keyword()} | {:error, struct()}
 end
 
 defmodule Squirrelixir.Inference do
   @moduledoc """
-  Converts parsed query directories into typed query directories using a describer callback.
+  Converts parsed query directories into typed query directories using an inferrer callback.
   """
 
   alias Squirrelixir.Error
@@ -17,19 +17,19 @@ defmodule Squirrelixir.Inference do
   alias Squirrelixir.TypedQuery
   alias Squirrelixir.TypedQueryDirectory
 
-  @type describer :: (Query.t() -> {:ok, keyword()} | {:error, struct()}) | module()
+  @type inferrer :: (Query.t() -> {:ok, keyword()} | {:error, struct()}) | module()
 
-  @spec from_query_directories([QueryDirectory.t()], describer()) :: [TypedQueryDirectory.t()]
-  def from_query_directories(query_directories, describer) when is_list(query_directories) do
+  @spec from_query_directories([QueryDirectory.t()], inferrer()) :: [TypedQueryDirectory.t()]
+  def from_query_directories(query_directories, inferrer) when is_list(query_directories) do
     query_directories
     |> Enum.sort_by(& &1.directory)
-    |> Enum.map(&from_query_directory(&1, describer))
+    |> Enum.map(&from_query_directory(&1, inferrer))
   end
 
-  defp from_query_directory(%QueryDirectory{} = query_directory, describer) do
+  defp from_query_directory(%QueryDirectory{} = query_directory, inferrer) do
     {typed_queries, errors} =
       Enum.reduce(query_directory.queries, {[], query_directory.errors}, fn query, acc ->
-        describe_query(query, describer, acc)
+        infer_query(query, inferrer, acc)
       end)
 
     %TypedQueryDirectory{
@@ -39,8 +39,8 @@ defmodule Squirrelixir.Inference do
     }
   end
 
-  defp describe_query(query, describer, {typed_queries, errors}) do
-    case call_describer(describer, query) do
+  defp infer_query(query, inferrer, {typed_queries, errors}) do
+    case call_inferrer(inferrer, query) do
       {:ok, metadata} ->
         typed_query_from_metadata(query, metadata, typed_queries, errors)
 
@@ -49,12 +49,12 @@ defmodule Squirrelixir.Inference do
     end
   end
 
-  defp call_describer(describer, query) when is_function(describer, 1) do
-    describer.(query)
+  defp call_inferrer(inferrer, query) when is_function(inferrer, 1) do
+    inferrer.(query)
   end
 
-  defp call_describer(describer, query) when is_atom(describer) do
-    describer.describe(query)
+  defp call_inferrer(inferrer, query) when is_atom(inferrer) do
+    inferrer.infer(query)
   end
 
   defp typed_query_from_metadata(query, metadata, typed_queries, errors) do

@@ -1,8 +1,8 @@
-defmodule SquirrelixirInferenceDescriber do
-  @behaviour Squirrelixir.Inference.Describer
+defmodule SquirrelixirInferenceInferrer do
+  @behaviour Squirrelixir.Inference.Inferrer
 
-  @impl Squirrelixir.Inference.Describer
-  def describe(_query) do
+  @impl Squirrelixir.Inference.Inferrer
+  def infer(_query) do
     {:ok, [params: [], returns: [%{name: "id", type: :integer, nullable?: false}]]}
   end
 end
@@ -17,10 +17,10 @@ defmodule SquirrelixirInferenceTest do
   alias Squirrelixir.TypedQuery
   alias Squirrelixir.TypedQueryDirectory
 
-  test "from_query_directories types queries using a describer function" do
+  test "from_query_directories types queries using an inferrer function" do
     query = query("find_account.sql", "find_account", "select name from accounts where id = $1")
 
-    describer = fn ^query ->
+    inferrer = fn ^query ->
       {:ok,
        [
          params: [{:postgres, "int4"}],
@@ -39,35 +39,35 @@ defmodule SquirrelixirInferenceTest do
                ],
                errors: []
              }
-           ] = Inference.from_query_directories([query_directory([query])], describer)
+           ] = Inference.from_query_directories([query_directory([query])], inferrer)
   end
 
-  test "from_query_directories accepts describer modules" do
+  test "from_query_directories accepts inferrer modules" do
     query = query("find_account.sql", "find_account", "select 1")
 
     assert [%TypedQueryDirectory{queries: [%TypedQuery{name: "find_account"}], errors: []}] =
              Inference.from_query_directories(
                [query_directory([query])],
-               SquirrelixirInferenceDescriber
+               SquirrelixirInferenceInferrer
              )
   end
 
-  test "from_query_directories preserves parse and describe errors" do
+  test "from_query_directories preserves parse and inference errors" do
     query = query("broken.sql", "broken", "select broken")
     parse_error = %Squirrelixir.Error.CannotReadFile{file: "missing.sql", reason: :enoent}
-    describe_error = %Squirrelixir.Error.UnsupportedPostgresType{name: "point"}
+    inference_error = %Squirrelixir.Error.UnsupportedPostgresType{name: "point"}
 
-    describer = fn ^query -> {:error, describe_error} end
+    inferrer = fn ^query -> {:error, inference_error} end
 
     assert [
              %TypedQueryDirectory{
                queries: [],
-               errors: [^parse_error, ^describe_error]
+               errors: [^parse_error, ^inference_error]
              }
            ] =
              Inference.from_query_directories(
                [query_directory([query], [parse_error])],
-               describer
+               inferrer
              )
   end
 
@@ -83,7 +83,7 @@ defmodule SquirrelixirInferenceTest do
       position: nil
     }
 
-    describer = fn ^query -> {:error, inference_error} end
+    inferrer = fn ^query -> {:error, inference_error} end
 
     assert [
              %TypedQueryDirectory{
@@ -96,7 +96,7 @@ defmodule SquirrelixirInferenceTest do
                  }
                ]
              }
-           ] = Inference.from_query_directories([query_directory([query])], describer)
+           ] = Inference.from_query_directories([query_directory([query])], inferrer)
   end
 
   defp query(file, name, content) do

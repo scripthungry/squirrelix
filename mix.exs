@@ -6,6 +6,8 @@ defmodule Squirrelixir.MixProject do
       app: :squirrelixir,
       version: "0.1.0",
       elixir: "~> 1.20",
+      description:
+        "Generates typed Elixir query modules from plain SQL files using Postgres inference or static metadata.",
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
       deps: deps()

@@ -32,7 +32,7 @@ defmodule SquirrelixirPostgresTest do
     end
   end
 
-  test "describe infers parameter and return types from a prepared query", %{conn: conn} do
+  test "infer infers parameter and return types from a prepared query", %{conn: conn} do
     query = query("select 1::int4 as id, $1::text as name")
 
     assert {:ok,
@@ -42,20 +42,20 @@ defmodule SquirrelixirPostgresTest do
                 %Column{name: "id", type: :integer, nullable?: false},
                 %Column{name: "name", type: :string, nullable?: false}
               ]
-            ]} = Postgres.describe(conn, query)
+            ]} = Postgres.infer(conn, query)
   end
 
-  test "describe infers array dimensions", %{conn: conn} do
+  test "infer infers array dimensions", %{conn: conn} do
     query = query("select $1::int4[] as ids")
 
     assert {:ok,
             [
               params: [{:list, :integer}],
               returns: [%Column{name: "ids", type: {:list, :integer}, nullable?: false}]
-            ]} = Postgres.describe(conn, query)
+            ]} = Postgres.infer(conn, query)
   end
 
-  test "describe infers custom enum types as strings", %{conn: conn} do
+  test "infer infers custom enum types as strings", %{conn: conn} do
     Postgrex.query!(conn, "drop type if exists squirrelixir_mood", [])
     Postgrex.query!(conn, "create type squirrelixir_mood as enum ('happy', 'sleepy')", [])
 
@@ -69,11 +69,11 @@ defmodule SquirrelixirPostgresTest do
                   %Column{name: "mood", type: :string, nullable?: false},
                   %Column{name: "moods", type: {:list, :string}, nullable?: false}
                 ]
-              ]} = Postgres.describe(conn, query)
+              ]} = Postgres.infer(conn, query)
     end)
   end
 
-  test "describe infers enums with quoted names and numeric variants as strings", %{conn: conn} do
+  test "infer infers enums with quoted names and numeric variants as strings", %{conn: conn} do
     Postgrex.query!(conn, "drop type if exists \"1 invalid enum\"", [])
     Postgrex.query!(conn, ~s/create type "1 invalid enum" as enum ('value')/, [])
 
@@ -85,10 +85,10 @@ defmodule SquirrelixirPostgresTest do
               returns: [
                 %Column{name: "res", type: :string, nullable?: false}
               ]
-            ]} = Postgres.describe(conn, query)
+            ]} = Postgres.infer(conn, query)
   end
 
-  test "describe infers enums with non-identifier variant labels as strings", %{conn: conn} do
+  test "infer infers enums with non-identifier variant labels as strings", %{conn: conn} do
     Postgrex.query!(conn, "drop type if exists invalid_variant", [])
     Postgrex.query!(conn, "create type invalid_variant as enum ('1 invalid value')", [])
 
@@ -100,20 +100,20 @@ defmodule SquirrelixirPostgresTest do
               returns: [
                 %Column{name: "res", type: :string, nullable?: false}
               ]
-            ]} = Postgres.describe(conn, query)
+            ]} = Postgres.infer(conn, query)
   end
 
-  test "describe rejects enums with no variants", %{conn: conn} do
+  test "infer rejects enums with no variants", %{conn: conn} do
     Postgrex.query!(conn, "drop type if exists no_variants", [])
     Postgrex.query!(conn, "create type no_variants as enum ()", [])
 
     query = query("select $1::no_variants as res")
 
     assert {:error, %QueryHasInvalidEnum{enum_name: "no_variants", reason: :no_variants}} =
-             Postgres.describe(conn, query)
+             Postgres.infer(conn, query)
   end
 
-  test "describe infers custom domain types from their base type", %{conn: conn} do
+  test "infer infers custom domain types from their base type", %{conn: conn} do
     Postgrex.query!(conn, "drop domain if exists squirrelixir_email cascade", [])
     Postgrex.query!(conn, "create domain squirrelixir_email as text", [])
 
@@ -127,11 +127,11 @@ defmodule SquirrelixirPostgresTest do
                   %Column{name: "email", type: :string, nullable?: false},
                   %Column{name: "emails", type: {:list, :string}, nullable?: false}
                 ]
-              ]} = Postgres.describe(conn, query)
+              ]} = Postgres.infer(conn, query)
     end)
   end
 
-  test "describe infers timestamp with time zone as utc datetime", %{conn: conn} do
+  test "infer infers timestamp with time zone as utc datetime", %{conn: conn} do
     query = query("select now() as occurred_at")
 
     assert {:ok,
@@ -140,10 +140,10 @@ defmodule SquirrelixirPostgresTest do
               returns: [
                 %Column{name: "occurred_at", type: :utc_datetime, nullable?: false}
               ]
-            ]} = Postgres.describe(conn, query)
+            ]} = Postgres.infer(conn, query)
   end
 
-  test "describe infers common scalar result types", %{conn: conn} do
+  test "infer infers common scalar result types", %{conn: conn} do
     query =
       query("""
       select
@@ -172,10 +172,10 @@ defmodule SquirrelixirPostgresTest do
                 %Column{name: "happened_at", type: :time},
                 %Column{name: "recorded_at", type: :naive_datetime}
               ]
-            ]} = Postgres.describe(conn, query)
+            ]} = Postgres.infer(conn, query)
   end
 
-  test "describe marks not-null table columns as non-nullable", %{conn: conn} do
+  test "infer marks not-null table columns as non-nullable", %{conn: conn} do
     Postgrex.query!(
       conn,
       "create temporary table squirrelixir_people (id integer not null, nickname text)",
@@ -191,10 +191,10 @@ defmodule SquirrelixirPostgresTest do
                 %Column{name: "id", type: :integer, nullable?: false},
                 %Column{name: "nickname", type: :string, nullable?: true}
               ]
-            ]} = Postgres.describe(conn, query)
+            ]} = Postgres.infer(conn, query)
   end
 
-  test "describe keeps left joined columns nullable", %{conn: conn} do
+  test "infer keeps left joined columns nullable", %{conn: conn} do
     create_join_tables(conn)
 
     query =
@@ -211,10 +211,10 @@ defmodule SquirrelixirPostgresTest do
                 %Column{name: "team_name", type: :string, nullable?: false},
                 %Column{name: "member_name", type: :string, nullable?: true}
               ]
-            ]} = Postgres.describe(conn, query)
+            ]} = Postgres.infer(conn, query)
   end
 
-  test "describe keeps unaliased left joined columns nullable", %{conn: conn} do
+  test "infer keeps unaliased left joined columns nullable", %{conn: conn} do
     create_join_tables(conn)
 
     query =
@@ -231,10 +231,10 @@ defmodule SquirrelixirPostgresTest do
                 %Column{name: "team_name", type: :string, nullable?: false},
                 %Column{name: "member_name", type: :string, nullable?: true}
               ]
-            ]} = Postgres.describe(conn, query)
+            ]} = Postgres.infer(conn, query)
   end
 
-  test "describe keeps right joined base columns nullable", %{conn: conn} do
+  test "infer keeps right joined base columns nullable", %{conn: conn} do
     create_join_tables(conn)
 
     query =
@@ -251,10 +251,10 @@ defmodule SquirrelixirPostgresTest do
                 %Column{name: "team_name", type: :string, nullable?: true},
                 %Column{name: "member_name", type: :string, nullable?: false}
               ]
-            ]} = Postgres.describe(conn, query)
+            ]} = Postgres.infer(conn, query)
   end
 
-  test "describe keeps full joined columns nullable", %{conn: conn} do
+  test "infer keeps full joined columns nullable", %{conn: conn} do
     create_join_tables(conn)
 
     query =
@@ -271,11 +271,11 @@ defmodule SquirrelixirPostgresTest do
                 %Column{name: "team_name", type: :string, nullable?: true},
                 %Column{name: "member_name", type: :string, nullable?: true}
               ]
-            ]} = Postgres.describe(conn, query)
+            ]} = Postgres.infer(conn, query)
   end
 
   @tag :cte
-  test "describe infers nullability for CTE queries", %{conn: conn} do
+  test "infer infers nullability for CTE queries", %{conn: conn} do
     Postgrex.query!(conn, "drop table if exists squirrelixir_cte_users", [])
 
     Postgrex.query!(
@@ -299,11 +299,11 @@ defmodule SquirrelixirPostgresTest do
                 %Column{name: "id", type: :integer, nullable?: false},
                 %Column{name: "name", type: :string, nullable?: false}
               ]
-            ]} = Postgres.describe(conn, query)
+            ]} = Postgres.infer(conn, query)
   end
 
   @tag :cte
-  test "describe infers nullability for CTE with left join", %{conn: conn} do
+  test "infer infers nullability for CTE with left join", %{conn: conn} do
     Postgrex.query!(conn, "drop table if exists squirrelixir_cte_users", [])
     Postgrex.query!(conn, "drop table if exists squirrelixir_cte_members", [])
 
@@ -336,10 +336,10 @@ defmodule SquirrelixirPostgresTest do
                 %Column{name: "id", type: :integer, nullable?: false},
                 %Column{name: "name", type: :string, nullable?: true}
               ]
-            ]} = Postgres.describe(conn, query)
+            ]} = Postgres.infer(conn, query)
   end
 
-  test "describe output can be converted into a typed query", %{conn: conn} do
+  test "infer output can be converted into a typed query", %{conn: conn} do
     query = %Query{
       file: "find_account.sql",
       starting_line: 1,
@@ -348,7 +348,7 @@ defmodule SquirrelixirPostgresTest do
       content: "select $1::text as name"
     }
 
-    assert {:ok, metadata} = Postgres.describe(conn, query)
+    assert {:ok, metadata} = Postgres.infer(conn, query)
 
     assert {:ok,
             %Squirrelixir.TypedQuery{
@@ -357,7 +357,7 @@ defmodule SquirrelixirPostgresTest do
             }} = Squirrelixir.TypedQuery.from_query(query, metadata)
   end
 
-  test "describe returns a structured syntax error", %{conn: conn} do
+  test "infer returns a structured syntax error", %{conn: conn} do
     query = query("select from")
 
     assert {:error,
@@ -367,10 +367,10 @@ defmodule SquirrelixirPostgresTest do
               content: "select from",
               message: "syntax error at end of input",
               position: 12
-            }} = Postgres.describe(conn, query)
+            }} = Postgres.infer(conn, query)
   end
 
-  test "describe returns a structured missing table error", %{conn: conn} do
+  test "infer returns a structured missing table error", %{conn: conn} do
     query = query("select * from squirrelixir_missing_table")
 
     assert {:error,
@@ -381,10 +381,10 @@ defmodule SquirrelixirPostgresTest do
               message: "relation \"squirrelixir_missing_table\" does not exist",
               table: "squirrelixir_missing_table",
               position: 15
-            }} = Postgres.describe(conn, query)
+            }} = Postgres.infer(conn, query)
   end
 
-  test "describe returns a structured missing column error", %{conn: conn} do
+  test "infer returns a structured missing column error", %{conn: conn} do
     query = query("select missing_column from pg_type")
 
     assert {:error,
@@ -395,10 +395,10 @@ defmodule SquirrelixirPostgresTest do
               message: "column \"missing_column\" does not exist",
               column: "missing_column",
               position: 8
-            }} = Postgres.describe(conn, query)
+            }} = Postgres.infer(conn, query)
   end
 
-  test "describe infers nullability for parameterized left joins using foreign keys", %{
+  test "infer infers nullability for parameterized left joins using foreign keys", %{
     conn: conn
   } do
     Postgrex.query!(conn, "drop table if exists squirrelixir_items_fk", [])
@@ -439,14 +439,14 @@ defmodule SquirrelixirPostgresTest do
                 %Column{name: "item_id", type: :integer, nullable?: false},
                 %Column{name: "name", type: :string, nullable?: true}
               ]
-            ]} = Postgres.describe(conn, query)
+            ]} = Postgres.infer(conn, query)
   end
 
   # https://github.com/giacomocavalieri/squirrel/issues/75
   # Mirrors Gleam recursive_common_table_query_with_semi_join_test: SQL uses a left
   # join plus an IN subquery that Postgres plans as a semi join.
   @tag :cte
-  test "describe infers nullability for recursive common table query with semi join", %{
+  test "infer infers nullability for recursive common table query with semi join", %{
     conn: conn
   } do
     Postgrex.query!(conn, "drop table if exists categories_issue75", [])
@@ -509,20 +509,20 @@ defmodule SquirrelixirPostgresTest do
                 %Column{name: "id", type: :uuid, nullable?: false},
                 %Column{name: "name", type: :string, nullable?: false}
               ]
-            ]} = Postgres.describe(conn, query)
+            ]} = Postgres.infer(conn, query)
   end
 
-  test "describe accepts queries starting with a semicolon", %{conn: conn} do
+  test "infer accepts queries starting with a semicolon", %{conn: conn} do
     query = query(";select 1::int4 as result")
 
     assert {:ok,
             [
               params: [],
               returns: [%Column{name: "result", type: :integer, nullable?: true}]
-            ]} = Postgres.describe(conn, query)
+            ]} = Postgres.infer(conn, query)
   end
 
-  test "describe accepts do blocks", %{conn: conn} do
+  test "infer accepts do blocks", %{conn: conn} do
     query =
       query("""
       do $$ begin
@@ -530,17 +530,17 @@ defmodule SquirrelixirPostgresTest do
       end $$;
       """)
 
-    assert {:ok, [params: [], returns: []]} = Postgres.describe(conn, query)
+    assert {:ok, [params: [], returns: []]} = Postgres.infer(conn, query)
   end
 
-  test "describer can generate modules from a live Postgres connection", %{conn: conn} do
+  test "inferrer can generate modules from a live Postgres connection", %{conn: conn} do
     root = tmp_project(:acorn_counter)
     sql_directory = Path.join(root, "lib/accounts/sql")
     File.mkdir_p!(sql_directory)
 
     File.write!(Path.join(sql_directory, "find_account.sql"), "select $1::text as name")
 
-    assert Squirrelixir.generate(root, Postgres.describer(conn), version: "v-test") ==
+    assert Squirrelixir.generate(root, Postgres.inferrer(conn), version: "v-test") ==
              %CodegenSummary{generated_count: 1, errors: [], status: :ok}
 
     assert File.read!(Path.join(root, "lib/accounts/sql.ex")) =~ "required(:name) => String.t()"
@@ -589,7 +589,7 @@ defmodule SquirrelixirPostgresTest do
       :ok
     end
 
-    test "describe infers char-like Postgres types as string", %{conn: conn} do
+    test "infer infers char-like Postgres types as string", %{conn: conn} do
       query =
         query("""
         select
@@ -608,10 +608,10 @@ defmodule SquirrelixirPostgresTest do
                   %Column{name: "citext_value", type: :string, nullable?: false},
                   %Column{name: "name_value", type: :string, nullable?: false}
                 ]
-              ]} = Postgres.describe(conn, query)
+              ]} = Postgres.infer(conn, query)
     end
 
-    test "describe infers char-like parameters as string", %{conn: conn} do
+    test "infer infers char-like parameters as string", %{conn: conn} do
       query =
         query("""
         select
@@ -628,10 +628,10 @@ defmodule SquirrelixirPostgresTest do
                   %Column{name: "citext_value", type: :string, nullable?: false},
                   %Column{name: "name_value", type: :string, nullable?: false}
                 ]
-              ]} = Postgres.describe(conn, query)
+              ]} = Postgres.infer(conn, query)
     end
 
-    test "describe infers name arrays as string lists", %{conn: conn} do
+    test "infer infers name arrays as string lists", %{conn: conn} do
       query = query("select $1::name[] as names, '{}'::name[] as empty_names")
 
       assert {:ok,
@@ -641,10 +641,10 @@ defmodule SquirrelixirPostgresTest do
                   %Column{name: "names", type: {:list, :string}, nullable?: false},
                   %Column{name: "empty_names", type: {:list, :string}, nullable?: false}
                 ]
-              ]} = Postgres.describe(conn, query)
+              ]} = Postgres.infer(conn, query)
     end
 
-    test "describe infers timestamp with time zone as utc datetime", %{conn: conn} do
+    test "infer infers timestamp with time zone as utc datetime", %{conn: conn} do
       query = query("select $1::timestamptz as occurred_at, now() as current_at")
 
       assert {:ok,
@@ -654,10 +654,10 @@ defmodule SquirrelixirPostgresTest do
                   %Column{name: "occurred_at", type: :utc_datetime, nullable?: false},
                   %Column{name: "current_at", type: :utc_datetime, nullable?: false}
                 ]
-              ]} = Postgres.describe(conn, query)
+              ]} = Postgres.infer(conn, query)
     end
 
-    test "describe rejects point and composite Postgres types", %{conn: conn} do
+    test "infer rejects point and composite Postgres types", %{conn: conn} do
       Postgrex.query!(conn, "drop type if exists squirrelixir_point cascade", [])
 
       Postgrex.query!(
@@ -667,13 +667,13 @@ defmodule SquirrelixirPostgresTest do
       )
 
       assert {:error, %UnsupportedPostgresType{name: "point", hint: nil}} =
-               Postgres.describe(conn, query("select point(1, 2) as location"))
+               Postgres.infer(conn, query("select point(1, 2) as location"))
 
       assert {:error, %UnsupportedPostgresType{name: "point", hint: nil}} =
-               Postgres.describe(conn, query("select $1::point as location"))
+               Postgres.infer(conn, query("select $1::point as location"))
 
       assert {:error, %UnsupportedPostgresType{name: "squirrelixir_point", hint: nil}} =
-               Postgres.describe(
+               Postgres.infer(
                  conn,
                  query("select '(1,2)'::squirrelixir_point as location")
                )

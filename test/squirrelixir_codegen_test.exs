@@ -42,6 +42,49 @@ defmodule SquirrelixirCodegenTest do
     assert code =~ "def z_last(connection)"
     assert code =~ "decode_rows([{:id, :integer, false}])"
     assert code =~ "defp decode_row("
+    assert code =~ "@typep column_spec ::"
+    assert code =~ "defp decode_column_value("
+  end
+
+  test "generate_module maps postgres enums to String.t() and round-trips at runtime" do
+    query =
+      typed_query(
+        "find_by_mood.sql",
+        "find_by_mood",
+        "select mood from squirrels where mood = $1",
+        [
+          %Parameter{index: 1, name: "mood", type: :string}
+        ],
+        [%Column{name: "mood", type: :string, nullable?: false}]
+      )
+
+    code =
+      Codegen.generate_module(Squirrelixir.GeneratedEnumTest.SQL, [query],
+        version: "v-test",
+        postgrex: PostgrexEnumMock
+      )
+
+    assert code =~ "@spec find_by_mood(Postgrex.conn(), String.t()) :: [find_by_mood_row()]"
+    assert code =~ "required(:mood) => String.t()"
+    refute code =~ "Mood"
+    refute code =~ "enum"
+
+    [{module, _bytecode}] = Code.compile_string(code)
+
+    assert module.find_by_mood({PostgrexEnumMock, self()}, "happy") == [%{mood: "happy"}]
+    assert_received {:query!, "select mood from squirrels where mood = $1", ["happy"]}
+  end
+
+  test "generate_module maps json columns to term() specs" do
+    query =
+      typed_query("payload.sql", "payload", "select payload from events", [], [
+        %Column{name: "payload", type: :map, nullable?: false}
+      ])
+
+    code = Codegen.generate_module(MyApp.SQL, [query], version: "v-test")
+
+    assert code =~ "required(:payload) => term()"
+    assert code =~ "@type payload_row :: %{required(:payload) => term()}"
   end
 
   test "generate_module uses fallback argument names when SQL inference could not name a parameter" do
@@ -667,5 +710,13 @@ defmodule PostgrexQuotedStringMock do
     send(owner, {:query!, sql, params})
 
     %Postgrex.Result{columns: ["result"], rows: [[1]]}
+  end
+end
+
+defmodule PostgrexEnumMock do
+  def query!({_module, owner}, sql, params) do
+    send(owner, {:query!, sql, params})
+
+    %Postgrex.Result{columns: ["mood"], rows: [["happy"]]}
   end
 end

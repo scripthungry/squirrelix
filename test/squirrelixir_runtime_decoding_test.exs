@@ -14,7 +14,8 @@ defmodule SquirrelixirRuntimeDecodingTest do
     Squirrelixir.RuntimeDecodeHelperTest.SQL,
     Squirrelixir.RuntimeEncodeHelperTest.SQL,
     Squirrelixir.RuntimeCommandTest.SQL,
-    Squirrelixir.RuntimeQueryTest.SQL
+    Squirrelixir.RuntimeQueryTest.SQL,
+    Squirrelixir.RuntimeEnumTest.SQL
   ]
 
   setup do
@@ -26,6 +27,55 @@ defmodule SquirrelixirRuntimeDecodingTest do
     end)
 
     :ok
+  end
+
+  describe "postgres enum strings" do
+    test "decodes enum columns as plain strings" do
+      assert decode_row(["happy"], [%Column{name: "mood", type: :string, nullable?: false}]) ==
+               %{mood: "happy"}
+
+      assert decode_row(["sleepy"], [%Column{name: "mood", type: :string, nullable?: true}]) ==
+               %{mood: "sleepy"}
+    end
+
+    test "encodes enum parameters as plain strings" do
+      assert encode_params(["happy"], [:string]) == ["happy"]
+      assert encode_params(["1 invalid value"], [:string]) == ["1 invalid value"]
+    end
+
+    test "generated query functions round-trip enum strings" do
+      query =
+        typed_query(
+          "update_mood.sql",
+          "update_mood",
+          "update squirrels set mood = $1 where id = $2 returning mood",
+          [
+            %Parameter{index: 1, name: "mood", type: :string},
+            %Parameter{index: 2, name: "id", type: :integer}
+          ],
+          [%Column{name: "mood", type: :string, nullable?: false}]
+        )
+
+      code =
+        Codegen.generate_module(Squirrelixir.RuntimeEnumTest.SQL, [query],
+          version: "v-test",
+          postgrex: RuntimeEnumMock
+        )
+
+      assert code =~ "@spec update_mood(Postgrex.conn(), String.t(), integer())"
+      assert code =~ "required(:mood) => String.t()"
+
+      [{module, _bytecode}] = Code.compile_string(code)
+
+      assert module.update_mood(
+               {RuntimeEnumMock, self(),
+                %Postgrex.Result{columns: ["mood"], rows: [["sleepy"]]}},
+               "sleepy",
+               42
+             ) == [%{mood: "sleepy"}]
+
+      assert_received {:query!, _, ["sleepy", 42]}
+    end
   end
 
   describe "scalar decoding" do
@@ -345,5 +395,12 @@ defmodule RuntimeEncodingCaptureMock do
   def query!({_module, owner}, sql, params) do
     send(owner, {:query!, sql, params})
     %Postgrex.Result{command: :select, columns: nil, rows: nil, num_rows: 0}
+  end
+end
+
+defmodule RuntimeEnumMock do
+  def query!({_module, owner, %Postgrex.Result{} = result}, sql, params) do
+    send(owner, {:query!, sql, params})
+    result
   end
 end

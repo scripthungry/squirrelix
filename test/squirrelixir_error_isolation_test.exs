@@ -51,9 +51,9 @@ defmodule SquirrelixirErrorIsolationTest do
                 file: "query.sql",
                 message: "syntax error at or near \"wobble\"",
                 position: 22
-              }} = Postgres.describe(conn, query)
+              }} = Postgres.infer(conn, query)
 
-      formatted = Error.format(Postgres.describe(conn, query) |> elem(1))
+      formatted = Error.format(Postgres.infer(conn, query) |> elem(1))
       assert formatted =~ "Invalid query [42601]"
       assert formatted =~ "query.sql"
       assert formatted =~ "syntax error at or near \"wobble\""
@@ -76,9 +76,9 @@ defmodule SquirrelixirErrorIsolationTest do
                 message: "relation \"i_do_not_exist\" does not exist",
                 table: "i_do_not_exist",
                 position: 22
-              }} = Postgres.describe(conn, query)
+              }} = Postgres.infer(conn, query)
 
-      formatted = Error.format(Postgres.describe(conn, query) |> elem(1))
+      formatted = Error.format(Postgres.infer(conn, query) |> elem(1))
       assert formatted =~ "Invalid query [42P01]"
       assert formatted =~ "i_do_not_exist"
     end
@@ -100,9 +100,9 @@ defmodule SquirrelixirErrorIsolationTest do
                 message: "column \"i_do_not_exist\" does not exist",
                 column: "i_do_not_exist",
                 position: 10
-              }} = Postgres.describe(conn, query)
+              }} = Postgres.infer(conn, query)
 
-      formatted = Error.format(Postgres.describe(conn, query) |> elem(1))
+      formatted = Error.format(Postgres.infer(conn, query) |> elem(1))
       assert formatted =~ "Invalid query [42703]"
       assert formatted =~ "i_do_not_exist"
     end
@@ -120,7 +120,7 @@ defmodule SquirrelixirErrorIsolationTest do
           """
         )
 
-      assert {:error, error} = Postgres.describe(conn, query)
+      assert {:error, error} = Postgres.infer(conn, query)
 
       assert %MissingPostgresConstraint{
                file: "query.sql",
@@ -144,7 +144,7 @@ defmodule SquirrelixirErrorIsolationTest do
         ])
 
       assert [%TypedQueryDirectory{queries: [], errors: errors}] =
-               Inference.from_query_directories([directory], Postgres.describer(conn))
+               Inference.from_query_directories([directory], Postgres.inferrer(conn))
 
       assert [
                %MissingPostgresTable{
@@ -174,7 +174,7 @@ defmodule SquirrelixirErrorIsolationTest do
         ])
 
       assert [%TypedQueryDirectory{queries: [], errors: errors}] =
-               Inference.from_query_directories([directory], Postgres.describer(conn))
+               Inference.from_query_directories([directory], Postgres.inferrer(conn))
 
       assert [
                %PostgresSyntaxError{

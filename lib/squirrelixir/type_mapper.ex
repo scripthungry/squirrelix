@@ -1,6 +1,20 @@
 defmodule Squirrelixir.TypeMapper do
   @moduledoc """
   Maps Postgres type names into Squirrelixir's Elixir type metadata and typespecs.
+
+  ## Postgres enums
+
+  Custom Postgres enums (`kind: "e"`) map to the internal atom `:string` and emit
+  `String.t()` in generated `@spec`s. Runtime encode/decode passes enum labels
+  through as plain strings — Squirrelixir does not generate Gleam-style enum ADTs.
+
+  ## JSON and JSONB
+
+  JSON columns map to the internal atom `:map` (shared by `json` and `jsonb`) but
+  emit `term()` in generated `@spec`s. JSON values are not always objects, and
+  Postgrex may return maps, lists, or primitives depending on the stored payload.
+  `term()` matches Elixir 1.20 practice for dynamically typed JSON columns; row
+  result maps still use `map()` with `required/1` keys via `row_typespec/1`.
   """
 
   alias Squirrelixir.Error.UnsupportedPostgresType
@@ -76,7 +90,7 @@ defmodule Squirrelixir.TypeMapper do
   def typespec(:float), do: "float()"
   def typespec(:decimal), do: "Decimal.t()"
   def typespec(:binary), do: "binary()"
-  def typespec(:map), do: "map()"
+  def typespec(:map), do: "term()"
   def typespec(:uuid), do: "String.t()"
   def typespec(:date), do: "Date.t()"
   def typespec(:time), do: "Time.t()"
