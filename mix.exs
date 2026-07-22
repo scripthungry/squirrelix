@@ -1,4 +1,4 @@
-defmodule Squirrelixir.MixProject do
+defmodule SquirrElix.MixProject do
   use Mix.Project
 
   @version "0.1.0"
@@ -6,7 +6,7 @@ defmodule Squirrelixir.MixProject do
 
   def project do
     [
-      app: :squirrelixir,
+      app: :squirr_elix,
       version: @version,
       elixir: "~> 1.20",
       name: "SquirrElix",
@@ -46,7 +46,7 @@ defmodule Squirrelixir.MixProject do
 
   defp package do
     [
-      name: "squirrelixir",
+      name: "squirr_elix",
       maintainers: ["Michael Ward"],
       licenses: ["Apache-2.0"],
       links: %{
@@ -75,31 +75,31 @@ defmodule Squirrelixir.MixProject do
       source_ref: "v#{@version}",
       groups_for_modules: [
         "Core API": [
-          Squirrelixir,
-          Squirrelixir.CLI,
-          Squirrelixir.Project
+          SquirrElix,
+          SquirrElix.CLI,
+          SquirrElix.Project
         ],
         "Query discovery": [
-          Squirrelixir.Query,
-          Squirrelixir.QueryDirectory,
-          Squirrelixir.TypedQuery,
-          Squirrelixir.TypedQueryDirectory,
-          Squirrelixir.SQL
+          SquirrElix.Query,
+          SquirrElix.QueryDirectory,
+          SquirrElix.TypedQuery,
+          SquirrElix.TypedQueryDirectory,
+          SquirrElix.SQL
         ],
         Inference: [
-          Squirrelixir.Inference,
-          Squirrelixir.Postgres,
-          Squirrelixir.TypeMapper,
-          Squirrelixir.Metadata,
-          Squirrelixir.ConnectionOptions
+          SquirrElix.Inference,
+          SquirrElix.Postgres,
+          SquirrElix.TypeMapper,
+          SquirrElix.Metadata,
+          SquirrElix.ConnectionOptions
         ],
         Codegen: [
-          Squirrelixir.Codegen,
-          Squirrelixir.Output
+          SquirrElix.Codegen,
+          SquirrElix.Output
         ],
         "Mix tasks": [
-          Mix.Tasks.Squirrelixir.Gen,
-          Mix.Tasks.Squirrelixir.Check
+          Mix.Tasks.SquirrElix.Gen,
+          Mix.Tasks.SquirrElix.Check
         ]
       ]
     ]

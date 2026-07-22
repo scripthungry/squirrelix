@@ -10,7 +10,7 @@ Add SquirrElix and Postgrex to your `mix.exs`:
 ```elixir
 def deps do
   [
-    {:squirrelixir, "~> 0.1.0"},
+    {:squirr_elix, "~> 0.1.0"},
     {:postgrex, "~> 0.22"}
   ]
 end
@@ -19,7 +19,7 @@ end
 Before the initial Hex release:
 
 ```elixir
-{:squirrelixir, github: "mward-sudo/squirrelixir"}
+{:squirr_elix, github: "mward-sudo/squirr_elix"}
 ```
 
 Then run:
@@ -45,7 +45,7 @@ my_app/
 │           │   └── find_user.sql
 │           └── sql.ex              # generated
 ├── mix.exs
-└── squirrelixir.exs                # optional metadata file
+└── squirr_elix.exs                # optional metadata file
 ```
 
 Each `sql/` directory maps to one generated module. The module name is derived from
@@ -87,7 +87,7 @@ plus one parameter).
 Point SquirrElix at a database that has your schema applied (migrations run):
 
 ```sh
-mix squirrelixir.gen --infer --database my_app_dev
+mix squirr_elix.gen --infer --database my_app_dev
 ```
 
 SquirrElix connects to Postgres, prepares each query, and reads parameter and
@@ -100,19 +100,19 @@ export PGHOST=localhost
 export PGDATABASE=my_app_dev
 export PGUSER=postgres
 
-mix squirrelixir.gen --infer
+mix squirr_elix.gen --infer
 ```
 
 Or pass a URL:
 
 ```sh
-mix squirrelixir.gen --infer --url postgres://postgres@localhost/my_app_dev
+mix squirr_elix.gen --infer --url postgres://postgres@localhost/my_app_dev
 ```
 
 ### With a metadata file
 
 If you cannot connect to Postgres during generation, provide types manually in
-`squirrelixir.exs`:
+`squirr_elix.exs`:
 
 ```elixir
 %{
@@ -128,7 +128,7 @@ If you cannot connect to Postgres during generation, provide types manually in
 ```
 
 ```sh
-mix squirrelixir.gen
+mix squirr_elix.gen
 ```
 
 See [Configuration](configuration.md) for the full metadata format.
@@ -164,11 +164,11 @@ Command queries (no returned rows) return `:ok`:
 Run the check task in CI to catch stale generated files:
 
 ```sh
-mix squirrelixir.check --infer --database my_app_dev
+mix squirr_elix.check --infer --database my_app_dev
 ```
 
 If SQL changed but `sql.ex` was not regenerated, the check fails with an
-`OutdatedFile` error. Fix it by running `mix squirrelixir.gen` again and committing
+`OutdatedFile` error. Fix it by running `mix squirr_elix.gen` again and committing
 the updated `sql.ex`.
 
 ## Next steps

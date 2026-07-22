@@ -38,15 +38,15 @@ Gleam records, custom enum ADTs, or opaque tagged error values.
 - **Code generation**
   - [x] Per-query row `@type` definitions and `@spec`-annotated functions.
   - [x] Row queries return decoded maps; command queries return `:ok`.
-  - [x] Safe overwrite and `mix squirrelixir.check` drift detection.
+  - [x] Safe overwrite and `mix squirr_elix.check` drift detection.
   - [x] Runtime decode coverage for nullable values, arrays, JSON, UUIDs, dates/times, and
     command results.
 
 - **Mix tasks and configuration**
-  - [x] Metadata-file mode (`squirrelixir.exs` or `--metadata`).
+  - [x] Metadata-file mode (`squirr_elix.exs` or `--metadata`).
   - [x] `--infer` mode with Postgrex connection options and `PG*` environment defaults.
-  - [x] `mix squirrelixir.gen` and `mix squirrelixir.check` task documentation.
-  - [x] Programmatic `Squirrelixir.generate/3` and `Squirrelixir.check/3` API.
+  - [x] `mix squirr_elix.gen` and `mix squirr_elix.check` task documentation.
+  - [x] Programmatic `SquirrElix.generate/3` and `SquirrElix.check/3` API.
 
 - **Package and docs**
   - [x] Hex package metadata, Apache-2.0 license, and ExDoc module grouping.
@@ -74,7 +74,7 @@ Gleam records, custom enum ADTs, or opaque tagged error values.
   - [x] Port remaining Birdie snapshots into focused ExUnit cases by behavior rather than
     copying generated Gleam APIs (join nullability, select-list aliases, multi-helper codegen,
     long enum names, enum arrays, connection shadowing).
-  - [x] Document intentional Gleam-only snapshot gaps in `squirrelixir_gleam_parity_test.exs`.
+  - [x] Document intentional Gleam-only snapshot gaps in `squirr_elix_gleam_parity_test.exs`.
 
 - **Gleam implementation alignment**
   - [x] Sort generated query functions by source file path (matches Gleam reproducibility).
@@ -84,7 +84,7 @@ Gleam records, custom enum ADTs, or opaque tagged error values.
     `timestamptz` mapped to `DateTime.t()`, function-name sorting only when file/name differ.
 
 - **Release**
-  - [ ] Publish `0.1.0` to Hex and enable HexDocs at <https://hexdocs.pm/squirrelixir>.
+  - [ ] Publish `0.1.0` to Hex and enable HexDocs at <https://hexdocs.pm/squirr_elix>.
 
 ## Validation discipline
 

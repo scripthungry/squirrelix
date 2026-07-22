@@ -1,6 +1,6 @@
 ExUnit.start()
 
-defmodule Squirrelixir.TestSupport do
+defmodule SquirrElix.TestSupport do
   @moduledoc false
 
   def tmp_dir!(prefix) when is_binary(prefix) do
@@ -16,7 +16,7 @@ defmodule Squirrelixir.TestSupport do
   end
 
   def tmp_mix_project(app) when is_atom(app) do
-    path = tmp_dir!("squirrelixir-mix-project")
+    path = tmp_dir!("squirr_elix-mix-project")
 
     File.write!(Path.join(path, "mix.exs"), """
     defmodule TempProject.MixProject do

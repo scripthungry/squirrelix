@@ -1,8 +1,8 @@
 # 🐿️ SquirrElix — type-safe SQL in Elixir
 
-> SquirrElix (package `squirrelixir`)
+> SquirrElix (package `squirr_elix`)
 
-[![Hex Docs](https://img.shields.io/badge/hex-docs-ffaff3)](https://hexdocs.pm/squirrelixir/)
+[![Hex Docs](https://img.shields.io/badge/hex-docs-ffaff3)](https://hexdocs.pm/squirr_elix/)
 
 SquirrElix turns plain `.sql` files into typed Elixir modules. You write one query
 per file; the generator discovers those files, resolves parameter and return types,
@@ -61,7 +61,7 @@ where
   id = $1
 ```
 
-And run `mix squirrelixir.gen --infer`. Just like magic you'll now have a type-safe
+And run `mix squirr_elix.gen --infer`. Just like magic you'll now have a type-safe
 function `find_user/2` you can use just as you'd expect:
 
 ```elixir
@@ -99,7 +99,7 @@ Add SquirrElix to your `mix.exs` dependencies:
 ```elixir
 def deps do
   [
-    {:squirrelixir, "~> 0.1.0"},
+    {:squirr_elix, "~> 0.1.0"},
     {:postgrex, "~> 0.22"}
   ]
 end
@@ -110,7 +110,7 @@ Before the initial Hex release, depend on GitHub instead:
 ```elixir
 def deps do
   [
-    {:squirrelixir, github: "mward-sudo/squirrelixir"},
+    {:squirr_elix, github: "mward-sudo/squirr_elix"},
     {:postgrex, "~> 0.22"}
   ]
 end
@@ -123,7 +123,7 @@ mix deps.get
 ```
 
 Documentation is generated with [ExDoc](https://github.com/elixir-lang/ex_doc) and
-will be published at <https://hexdocs.pm/squirrelixir> after the initial Hex release.
+will be published at <https://hexdocs.pm/squirr_elix> after the initial Hex release.
 Browse module docs locally with `mix docs`.
 
 ## Quick start
@@ -146,7 +146,7 @@ query per file inside a `sql/` directory:
 Generate typed query modules by connecting to Postgres and inferring types:
 
 ```sh
-mix squirrelixir.gen --infer --database my_app_dev
+mix squirr_elix.gen --infer --database my_app_dev
 ```
 
 Each `sql/` directory becomes one Elixir module named from your app and path — for
@@ -156,7 +156,7 @@ becomes a function named after the file (without the extension).
 Verify generated code is current in CI:
 
 ```sh
-mix squirrelixir.check --infer --database my_app_dev
+mix squirr_elix.check --infer --database my_app_dev
 ```
 
 See the [Getting Started guide](guides/getting_started.md) for a full walkthrough.
@@ -175,7 +175,7 @@ SquirrElix follows a small set of conventions:
   the name of the corresponding Elixir function to run that query.
 - Leading SQL comments (`-- ...`) become `@doc` strings on the generated functions.
 
-> **Example.** Given the project layout above, running `mix squirrelixir.gen --infer`
+> **Example.** Given the project layout above, running `mix squirr_elix.gen --infer`
 > creates `lib/my_app/accounts/sql.ex` defining two functions — `find_user/2` and
 > `list_users/1` — that you can import and use in your code.
 
@@ -215,24 +215,24 @@ Row-returning queries produce `[map()]`. Command queries (for example `insert`,
 
 Generated modules include a runtime helpers section with shared encode/decode
 functions. You should treat `sql.ex` as generated code — edit the `.sql` files and
-re-run `mix squirrelixir.gen` instead of editing the Elixir module directly.
+re-run `mix squirr_elix.gen` instead of editing the Elixir module directly.
 
 ## CLI commands
 
 SquirrElix offers the following Mix tasks to streamline your workflow:
 
-- `mix squirrelixir.gen` — Generates typed Elixir code for all SQL queries found
+- `mix squirr_elix.gen` — Generates typed Elixir code for all SQL queries found
   under `{lib,test,dev}/**/sql/*.sql`.
-- `mix squirrelixir.check` — Validates that the generated Elixir code is up-to-date
+- `mix squirr_elix.check` — Validates that the generated Elixir code is up-to-date
   with the SQL queries. This is particularly useful to run in a CI pipeline to make
-  sure you don't forget to run `mix squirrelixir.gen`.
+  sure you don't forget to run `mix squirr_elix.gen`.
 
 Both tasks accept the same options. See [Configuration](guides/configuration.md) for
 metadata files, connection settings, and programmatic use.
 
 ```sh
-mix squirrelixir.gen --infer --database my_app_dev
-mix squirrelixir.check --infer --database my_app_dev
+mix squirr_elix.gen --infer --database my_app_dev
+mix squirr_elix.check --infer --database my_app_dev
 ```
 
 ## Query sources
@@ -242,10 +242,10 @@ Postgres inferrer:
 
 **Metadata file** — keys are absolute or project-relative paths to `.sql` files;
 values are keyword lists with `:params` and `:returns`. Load one from
-`squirrelixir.exs` in the project root (or pass `--metadata PATH`):
+`squirr_elix.exs` in the project root (or pass `--metadata PATH`):
 
 ```elixir
-# squirrelixir.exs
+# squirr_elix.exs
 %{
   "lib/my_app/accounts/sql/find_user.sql" => [
     params: [:integer],
@@ -258,8 +258,8 @@ values are keyword lists with `:params` and `:returns`. Load one from
 ```
 
 ```sh
-mix squirrelixir.gen
-mix squirrelixir.gen --metadata config/squirrelixir.exs
+mix squirr_elix.gen
+mix squirr_elix.gen --metadata config/squirr_elix.exs
 ```
 
 **Postgres inferrer** — connects to a database, prepares each query, and reads
@@ -267,12 +267,12 @@ parameter and column types from Postgrex. Pass connection options on the CLI or
 via `PG*` environment variables:
 
 ```sh
-mix squirrelixir.gen --infer --database my_app_dev
-mix squirrelixir.gen --infer --url postgres://localhost/my_app_dev
+mix squirr_elix.gen --infer --database my_app_dev
+mix squirr_elix.gen --infer --url postgres://localhost/my_app_dev
 ```
 
-The programmatic API mirrors this split — see `Squirrelixir.generate/3` and
-`Squirrelixir.check/3`.
+The programmatic API mirrors this split — see `SquirrElix.generate/3` and
+`SquirrElix.check/3`.
 
 ## Configuration and connection
 
@@ -282,7 +282,7 @@ the Postgres server where the database schema is defined when you use `--infer`.
 Pass a connection URL on the CLI:
 
 ```sh
-mix squirrelixir.gen --infer --url postgres://user:password@host:5432/database?connect_timeout=5
+mix squirr_elix.gen --infer --url postgres://user:password@host:5432/database?connect_timeout=5
 ```
 
 Or set [Postgres environment variables](https://www.postgresql.org/docs/current/libpq-envars.html).
@@ -395,14 +395,14 @@ SquirrElix reports structured errors during generation and checking. Common case
 
 | Error | Typical cause | What to do |
 | --- | --- | --- |
-| `OutdatedFile` | SQL changed but `sql.ex` was not regenerated | Run `mix squirrelixir.gen` |
+| `OutdatedFile` | SQL changed but `sql.ex` was not regenerated | Run `mix squirr_elix.gen` |
 | `CannotOverwriteFile` | A non-generated file would be overwritten | Remove or rename the existing `sql.ex` |
 | `PostgresSyntaxError` | Invalid SQL | Fix the query and re-run generation |
 | `MissingPostgresTable` / `MissingPostgresColumn` | Schema mismatch | Apply migrations before `--infer` |
 | `DuplicateReturnColumns` | Two columns share the same name in the result | Add aliases in the `select` list |
 | `QueryFileHasInvalidName` | Filename is not a valid Elixir function name | Rename the `.sql` file (a suggested name may be shown) |
 | `UnsupportedPostgresType` | Postgres type not yet mapped | Check the supported types table; some types include hints |
-| `MissingQueryMetadata` | No metadata entry for a query file | Add an entry to `squirrelixir.exs` or use `--infer` |
+| `MissingQueryMetadata` | No metadata entry for a query file | Add an entry to `squirr_elix.exs` or use `--infer` |
 
 Connection failures during `--infer` produce a Mix error with the underlying
 Postgrex reason. Verify `PG*` variables or `--url`, ensure Postgres is running, and

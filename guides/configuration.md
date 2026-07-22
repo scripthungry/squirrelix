@@ -12,9 +12,9 @@ accepts one of two sources:
 | Mode | When to use | How to enable |
 | --- | --- | --- |
 | **Postgres inferrer** | Schema is available locally or in CI | `--infer` |
-| **Metadata file** | No database at generation time | Default (requires `squirrelixir.exs`) |
+| **Metadata file** | No database at generation time | Default (requires `squirr_elix.exs`) |
 
-Both `mix squirrelixir.gen` and `mix squirrelixir.check` use the same source for a
+Both `mix squirr_elix.gen` and `mix squirr_elix.check` use the same source for a
 given invocation.
 
 ## Postgres inference
@@ -23,7 +23,7 @@ Pass `--infer` to connect to a live database and read types from Postgrex prepar
 metadata:
 
 ```sh
-mix squirrelixir.gen --infer --database my_app_dev
+mix squirr_elix.gen --infer --database my_app_dev
 ```
 
 The database must exist, be reachable, and have the schema your queries reference
@@ -32,7 +32,7 @@ The database must exist, be reachable, and have the schema your queries referenc
 ### Connection URL
 
 ```sh
-mix squirrelixir.gen --infer \
+mix squirr_elix.gen --infer \
   --url postgres://user:password@host:5432/database?connect_timeout=5
 ```
 
@@ -64,7 +64,7 @@ export PGUSER=postgres
 
 ```sh
 direnv allow
-mix squirrelixir.gen --infer
+mix squirr_elix.gen --infer
 ```
 
 SquirrElix does not read `.env` files directly. Use your shell, `direnv`, or
@@ -75,7 +75,7 @@ similar tools to load environment variables.
 Individual flags override environment variables:
 
 ```sh
-mix squirrelixir.gen --infer \
+mix squirr_elix.gen --infer \
   --hostname db.example.com \
   --port 5433 \
   --username app \
@@ -91,13 +91,13 @@ Flag precedence (highest first): CLI flags → URL parameters → environment va
 When `--infer` is not passed, SquirrElix loads a metadata file that maps query file
 paths to parameter and return type descriptors.
 
-Default path: `squirrelixir.exs` in the project root.
+Default path: `squirr_elix.exs` in the project root.
 
 Custom path:
 
 ```sh
-mix squirrelixir.gen --metadata config/squirrelixir.exs
-mix squirrelixir.check --metadata config/squirrelixir.exs
+mix squirr_elix.gen --metadata config/squirr_elix.exs
+mix squirr_elix.check --metadata config/squirr_elix.exs
 ```
 
 ### Format
@@ -136,11 +136,11 @@ Every discovered `.sql` file must have a metadata entry, or generation fails wit
 
 ## Mix task options
 
-Both `mix squirrelixir.gen` and `mix squirrelixir.check` accept:
+Both `mix squirr_elix.gen` and `mix squirr_elix.check` accept:
 
 | Option | Description |
 | --- | --- |
-| `--metadata PATH` | Metadata file path (default: `squirrelixir.exs`) |
+| `--metadata PATH` | Metadata file path (default: `squirr_elix.exs`) |
 | `--infer` | Infer types from Postgres instead of metadata |
 | `--url URL` | Postgres connection URL |
 | `--database NAME` | Database name |
@@ -151,7 +151,7 @@ Both `mix squirrelixir.gen` and `mix squirrelixir.check` accept:
 
 ## Programmatic API
 
-Use `Squirrelixir.generate/3` and `Squirrelixir.check/3` from Elixir code:
+Use `SquirrElix.generate/3` and `SquirrElix.check/3` from Elixir code:
 
 ```elixir
 # Metadata map
@@ -162,13 +162,13 @@ metadata = %{
   ]
 }
 
-Squirrelixir.generate("/path/to/project", metadata, version: "v0.1.0")
+SquirrElix.generate("/path/to/project", metadata, version: "v0.1.0")
 
-# Postgres inferrer (function or module implementing Squirrelixir.Inference.Inferrer)
+# Postgres inferrer (function or module implementing SquirrElix.Inference.Inferrer)
 {:ok, conn} = Postgrex.start_link(database: "my_app_dev")
 
 try do
-  Squirrelixir.generate("/path/to/project", Squirrelixir.Postgres.inferrer(conn),
+  SquirrElix.generate("/path/to/project", SquirrElix.Postgres.inferrer(conn),
     version: "v0.1.0"
   )
 after
@@ -183,8 +183,8 @@ Options:
 
 Returns:
 
-- `Squirrelixir.generate/3` → `%Squirrelixir.CodegenSummary{}`
-- `Squirrelixir.check/3` → `%Squirrelixir.CodegenCheckSummary{}`
+- `SquirrElix.generate/3` → `%SquirrElix.CodegenSummary{}`
+- `SquirrElix.check/3` → `%SquirrElix.CodegenCheckSummary{}`
 
 ## CI setup
 
@@ -199,7 +199,7 @@ A typical CI step runs the check task after migrations:
     PGDATABASE: my_app_test
     PGHOST: localhost
     PGUSER: postgres
-  run: mix squirrelixir.check --infer
+  run: mix squirr_elix.check --infer
 ```
 
 Commit generated `sql.ex` files alongside your `.sql` sources so CI verifies they
