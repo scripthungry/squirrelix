@@ -74,6 +74,13 @@ Gleam records, custom enum ADTs, or opaque tagged error values.
     long enum names, enum arrays, connection shadowing).
   - [x] Document intentional Gleam-only snapshot gaps in `squirrelixir_gleam_parity_test.exs`.
 
+- **Gleam implementation alignment**
+  - [x] Sort generated query functions by source file path (matches Gleam reproducibility).
+  - [x] Align validation error titles and hints with upstream Squirrel wording (duplicate
+    columns, invalid file/column names, outdated/cannot-overwrite files).
+  - [x] Keep intentional divergences: Elixir row maps and `@spec`s, `String.t()` enums,
+    `timestamptz` mapped to `DateTime.t()`, function-name sorting only when file/name differ.
+
 - **Release**
   - [ ] Publish `0.1.0` to Hex and enable HexDocs at <https://hexdocs.pm/squirrelixir>.
 

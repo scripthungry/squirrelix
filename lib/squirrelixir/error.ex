@@ -247,14 +247,18 @@ defmodule Squirrelixir.Error do
   Formatting and normalization helpers for Squirrelixir errors.
   """
 
+  alias Squirrelixir.Error.CannotOverwriteFile
   alias Squirrelixir.Error.DuplicateReturnColumns
   alias Squirrelixir.Error.MissingPostgresColumn
   alias Squirrelixir.Error.MissingPostgresConstraint
   alias Squirrelixir.Error.MissingPostgresTable
+  alias Squirrelixir.Error.OutdatedFile
   alias Squirrelixir.Error.PostgresInferenceError
   alias Squirrelixir.Error.PostgresSyntaxError
   alias Squirrelixir.Error.QueryFileHasInvalidName
   alias Squirrelixir.Error.QueryHasInvalidColumn
+  alias Squirrelixir.Error.QueryHasInvalidEnum
+  alias Squirrelixir.Error.UnsupportedPostgresType
   alias Squirrelixir.Query
 
   @spec normalize(struct()) :: struct()
@@ -335,8 +339,15 @@ defmodule Squirrelixir.Error do
   end
 
   defp do_format(%QueryFileHasInvalidName{} = error), do: format_query_file_name_error(error)
-  defp do_format(%DuplicateReturnColumns{} = error), do: format_validation_query_error(error)
-  defp do_format(%QueryHasInvalidColumn{} = error), do: format_validation_query_error(error)
+
+  defp do_format(%DuplicateReturnColumns{} = error),
+    do: format_duplicate_return_columns_error(error)
+
+  defp do_format(%QueryHasInvalidColumn{} = error), do: format_invalid_column_error(error)
+  defp do_format(%QueryHasInvalidEnum{} = error), do: format_invalid_enum_error(error)
+  defp do_format(%UnsupportedPostgresType{} = error), do: format_unsupported_type_error(error)
+  defp do_format(%OutdatedFile{} = error), do: format_outdated_file_error(error)
+  defp do_format(%CannotOverwriteFile{} = error), do: format_cannot_overwrite_file_error(error)
 
   defp do_format(error) do
     if postgres_query_error?(error) do
@@ -370,63 +381,125 @@ defmodule Squirrelixir.Error do
     |> Enum.join("\n")
   end
 
-  defp format_validation_query_error(error) do
-    [
-      "Error: Invalid query",
-      "",
-      code_block(error),
-      validation_message(error)
-    ]
-    |> Enum.reject(&(&1 == ""))
-    |> Enum.join("\n")
-  end
-
   defp format_query_file_name_error(%QueryFileHasInvalidName{} = error) do
     lines = [
-      "Error: Invalid query file name",
+      "Error: Query file with invalid name",
       "",
-      "File: #{error.file}",
-      identifier_reason_message(error.reason)
+      "File #{error.file} doesn't have a valid name.",
+      "The name of a file is used to generate a corresponding Elixir function, so it should be a valid Elixir identifier.",
+      identifier_reason_message(error.reason),
+      "Hint: A file name must start with a lowercase letter and can only contain lowercase letters, numbers and underscores."
     ]
 
     lines =
       case error.suggested_name do
         nil -> lines
-        suggested_name -> lines ++ ["Suggested name: #{suggested_name}"]
+        suggested_name -> lines ++ ["Maybe try renaming it to `#{suggested_name}`?"]
       end
 
     Enum.join(lines, "\n")
   end
 
-  defp validation_message(%DuplicateReturnColumns{names: names}) do
-    "Duplicate return columns: #{Enum.join(names, ", ")}"
-  end
+  defp format_duplicate_return_columns_error(%DuplicateReturnColumns{} = error) do
+    pretty_names = Enum.map_join(error.names, ", ", &"`#{&1}`")
+    label = if length(error.names) == 1, do: "name", else: "names"
 
-  defp validation_message(%QueryHasInvalidColumn{column_name: column_name, suggested_name: nil}) do
-    "Column name #{inspect(column_name)} is not a valid Elixir identifier"
-  end
-
-  defp validation_message(%QueryHasInvalidColumn{
-         column_name: column_name,
-         suggested_name: suggested_name
-       }) do
     [
-      "Column name #{inspect(column_name)} is not a valid Elixir identifier",
-      "Suggested name: #{suggested_name}"
+      "Error: Duplicate names",
+      "",
+      code_block(error),
+      "This query returns multiple values sharing the same #{label}: #{pretty_names}."
     ]
     |> Enum.join("\n")
   end
 
-  defp identifier_reason_message(:empty), do: "Reason: the file name is empty"
+  defp format_invalid_column_error(%QueryHasInvalidColumn{reason: :empty} = error) do
+    [
+      "Error: Column with empty name",
+      "",
+      code_block(error),
+      "A column returned by this query has the empty string as a name, all columns should have a valid Elixir identifier as name."
+    ]
+    |> Enum.join("\n")
+  end
 
-  defp identifier_reason_message({:invalid_grapheme, 0, grapheme}),
-    do: "Reason: cannot start with #{inspect(grapheme)}"
+  defp format_invalid_column_error(%QueryHasInvalidColumn{} = error) do
+    message =
+      case error.suggested_name do
+        nil -> "This is not a valid Elixir identifier"
+        suggested_name -> "This is not a valid Elixir identifier, maybe try `#{suggested_name}`?"
+      end
 
-  defp identifier_reason_message({:invalid_grapheme, position, grapheme}),
-    do: "Reason: invalid character #{inspect(grapheme)} at position #{position}"
+    [
+      "Error: Column with invalid name",
+      "",
+      code_block(error, {error.column_name, message}),
+      "Hint: A column name must start with a lowercase letter and can only contain lowercase letters, numbers and underscores."
+    ]
+    |> Enum.join("\n")
+  end
 
-  defp code_block(%{file: file, content: content, starting_line: starting_line} = error) do
-    pointer = pointer_for(error)
+  defp format_invalid_enum_error(%QueryHasInvalidEnum{} = error) do
+    reason_message =
+      case error.reason do
+        :no_variants -> "it has no variants."
+      end
+
+    [
+      "Error: Query with invalid enum",
+      "",
+      code_block(error),
+      "One of the values in this query is the `#{error.enum_name}` enum, but it cannot be turned into a generated type because #{reason_message}"
+    ]
+    |> Enum.join("\n")
+  end
+
+  defp format_unsupported_type_error(%UnsupportedPostgresType{} = error) do
+    lines = [
+      "Error: Unsupported type",
+      "",
+      "One of the rows returned by this query has type `#{error.name}` which cannot currently generate code for."
+    ]
+
+    lines =
+      case error.hint do
+        nil -> lines
+        hint -> lines ++ ["Hint: #{hint}"]
+      end
+
+    Enum.join(lines, "\n")
+  end
+
+  defp format_outdated_file_error(%OutdatedFile{} = error) do
+    [
+      "Error: Outdated file",
+      "",
+      "It looks like #{error.file} is outdated, try running `mix squirrelixir.gen` to generate a new up to date version."
+    ]
+    |> Enum.join("\n")
+  end
+
+  defp format_cannot_overwrite_file_error(%CannotOverwriteFile{} = error) do
+    [
+      "Error: Cannot overwrite file",
+      "",
+      "It looks like #{error.file} already exists and was not generated by Squirrelixir, it cannot be overwritten!",
+      "Hint: Rename the file and run `mix squirrelixir.gen` again."
+    ]
+    |> Enum.join("\n")
+  end
+
+  defp code_block(
+         %{file: file, content: content, starting_line: starting_line} = error,
+         pointer \\ nil
+       ) do
+    pointer =
+      case pointer do
+        {column_name, message} -> pointer_for({column_name, message}, content)
+        nil -> pointer_for(error)
+        other -> other
+      end
+
     lines = String.split(content, "\n")
     width = byte_size(Integer.to_string(starting_line + length(lines) - 1)) + 2
     padding = String.duplicate(" ", width + 1)
@@ -470,6 +543,14 @@ defmodule Squirrelixir.Error do
   defp additional_message(%{message: message, position: nil}), do: message
   defp additional_message(_error), do: ""
 
+  defp pointer_for({column_name, message}, content)
+       when is_binary(column_name) and is_binary(message) and is_binary(content) do
+    case find_name_span(column_name, content) do
+      {line_number, column} -> {line_number, {column, message}}
+      :error -> nil
+    end
+  end
+
   defp pointer_for(%{position: position, message: message, content: content})
        when is_integer(position) and is_binary(message) and is_binary(content) do
     {line_number, column} = position_to_line_column(content, position)
@@ -477,6 +558,42 @@ defmodule Squirrelixir.Error do
   end
 
   defp pointer_for(_error), do: nil
+
+  defp find_name_span(name, content) do
+    case :binary.match(content, name) do
+      {offset, _length} ->
+        offset_to_line_column(content, offset)
+
+      :nomatch ->
+        :error
+    end
+  end
+
+  defp offset_to_line_column(content, offset) do
+    prefix = binary_part(content, 0, offset)
+
+    line_number =
+      prefix
+      |> String.graphemes()
+      |> Enum.count(&(&1 == "\n"))
+      |> Kernel.+(1)
+
+    column =
+      prefix
+      |> String.split("\n")
+      |> List.last()
+      |> then(&String.length(&1 || ""))
+
+    {line_number, column}
+  end
+
+  defp identifier_reason_message(:empty), do: "Reason: the file name is empty"
+
+  defp identifier_reason_message({:invalid_grapheme, 0, grapheme}),
+    do: "Reason: cannot start with #{inspect(grapheme)}"
+
+  defp identifier_reason_message({:invalid_grapheme, position, grapheme}),
+    do: "Reason: invalid character #{inspect(grapheme)} at position #{position}"
 
   defp position_to_line_column(content, position) do
     prefix = String.slice(content, 0, position - 1)

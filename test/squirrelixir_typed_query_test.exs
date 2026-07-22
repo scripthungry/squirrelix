@@ -193,9 +193,10 @@ defmodule SquirrelixirTypedQueryTest do
              )
 
     formatted = Squirrelixir.Error.format(error)
-    assert formatted =~ "Invalid query"
+    assert formatted =~ "Error: Column with invalid name"
     assert formatted =~ "invalid_column.sql"
-    assert formatted =~ "Suggested name: not_a_valid_name"
+    assert formatted =~ "maybe try `not_a_valid_name`"
+    assert formatted =~ "Hint: A column name must start with a lowercase letter"
   end
 
   test "from_query duplicate column errors format with query context" do
@@ -217,7 +218,8 @@ defmodule SquirrelixirTypedQueryTest do
              )
 
     formatted = Squirrelixir.Error.format(error)
-    assert formatted =~ "Duplicate return columns: duplicate"
+    assert formatted =~ "Error: Duplicate names"
+    assert formatted =~ "sharing the same name: `duplicate`"
   end
 
   test "from_query infers multiple parameter names" do

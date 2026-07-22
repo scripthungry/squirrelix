@@ -59,7 +59,7 @@ defmodule Squirrelixir.Codegen do
 
       @type column_spec :: {atom(), atom() | {:list, atom()}, boolean()}
 
-    #{queries |> Enum.sort_by(& &1.name) |> Enum.map(&function_source(&1, postgrex_module)) |> join_function_sources()}#{runtime_helpers_section(queries)}
+    #{queries |> Enum.sort_by(& &1.file) |> Enum.map(&function_source(&1, postgrex_module)) |> join_function_sources()}#{runtime_helpers_section(queries)}
     end
     """
 

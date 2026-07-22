@@ -47,7 +47,7 @@ defmodule SquirrelixirCodegenTest do
     assert function_position(code, "find_user") < function_position(code, "z_last")
   end
 
-  test "generate_module sorts queries by name not source file" do
+  test "generate_module sorts queries by source file path like Gleam" do
     queries = [
       typed_query("a_last.sql", "zebra", "select 1 as res", [], [
         %Column{name: "res", type: :integer, nullable?: false}
@@ -59,7 +59,7 @@ defmodule SquirrelixirCodegenTest do
 
     code = Codegen.generate_module(MyApp.SQL, queries, version: "v-test")
 
-    assert function_position(code, "apple") < function_position(code, "zebra")
+    assert function_position(code, "zebra") < function_position(code, "apple")
   end
 
   test "generate_module emits a runtime helpers section" do
