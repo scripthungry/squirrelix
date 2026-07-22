@@ -44,6 +44,39 @@ defmodule SquirrelixirMetadataTest do
              {:error, %Squirrelixir.Error.CannotReadFile{file: file, reason: :enoent}}
   end
 
+  test "from_file expands dot-relative query paths from the project root" do
+    root = Squirrelixir.TestSupport.tmp_dir!("squirrelixir-metadata")
+    metadata_file = Path.join(root, "squirrelixir.exs")
+
+    File.write!(metadata_file, """
+    %{
+      "./lib/accounts/sql/find_account.sql" => [
+        params: [:integer],
+        returns: [%{name: "name", type: :string, nullable?: false}]
+      ]
+    }
+    """)
+
+    assert Metadata.from_file(metadata_file, root: root) ==
+             {:ok,
+              %{
+                Path.join(root, "lib/accounts/sql/find_account.sql") => [
+                  params: [:integer],
+                  returns: [%{name: "name", type: :string, nullable?: false}]
+                ]
+              }}
+  end
+
+  test "from_file reports syntax errors in metadata files" do
+    root = Squirrelixir.TestSupport.tmp_dir!("squirrelixir-metadata")
+    metadata_file = Path.join(root, "squirrelixir.exs")
+
+    File.write!(metadata_file, "%{")
+
+    assert {:error, %Squirrelixir.Error.InvalidQueryMetadataFile{file: ^metadata_file, reason: _}} =
+             Metadata.from_file(metadata_file, root: root)
+  end
+
   test "from_file reports metadata files that do not return a map" do
     root = Squirrelixir.TestSupport.tmp_dir!("squirrelixir-metadata")
     metadata_file = Path.join(root, "squirrelixir.exs")
