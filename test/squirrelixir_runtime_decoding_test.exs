@@ -68,8 +68,7 @@ defmodule SquirrelixirRuntimeDecodingTest do
       [{module, _bytecode}] = Code.compile_string(code)
 
       assert module.update_mood(
-               {RuntimeEnumMock, self(),
-                %Postgrex.Result{columns: ["mood"], rows: [["sleepy"]]}},
+               {RuntimeEnumMock, self(), %Postgrex.Result{columns: ["mood"], rows: [["sleepy"]]}},
                "sleepy",
                42
              ) == [%{mood: "sleepy"}]

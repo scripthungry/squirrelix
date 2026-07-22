@@ -57,7 +57,7 @@ defmodule Squirrelixir.Codegen do
       `{:list, :integer}`.
       \"\"\"
 
-      @typep column_spec :: {atom(), atom() | {:list, atom()}, boolean()}
+      @type column_spec :: {atom(), atom() | {:list, atom()}, boolean()}
 
     #{queries |> Enum.sort_by(& &1.file) |> Enum.map(&function_source(&1, postgrex_module)) |> join_function_sources()}
     #{decode_helpers(queries)}

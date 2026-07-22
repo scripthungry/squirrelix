@@ -42,7 +42,7 @@ defmodule SquirrelixirCodegenTest do
     assert code =~ "def z_last(connection)"
     assert code =~ "decode_rows([{:id, :integer, false}])"
     assert code =~ "defp decode_row("
-    assert code =~ "@typep column_spec ::"
+    assert code =~ "@type column_spec ::"
     assert code =~ "defp decode_column_value("
   end
 
