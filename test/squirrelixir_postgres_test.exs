@@ -437,6 +437,70 @@ defmodule SquirrelixirPostgresTest do
             ]} = Postgres.describe(conn, query)
   end
 
+  test "describe infers nullability for recursive CTE with semi join", %{conn: conn} do
+    Postgrex.query!(conn, "drop table if exists categories_issue75", [])
+    Postgrex.query!(conn, "drop table if exists items_issue75", [])
+    Postgrex.query!(conn, "drop table if exists items_categories_issue75", [])
+
+    Postgrex.query!(
+      conn,
+      """
+      create temporary table categories_issue75 (
+        id uuid primary key,
+        name varchar(70) not null,
+        parent_id uuid not null
+      )
+      """,
+      []
+    )
+
+    Postgrex.query!(
+      conn,
+      "create temporary table items_issue75 (id uuid primary key, name varchar(70) not null)",
+      []
+    )
+
+    Postgrex.query!(
+      conn,
+      """
+      create temporary table items_categories_issue75 (
+        item_id uuid not null,
+        category_id uuid not null,
+        primary key (item_id, category_id)
+      )
+      """,
+      []
+    )
+
+    query =
+      query("""
+      with recursive subcategories as (
+        select id
+        from categories_issue75
+        where id = $1
+
+        union all
+
+        select c.id
+        from categories_issue75 c
+        join subcategories sc on c.parent_id = sc.id
+      )
+      select i.id, i.name
+      from items_issue75 i
+      left join items_categories_issue75 ic on ic.item_id = i.id
+      where ic.category_id in (select id from subcategories);
+      """)
+
+    assert {:ok,
+            [
+              params: [:uuid],
+              returns: [
+                %Column{name: "id", type: :uuid, nullable?: false},
+                %Column{name: "name", type: :string, nullable?: false}
+              ]
+            ]} = Postgres.describe(conn, query)
+  end
+
   test "describe accepts queries starting with a semicolon", %{conn: conn} do
     query = query(";select 1::int4 as result")
 
