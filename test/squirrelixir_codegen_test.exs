@@ -20,7 +20,7 @@ defmodule SquirrelixirCodegenTest do
   alias Squirrelixir.TypedQueryDirectory
   alias Squirrelixir.TypeMapper
 
-  test "generate_module emits formatted Elixir functions sorted by source file" do
+  test "generate_module emits formatted Elixir functions sorted alphabetically by name" do
     queries = [
       typed_query("z_last.sql", "z_last", "select * from users", []),
       typed_query(
@@ -44,6 +44,105 @@ defmodule SquirrelixirCodegenTest do
     assert code =~ "defp decode_row("
     assert code =~ "@type column_spec ::"
     assert code =~ "defp decode_column_value("
+    assert function_position(code, "find_user") < function_position(code, "z_last")
+  end
+
+  test "generate_module sorts queries by name not source file" do
+    queries = [
+      typed_query("a_last.sql", "zebra", "select 1 as res", [], [
+        %Column{name: "res", type: :integer, nullable?: false}
+      ]),
+      typed_query("z_first.sql", "apple", "select 2 as res", [], [
+        %Column{name: "res", type: :integer, nullable?: false}
+      ])
+    ]
+
+    code = Codegen.generate_module(MyApp.SQL, queries, version: "v-test")
+
+    assert function_position(code, "apple") < function_position(code, "zebra")
+  end
+
+  test "generate_module emits a runtime helpers section" do
+    query =
+      typed_query("find_user.sql", "find_user", "select name from users", [], [
+        %Column{name: "name", type: :string, nullable?: false}
+      ])
+
+    code = Codegen.generate_module(MyApp.SQL, [query], version: "v-test")
+
+    assert code =~ "# --- Runtime helpers ---"
+    assert code =~ ~r/end\n\n  # --- Runtime helpers ---\n\n  @spec decode_rows/
+    refute code =~ ~r/end\n\n\n  # --- Runtime helpers ---/
+  end
+
+  test "generate_module deduplicates uuid helpers when multiple queries use uuids" do
+    uuid_query = fn name, file ->
+      typed_query(file, name, "select gen_random_uuid()", [], [
+        %Column{name: "gen_random_uuid", type: :uuid, nullable?: false}
+      ])
+    end
+
+    queries = [
+      uuid_query.("one", "one.sql"),
+      uuid_query.("other", "other.sql")
+    ]
+
+    code = Codegen.generate_module(MyApp.SQL, queries, version: "v-test")
+
+    assert Regex.scan(~r/defp uuid_to_string\(/, code) |> length() == 1
+    assert Regex.scan(~r/defp uuid_from_string\(/, code) |> length() == 1
+    assert function_position(code, "one") < function_position(code, "other")
+  end
+
+  test "generate_module uses String.t() for multiple enum-using queries without enum modules" do
+    queries = [
+      typed_query(
+        "find_by_mood.sql",
+        "find_by_mood",
+        "select mood from squirrels where mood = $1",
+        [%Parameter{index: 1, name: "mood", type: :string}],
+        [%Column{name: "mood", type: :string, nullable?: false}]
+      ),
+      typed_query(
+        "find_by_colour.sql",
+        "find_by_colour",
+        "select colour from squirrels where colour = $1",
+        [%Parameter{index: 1, name: "colour", type: :string}],
+        [%Column{name: "colour", type: :string, nullable?: false}]
+      )
+    ]
+
+    code = Codegen.generate_module(MyApp.SQL, queries, version: "v-test")
+
+    assert code =~ "@spec find_by_colour(Postgrex.conn(), String.t()) :: [find_by_colour_row()]"
+    assert code =~ "@spec find_by_mood(Postgrex.conn(), String.t()) :: [find_by_mood_row()]"
+    assert code =~ "required(:colour) => String.t()"
+    assert code =~ "required(:mood) => String.t()"
+    refute code =~ "SquirrelColour"
+    refute code =~ "SquirrelMood"
+    refute code =~ "_decoder"
+    refute code =~ "_encoder"
+    refute code =~ "# --- Enums ---"
+    assert function_position(code, "find_by_colour") < function_position(code, "find_by_mood")
+  end
+
+  test "generate_module uses String.t() when a query uses multiple enum strings" do
+    query =
+      typed_query(
+        "query.sql",
+        "query",
+        "select 'red'::squirrel_colour where $1 = 'gleamy'::squirrel_mood",
+        [%Parameter{index: 1, name: "mood", type: :string}],
+        [%Column{name: "squirrel_colour", type: :string, nullable?: false}]
+      )
+
+    code = Codegen.generate_module(MyApp.SQL, [query], version: "v-test")
+
+    assert code =~ "@spec query(Postgrex.conn(), String.t()) :: [query_row()]"
+    assert code =~ "required(:squirrel_colour) => String.t()"
+    refute code =~ "SquirrelColour"
+    refute code =~ "SquirrelMood"
+    refute code =~ "# --- Enums ---"
   end
 
   test "generate_module maps postgres enums to String.t() and round-trips at runtime" do
@@ -640,6 +739,10 @@ defmodule SquirrelixirCodegenTest do
     assert code =~ "{:first, :boolean, false}"
     assert code =~ "{:second, :integer, false}"
     assert code =~ "{:third, :string, false}"
+  end
+
+  defp function_position(code, function_name) do
+    code |> :binary.match("def #{function_name}(") |> elem(0)
   end
 
   defp typespec_fragment(code, function_name) do

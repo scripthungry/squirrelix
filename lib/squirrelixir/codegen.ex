@@ -59,8 +59,7 @@ defmodule Squirrelixir.Codegen do
 
       @type column_spec :: {atom(), atom() | {:list, atom()}, boolean()}
 
-    #{queries |> Enum.sort_by(& &1.file) |> Enum.map(&function_source(&1, postgrex_module)) |> join_function_sources()}
-    #{decode_helpers(queries)}
+    #{queries |> Enum.sort_by(& &1.name) |> Enum.map(&function_source(&1, postgrex_module)) |> join_function_sources()}#{runtime_helpers_section(queries)}
     end
     """
 
@@ -195,12 +194,23 @@ defmodule Squirrelixir.Codegen do
     |> then(&"[#{Enum.join(&1, ", ")}]")
   end
 
-  defp decode_helpers([]), do: ""
+  @runtime_helpers_header "# --- Runtime helpers ---"
 
-  defp decode_helpers(queries) do
-    queries
-    |> runtime_helper_sources()
-    |> Enum.join("\n")
+  defp runtime_helpers_section([]), do: ""
+
+  defp runtime_helpers_section(queries) do
+    case runtime_helper_sources(queries) do
+      [] ->
+        ""
+
+      sources ->
+        """
+
+        #{@runtime_helpers_header}
+
+        #{Enum.join(sources, "\n\n")}
+        """
+    end
   end
 
   defp runtime_helper_sources(queries) do

@@ -64,6 +64,7 @@ defmodule SquirrelixirRuntimeDecodingTest do
 
       assert code =~ "@spec update_mood(Postgrex.conn(), String.t(), integer())"
       assert code =~ "required(:mood) => String.t()"
+      assert code =~ "# --- Runtime helpers ---"
 
       [{module, _bytecode}] = Code.compile_string(code)
 
@@ -74,6 +75,48 @@ defmodule SquirrelixirRuntimeDecodingTest do
              ) == [%{mood: "sleepy"}]
 
       assert_received {:query!, _, ["sleepy", 42]}
+    end
+
+    test "multiple enum-using queries share one runtime helpers section" do
+      queries = [
+        typed_query(
+          "find_by_mood.sql",
+          "find_by_mood",
+          "select mood from squirrels where mood = $1",
+          [%Parameter{index: 1, name: "mood", type: :string}],
+          [%Column{name: "mood", type: :string, nullable?: false}]
+        ),
+        typed_query(
+          "find_by_colour.sql",
+          "find_by_colour",
+          "select colour from squirrels where colour = $1",
+          [%Parameter{index: 1, name: "colour", type: :string}],
+          [%Column{name: "colour", type: :string, nullable?: false}]
+        )
+      ]
+
+      code =
+        Codegen.generate_module(Squirrelixir.RuntimeEnumTest.SQL, queries,
+          version: "v-test",
+          postgrex: RuntimeEnumMock
+        )
+
+      assert Regex.scan(~r/# --- Runtime helpers ---/, code) |> length() == 1
+      refute code =~ "# --- Enums ---"
+      refute code =~ "SquirrelMood"
+      refute code =~ "SquirrelColour"
+
+      [{module, _bytecode}] = Code.compile_string(code)
+
+      assert module.find_by_mood(
+               {RuntimeEnumMock, self(), %Postgrex.Result{columns: ["mood"], rows: [["happy"]]}},
+               "happy"
+             ) == [%{mood: "happy"}]
+
+      assert module.find_by_colour(
+               {RuntimeEnumMock, self(), %Postgrex.Result{columns: ["colour"], rows: [["red"]]}},
+               "red"
+             ) == [%{colour: "red"}]
     end
   end
 
@@ -286,6 +329,10 @@ defmodule SquirrelixirRuntimeDecodingTest do
           version: "v-test",
           postgrex: RuntimeDecodingMock
         )
+
+      assert Regex.scan(~r/defp uuid_to_string\(/, code) |> length() == 1
+      assert Regex.scan(~r/defp uuid_from_string\(/, code) |> length() == 1
+      assert code =~ "# --- Runtime helpers ---"
 
       [{module, _bytecode}] = Code.compile_string(code)
 
