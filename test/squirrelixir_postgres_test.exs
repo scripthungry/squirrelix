@@ -437,7 +437,13 @@ defmodule SquirrelixirPostgresTest do
             ]} = Postgres.describe(conn, query)
   end
 
-  test "describe infers nullability for recursive CTE with semi join", %{conn: conn} do
+  # https://github.com/giacomocavalieri/squirrel/issues/75
+  # Mirrors Gleam recursive_common_table_query_with_semi_join_test: SQL uses a left
+  # join plus an IN subquery that Postgres plans as a semi join.
+  @tag :cte
+  test "describe infers nullability for recursive common table query with semi join", %{
+    conn: conn
+  } do
     Postgrex.query!(conn, "drop table if exists categories_issue75", [])
     Postgrex.query!(conn, "drop table if exists items_issue75", [])
     Postgrex.query!(conn, "drop table if exists items_categories_issue75", [])
