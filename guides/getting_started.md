@@ -1,11 +1,11 @@
 # Getting Started
 
-This guide walks through adding Squirrelixir to a Mix project, writing your first
+This guide walks through adding SquirrElix to a Mix project, writing your first
 query, and generating typed Elixir modules.
 
 ## Add the dependency
 
-Add Squirrelixir and Postgrex to your `mix.exs`:
+Add SquirrElix and Postgrex to your `mix.exs`:
 
 ```elixir
 def deps do
@@ -28,12 +28,12 @@ Then run:
 mix deps.get
 ```
 
-Squirrelixir is typically a **dev dependency** — you run code generation at build or
+SquirrElix is typically a **dev dependency** — you run code generation at build or
 CI time rather than at runtime in production. Add it under `only: :dev` if you prefer.
 
 ## Project layout
 
-Squirrelixir discovers queries under `lib/`, `test/`, and `dev/` in directories
+SquirrElix discovers queries under `lib/`, `test/`, and `dev/` in directories
 named `sql/`:
 
 ```txt
@@ -84,13 +84,13 @@ plus one parameter).
 
 ### With Postgres inference (recommended)
 
-Point Squirrelixir at a database that has your schema applied (migrations run):
+Point SquirrElix at a database that has your schema applied (migrations run):
 
 ```sh
 mix squirrelixir.gen --infer --database my_app_dev
 ```
 
-Squirrelixir connects to Postgres, prepares each query, and reads parameter and
+SquirrElix connects to Postgres, prepares each query, and reads parameter and
 column types from Postgrex metadata.
 
 Set connection details via environment variables or flags:

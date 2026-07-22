@@ -9,7 +9,7 @@ defmodule SquirrelixirGleamParityTest do
   ## Intentional Elixir differences (no ExUnit port)
 
   The following Gleam Birdie snapshot tests are intentionally not ported because
-  Squirrelixir generates idiomatic Elixir instead of Gleam ADTs and pipeline code:
+  SquirrElix generates idiomatic Elixir instead of Gleam ADTs and pipeline code:
 
   * `generated_type_has_the_same_name_as_the_function_but_in_pascal_case_test` —
     Elixir row types use `query_row` maps, not PascalCase Gleam custom types.

@@ -2,7 +2,7 @@ defmodule Squirrelixir do
   @moduledoc """
   Elixir-native SQL query code generation for Mix projects.
 
-  Squirrelixir discovers `.sql` files under conventional Elixir source roots
+  SquirrElix discovers `.sql` files under conventional Elixir source roots
   (`lib/`, `test/`, `dev/`), then generates sibling `sql.ex` modules with
   `@spec`-annotated functions that execute through Postgrex.
 

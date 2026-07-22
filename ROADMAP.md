@@ -1,12 +1,12 @@
-# Squirrelixir Roadmap
+# SquirrElix Roadmap
 
-Squirrelixir reimplements [Gleam Squirrel](https://github.com/giacomocavalieri/squirrel)'s core
+SquirrElix reimplements [Gleam Squirrel](https://github.com/giacomocavalieri/squirrel)'s core
 SQL discovery, inference, and codegen behavior with an idiomatic **Elixir-native** public API.
 Upstream Squirrel remains the compatibility reference for query conventions and edge-case tests;
 Elixir conventions take precedence for API shape, `@spec` output, and runtime return values.
 
 **Elixir-native direction:** generated modules use stdlib typespecs (`String.t()`, `integer()`,
-`map()` with `required/1`, `term()` for JSON, and so on). Squirrelixir does **not** generate
+`map()` with `required/1`, `term()` for JSON, and so on). SquirrElix does **not** generate
 Gleam records, custom enum ADTs, or opaque tagged error values.
 
 ## Completed

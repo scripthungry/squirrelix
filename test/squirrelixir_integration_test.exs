@@ -1,6 +1,6 @@
 defmodule SquirrelixirIntegrationTest do
   @moduledoc """
-  End-to-end integration tests proving Squirrelixir is a complete Elixir Squirrel.
+  End-to-end integration tests proving SquirrElix is a complete Elixir Squirrel.
 
   ## Elixir workflow vs Gleam Squirrel
 
@@ -12,7 +12,7 @@ defmodule SquirrelixirIntegrationTest do
 
     * **Gleam Squirrel** emits Gleam modules with custom ADTs, `Result` types, and
       Gleam-specific decoders. Metadata often lives in a Gleam config module.
-    * **Squirrelixir** emits Elixir modules with `@spec` annotations, stdlib types
+    * **SquirrElix** emits Elixir modules with `@spec` annotations, stdlib types
       (`String.t()`, `integer()`, `map/0` row shapes), and Postgrex at runtime.
       Query sources are either a metadata map (like `squirrelixir.exs`) or a
       Postgres inferrer callback — the same split as `mix squirrelixir.gen`

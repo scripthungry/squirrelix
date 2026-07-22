@@ -1,6 +1,6 @@
 # Types
 
-Squirrelixir maps Postgres column and parameter types to Elixir typespecs used in
+SquirrElix maps Postgres column and parameter types to Elixir typespecs used in
 generated `@spec`s and row `@type` definitions. This guide describes the supported
 mappings and intentional differences from Gleam Squirrel.
 
@@ -71,8 +71,8 @@ UUID strings such as `"550e8400-e29b-41d4-a716-446655440000"`.
 
 ### Timestamptz
 
-Squirrelixir maps `timestamptz` to `DateTime.t()`. When inference encounters
-`timestamptz`, Squirrelixir may emit a hint recommending plain `timestamp` columns
+SquirrElix maps `timestamptz` to `DateTime.t()`. When inference encounters
+`timestamptz`, SquirrElix may emit a hint recommending plain `timestamp` columns
 to avoid time-zone conversion surprises.
 
 Gleam Squirrel maps `timestamptz` differently; this is an intentional Elixir-native
@@ -93,7 +93,7 @@ Nullable elements inside arrays follow Postgrex decoding behaviour.
 ## Postgres enums
 
 User-defined Postgres enums (`create type ... as enum`) map to `String.t()` in
-generated code. Squirrelixir does **not** generate Elixir enum modules.
+generated code. SquirrElix does **not** generate Elixir enum modules.
 
 Given:
 
@@ -118,7 +118,7 @@ type for both inference and code generation.
 ## Unsupported types
 
 Some Postgres types are not yet supported. When inference encounters them,
-Squirrelixir returns `UnsupportedPostgresType` with the type name and, when
+SquirrElix returns `UnsupportedPostgresType` with the type name and, when
 available, a hint.
 
 Currently rejected types include composite types and some built-ins such as `point`.
@@ -160,7 +160,7 @@ Example metadata entry:
 
 ## Differences from Gleam Squirrel
 
-| Aspect | Gleam Squirrel | Squirrelixir |
+| Aspect | Gleam Squirrel | SquirrElix |
 | --- | --- | --- |
 | Row shape | Custom record type | `map()` with `required/1` |
 | Postgres enums | Generated enum ADT | `String.t()` |

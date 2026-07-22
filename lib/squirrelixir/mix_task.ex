@@ -133,7 +133,7 @@ defmodule Squirrelixir.MixTask do
 
     case Metadata.from_file(metadata_file, root: root) do
       {:ok, metadata} -> metadata
-      {:error, error} -> Mix.raise("Could not load Squirrelixir metadata: #{inspect(error)}")
+      {:error, error} -> Mix.raise("Could not load SquirrElix metadata: #{inspect(error)}")
     end
   end
 
@@ -156,7 +156,7 @@ defmodule Squirrelixir.MixTask do
   end
 
   defp report_generate_summary(%CodegenSummary{errors: errors}) do
-    Mix.raise("Squirrelixir generation failed: #{inspect(errors)}")
+    Mix.raise("SquirrElix generation failed: #{inspect(errors)}")
   end
 
   defp report_check_summary(%CodegenCheckSummary{status: :ok, checked_count: count}) do
@@ -170,7 +170,7 @@ defmodule Squirrelixir.MixTask do
   end
 
   defp report_check_summary(%CodegenCheckSummary{errors: errors}) do
-    Mix.raise("Squirrelixir check failed: #{inspect(errors)}")
+    Mix.raise("SquirrElix check failed: #{inspect(errors)}")
   end
 
   defp pluralize(1, singular, _plural), do: singular

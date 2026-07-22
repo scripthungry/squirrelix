@@ -1,8 +1,10 @@
-# 🐿️ Squirrelixir — type-safe SQL in Elixir
+# 🐿️ SquirrElix — type-safe SQL in Elixir
+
+> SquirrElix (package `squirrelixir`)
 
 [![Hex Docs](https://img.shields.io/badge/hex-docs-ffaff3)](https://hexdocs.pm/squirrelixir/)
 
-Squirrelixir turns plain `.sql` files into typed Elixir modules. You write one query
+SquirrElix turns plain `.sql` files into typed Elixir modules. You write one query
 per file; the generator discovers those files, resolves parameter and return types,
 and writes a sibling `sql.ex` module with `@spec`-annotated functions that run the
 queries through Postgrex.
@@ -10,9 +12,9 @@ queries through Postgrex.
 It targets **Elixir 1.20** and uses native typespecs rather than custom ADTs or
 Gleam-style records. See the [Gleam Squirrel](https://github.com/giacomocavalieri/squirrel)
 project for the upstream SQL discovery, inference, and query conventions that
-Squirrelixir follows.
+SquirrElix follows.
 
-## What's Squirrelixir?
+## What's SquirrElix?
 
 If you need to talk with a database in Elixir you'll often write something like this:
 
@@ -39,9 +41,9 @@ burden when you have a lot of queries:
 - You have to manually keep row decoding in sync with the query's output.
 
 One might be tempted to hide all of this by reaching for something like an ORM.
-Squirrelixir proposes a different approach: instead of trying to hide the SQL it
+SquirrElix proposes a different approach: instead of trying to hide the SQL it
 _embraces it and leaves you in control._ You write the SQL queries in plain old
-`*.sql` files and Squirrelixir will take care of generating all the corresponding
+`*.sql` files and SquirrElix will take care of generating all the corresponding
 functions.
 
 Instead of the hand-written example shown earlier you can instead just write the
@@ -72,12 +74,12 @@ rows = SQL.find_user(conn, 42)
 # => [%{name: "Ada", age: 36}]
 ```
 
-Behind the scenes Squirrelixir generates the decode helpers and functions you need;
+Behind the scenes SquirrElix generates the decode helpers and functions you need;
 and it's pretty-printed, standard Elixir code. So now you get the best of both worlds:
 
-- You don't have to take care of keeping encoders and decoders in sync — Squirrelixir
+- You don't have to take care of keeping encoders and decoders in sync — SquirrElix
   does that for you.
-- And you're not compromising on type safety either: Squirrelixir is able to
+- And you're not compromising on type safety either: SquirrElix is able to
   understand the types of your query and produce correct `@spec`s and runtime decoders.
 - You can stick to writing plain SQL in `*.sql` files. You'll have better editor
   support, syntax highlighting and completions.
@@ -92,7 +94,7 @@ and it's pretty-printed, standard Elixir code. So now you get the best of both w
 
 ## Installation
 
-Add Squirrelixir to your `mix.exs` dependencies:
+Add SquirrElix to your `mix.exs` dependencies:
 
 ```elixir
 def deps do
@@ -126,7 +128,7 @@ Browse module docs locally with `mix docs`.
 
 ## Quick start
 
-Squirrelixir discovers queries under conventional Elixir source roots. Put one SQL
+SquirrElix discovers queries under conventional Elixir source roots. Put one SQL
 query per file inside a `sql/` directory:
 
 ```txt
@@ -161,9 +163,9 @@ See the [Getting Started guide](guides/getting_started.md) for a full walkthroug
 
 ## Writing SQL queries
 
-Squirrelixir follows a small set of conventions:
+SquirrElix follows a small set of conventions:
 
-- Squirrelixir looks for all `sql/` directories under your project's `lib/`, `test/`,
+- SquirrElix looks for all `sql/` directories under your project's `lib/`, `test/`,
   and `dev/` roots and reads all the `*.sql` files in there (in glob terms
   `{lib,test,dev}/**/sql/*.sql`).
 - Each `sql/` directory is turned into a single Elixir module containing a function
@@ -182,7 +184,7 @@ conventions, and tips for nullable parameters.
 
 ## Generated code overview
 
-For each query Squirrelixir generates:
+For each query SquirrElix generates:
 
 - A per-query row `@type` (PascalCase of the function name + `_row`) describing the
   returned map shape.
@@ -217,7 +219,7 @@ re-run `mix squirrelixir.gen` instead of editing the Elixir module directly.
 
 ## CLI commands
 
-Squirrelixir offers the following Mix tasks to streamline your workflow:
+SquirrElix offers the following Mix tasks to streamline your workflow:
 
 - `mix squirrelixir.gen` — Generates typed Elixir code for all SQL queries found
   under `{lib,test,dev}/**/sql/*.sql`.
@@ -274,7 +276,7 @@ The programmatic API mirrors this split — see `Squirrelixir.generate/3` and
 
 ## Configuration and connection
 
-In order to understand the type of your queries, Squirrelixir needs to connect to
+In order to understand the type of your queries, SquirrElix needs to connect to
 the Postgres server where the database schema is defined when you use `--infer`.
 
 Pass a connection URL on the CLI:
@@ -284,7 +286,7 @@ mix squirrelixir.gen --infer --url postgres://user:password@host:5432/database?c
 ```
 
 Or set [Postgres environment variables](https://www.postgresql.org/docs/current/libpq-envars.html).
-When a value is not set, Squirrelixir uses these defaults:
+When a value is not set, SquirrElix uses these defaults:
 
 | Variable | Default |
 | --- | --- |
@@ -303,7 +305,7 @@ programmatic API, and CI setup.
 
 ## Supported types
 
-Squirrelixir takes care of the mapping between Postgres types and Elixir types.
+SquirrElix takes care of the mapping between Postgres types and Elixir types.
 This is needed in two places:
 
 - Elixir values need to be _encoded_ into Postgres values when you're filling in the
@@ -336,9 +338,9 @@ intentional differences from Gleam Squirrel.
 
 ### Enums
 
-If your queries deal with user-defined Postgres enums, Squirrelixir maps them to
+If your queries deal with user-defined Postgres enums, SquirrElix maps them to
 `String.t()` in generated `@spec`s. Enum labels are passed through at runtime as
-plain strings — Squirrelixir does **not** generate Elixir enum modules or
+plain strings — SquirrElix does **not** generate Elixir enum modules or
 Gleam-style custom types.
 
 For example, given this enum:
@@ -356,21 +358,21 @@ A column of type `squirrel_colour` is typed as `String.t()` and decoded as
 
 ## FAQ
 
-### What flavour of SQL does Squirrelixir support?
+### What flavour of SQL does SquirrElix support?
 
-Squirrelixir only supports Postgres. It supports all versions `>= 16`.
+SquirrElix only supports Postgres. It supports all versions `>= 16`.
 
-### Why isn't Squirrelixir configurable in any way?
+### Why isn't SquirrElix configurable in any way?
 
-By going the "convention over configuration" route, Squirrelixir enforces that all
+By going the "convention over configuration" route, SquirrElix enforces that all
 projects adopting it will always have the same structure. If you need to contribute
-to a project using Squirrelixir you'll immediately know which directories and modules
+to a project using SquirrElix you'll immediately know which directories and modules
 to look for.
 
 This makes it easier to get started with a new project and cuts down on bike shedding:
 _"Where should I put my queries?"_, _"How many queries should go in one file?"_, ...
 
-### Can Squirrelixir read my `.env` file?
+### Can SquirrElix read my `.env` file?
 
 The approach we recommend is either use your shell's built-in functionality for loading
 environment variables or use a convenience tool which builds upon that capability, such
@@ -379,9 +381,9 @@ environment rather than the application itself.
 
 ### How do I deal with nullable query parameters?
 
-Squirrelixir works by inspecting the data that Postgres itself exposes about a query.
+SquirrElix works by inspecting the data that Postgres itself exposes about a query.
 Postgres doesn't expose any data about the nullability of query parameters, so
-Squirrelixir can't generate the correct nullable type when, for example, inserting
+SquirrElix can't generate the correct nullable type when, for example, inserting
 into a nullable column.
 
 See the [Writing Queries guide](guides/writing_queries.md#nullable-query-parameters)
@@ -389,7 +391,7 @@ for recommended workarounds.
 
 ## Errors and troubleshooting
 
-Squirrelixir reports structured errors during generation and checking. Common cases:
+SquirrElix reports structured errors during generation and checking. Common cases:
 
 | Error | Typical cause | What to do |
 | --- | --- | --- |
@@ -408,7 +410,7 @@ confirm the database exists and has the expected schema.
 
 ## Relationship to Gleam Squirrel
 
-Squirrelixir is an Elixir port of [Gleam Squirrel](https://github.com/giacomocavalieri/squirrel)
+SquirrElix is an Elixir port of [Gleam Squirrel](https://github.com/giacomocavalieri/squirrel)
 by Giacomo Cavalieri. It follows upstream query conventions — one query per file,
 `sql/` directory layout, comment-to-doc mapping, parameter name inference, and
 Postgres type inference — while producing idiomatic Elixir output:
@@ -445,4 +447,4 @@ See [ROADMAP.md](ROADMAP.md) for completed work and remaining compatibility slic
 
 ## License
 
-Squirrelixir is licensed under the Apache License 2.0. See [LICENSE](LICENSE).
+SquirrElix is licensed under the Apache License 2.0. See [LICENSE](LICENSE).

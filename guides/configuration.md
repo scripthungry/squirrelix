@@ -1,12 +1,12 @@
 # Configuration
 
-Squirrelixir is intentionally minimal: convention over configuration. This guide
+SquirrElix is intentionally minimal: convention over configuration. This guide
 covers the two query sources (Postgres inference and metadata files), connection
 settings, Mix task options, and the programmatic API.
 
 ## Query sources
 
-Every generation or check pass needs type information for each query. Squirrelixir
+Every generation or check pass needs type information for each query. SquirrElix
 accepts one of two sources:
 
 | Mode | When to use | How to enable |
@@ -42,7 +42,7 @@ The `connect_timeout` query parameter sets the connection timeout in seconds.
 
 ### Environment variables
 
-When no URL is provided, Squirrelixir reads standard
+When no URL is provided, SquirrElix reads standard
 [libpq environment variables](https://www.postgresql.org/docs/current/libpq-envars.html):
 
 | Variable | Default |
@@ -67,7 +67,7 @@ direnv allow
 mix squirrelixir.gen --infer
 ```
 
-Squirrelixir does not read `.env` files directly. Use your shell, `direnv`, or
+SquirrElix does not read `.env` files directly. Use your shell, `direnv`, or
 similar tools to load environment variables.
 
 ### CLI flags
@@ -88,7 +88,7 @@ Flag precedence (highest first): CLI flags → URL parameters → environment va
 
 ## Metadata files
 
-When `--infer` is not passed, Squirrelixir loads a metadata file that maps query file
+When `--infer` is not passed, SquirrElix loads a metadata file that maps query file
 paths to parameter and return type descriptors.
 
 Default path: `squirrelixir.exs` in the project root.
@@ -194,7 +194,7 @@ A typical CI step runs the check task after migrations:
 - name: Apply migrations
   run: mix ecto.migrate
 
-- name: Check Squirrelixir output
+- name: Check SquirrElix output
   env:
     PGDATABASE: my_app_test
     PGHOST: localhost
@@ -207,8 +207,8 @@ stay in sync.
 
 ## Safe overwrite rules
 
-Squirrelixir only overwrites files it recognises as previously generated (containing
-the Squirrelixir generation marker). If a `sql.ex` file exists and was written by
+SquirrElix only overwrites files it recognises as previously generated (containing
+the SquirrElix generation marker). If a `sql.ex` file exists and was written by
 hand, generation fails with `CannotOverwriteFile`.
 
 During check, an outdated generated file produces `OutdatedFile`.

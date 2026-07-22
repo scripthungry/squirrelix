@@ -1,12 +1,12 @@
 defmodule Squirrelixir.TypeMapper do
   @moduledoc """
-  Maps Postgres type names into Squirrelixir's Elixir type metadata and typespecs.
+  Maps Postgres type names into SquirrElix's Elixir type metadata and typespecs.
 
   ## Postgres enums
 
   Custom Postgres enums (`kind: "e"`) map to the internal atom `:string` and emit
   `String.t()` in generated `@spec`s. Runtime encode/decode passes enum labels
-  through as plain strings — Squirrelixir does not generate Gleam-style enum ADTs.
+  through as plain strings — SquirrElix does not generate Gleam-style enum ADTs.
 
   ## JSON and JSONB
 

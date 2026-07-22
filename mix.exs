@@ -9,7 +9,7 @@ defmodule Squirrelixir.MixProject do
       app: :squirrelixir,
       version: @version,
       elixir: "~> 1.20",
-      name: "Squirrelixir",
+      name: "SquirrElix",
       description:
         "Generates typed Elixir query modules from plain SQL files using Postgres inference or static metadata.",
       start_permanent: Mix.env() == :prod,
@@ -59,7 +59,7 @@ defmodule Squirrelixir.MixProject do
 
   defp docs do
     [
-      main: "Squirrelixir",
+      main: "SquirrElix",
       extras: [
         "README.md",
         "ROADMAP.md",

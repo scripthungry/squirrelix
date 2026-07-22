@@ -2,7 +2,7 @@ defmodule Mix.Tasks.Squirrelixir.Gen do
   @moduledoc """
   Generates Elixir query modules from SQL files in the current Mix project.
 
-  Squirrelixir scans `lib/`, `test/`, and `dev/` for `sql/` directories, then
+  SquirrElix scans `lib/`, `test/`, and `dev/` for `sql/` directories, then
   writes a sibling `sql.ex` module for each one.
 
   ## Usage
@@ -29,7 +29,7 @@ defmodule Mix.Tasks.Squirrelixir.Gen do
 
   use Mix.Task
 
-  @shortdoc "Generates Squirrelixir query modules from SQL files"
+  @shortdoc "Generates SquirrElix query modules from SQL files"
 
   @impl Mix.Task
   def run(args) do

@@ -1,6 +1,6 @@
 defmodule Squirrelixir.Postgres do
   @moduledoc """
-  Postgrex-backed query inferrer for Squirrelixir inference.
+  Postgrex-backed query inferrer for SquirrElix inference.
   """
 
   alias Squirrelixir.Column

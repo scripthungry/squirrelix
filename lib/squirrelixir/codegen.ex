@@ -54,7 +54,7 @@ defmodule Squirrelixir.Codegen do
       @moduledoc \"\"\"
       This module contains generated query functions.
 
-      > This module was generated automatically using Squirrelixir #{version}.
+      > This module was generated automatically using SquirrElix #{version}.
 
       Runtime row decoding uses `column_spec/0` tuples `{name, type, nullable?}`
       where `type` is an atom such as `:string` or a list wrapper such as

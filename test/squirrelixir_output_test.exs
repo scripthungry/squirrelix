@@ -7,7 +7,7 @@ defmodule SquirrelixirOutputTest do
   alias Squirrelixir.Output
 
   @generated_content """
-  //// > 🐿️ This module was generated automatically using Squirrelixir
+  //// > 🐿️ This module was generated automatically using SquirrElix
   defmodule Generated do
   end
   """
