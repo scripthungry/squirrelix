@@ -54,7 +54,7 @@ defmodule Squirrelixir.TypedQuery do
   @sql_literal_argument_names MapSet.new(~w(false nil null true))
 
   @runtime_helper_names MapSet.new(~w(
-    decode_command decode_rows decode_row decode_value decode_scalar
+    decode_command decode_rows decode_row decode_column_value decode_scalar
     encode_value uuid_to_string uuid_from_string
   ))
 
