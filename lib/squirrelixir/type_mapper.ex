@@ -51,9 +51,21 @@ defmodule Squirrelixir.TypeMapper do
                 ])
 
   @type elixir_type :: atom() | {:list, elixir_type()}
+  @type enum_reason ::
+          :no_variants
+          | {:invalid_name, String.t()}
+          | {:invalid_variants, [String.t()]}
 
   @spec hint_for(String.t()) :: String.t() | nil
   def hint_for(name) when is_binary(name), do: Map.get(@type_hints, name)
+
+  @spec validate_enum(String.t(), [String.t()]) :: :ok | {:error, enum_reason()}
+  def validate_enum(raw_name, variants) when is_binary(raw_name) and is_list(variants) do
+    case type_identifier(pascal_case(raw_name)) do
+      {:ok, _} -> validate_variants(variants)
+      {:error, _} -> {:error, {:invalid_name, raw_name}}
+    end
+  end
 
   @spec from_postgres(String.t(), keyword()) ::
           {:ok, elixir_type()} | {:error, UnsupportedPostgresType.t()}
