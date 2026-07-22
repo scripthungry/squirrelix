@@ -11,6 +11,7 @@ defmodule Squirrelixir.Inference do
   Converts parsed query directories into typed query directories using a describer.
   """
 
+  alias Squirrelixir.Error
   alias Squirrelixir.Query
   alias Squirrelixir.QueryDirectory
   alias Squirrelixir.TypedQuery
@@ -34,14 +35,17 @@ defmodule Squirrelixir.Inference do
     %TypedQueryDirectory{
       directory: query_directory.directory,
       queries: Enum.reverse(typed_queries),
-      errors: errors
+      errors: Enum.map(errors, &Error.normalize/1)
     }
   end
 
   defp describe_query(query, describer, {typed_queries, errors}) do
     case call_describer(describer, query) do
-      {:ok, metadata} -> typed_query_from_metadata(query, metadata, typed_queries, errors)
-      {:error, error} -> {typed_queries, errors ++ [error]}
+      {:ok, metadata} ->
+        typed_query_from_metadata(query, metadata, typed_queries, errors)
+
+      {:error, error} ->
+        {typed_queries, errors ++ [error |> Error.attach_query(query) |> Error.normalize()]}
     end
   end
 
@@ -56,7 +60,7 @@ defmodule Squirrelixir.Inference do
   defp typed_query_from_metadata(query, metadata, typed_queries, errors) do
     case TypedQuery.from_query(query, metadata) do
       {:ok, typed_query} -> {[typed_query | typed_queries], errors}
-      {:error, error} -> {typed_queries, errors ++ [error]}
+      {:error, error} -> {typed_queries, errors ++ [Error.attach_query(error, query)]}
     end
   end
 end

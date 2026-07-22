@@ -170,32 +170,55 @@ defmodule Squirrelixir.Codegen do
   defp function_source(%TypedQuery{} = query, postgrex_module) do
     args = argument_names(query.params)
     all_args = ["connection" | args]
-    params = Enum.join(args, ", ")
+    encoded_params = encode_params_call(args, query.params)
 
     """
       #{doc_source(query)}
       @spec #{query.name}(Postgrex.conn()#{spec_args(query.params)}) :: #{return_spec(query.returns)}
       def #{query.name}(#{Enum.join(all_args, ", ")}) do
         connection
-        |> #{inspect(postgrex_module)}.query!(#{sql_string_literal(query.content)}, [#{params}])
+        |> #{inspect(postgrex_module)}.query!(#{sql_string_literal(query.content)}, #{encoded_params})
         |> #{decode_call(query.returns)}
       end
     """
+  end
+
+  defp encode_params_call([], []), do: "[]"
+
+  defp encode_params_call(args, params) do
+    args
+    |> Enum.zip(params)
+    |> Enum.map(fn {name, %Parameter{type: type}} ->
+      "encode_param(#{name}, #{inspect(type, limit: :infinity)})"
+    end)
+    |> then(&"[#{Enum.join(&1, ", ")}]")
   end
 
   defp decode_helpers([]), do: ""
 
   defp decode_helpers(queries) do
     queries
-    |> decode_helper_sources()
+    |> runtime_helper_sources()
     |> Enum.join("\n")
   end
 
-  defp decode_helper_sources(queries) do
+  defp runtime_helper_sources(queries) do
+    types = runtime_types(queries)
+
     []
     |> maybe_add_command_helper(queries)
     |> maybe_add_rows_helper(queries)
+    |> maybe_add_encode_helpers(queries)
+    |> maybe_add_uuid_helpers(types)
     |> Enum.reverse()
+  end
+
+  defp runtime_types(queries) do
+    queries
+    |> Enum.flat_map(fn query ->
+      Enum.map(query.params, & &1.type) ++ Enum.map(query.returns, & &1.type)
+    end)
+    |> MapSet.new()
   end
 
   defp maybe_add_command_helper(sources, queries) do
@@ -215,16 +238,199 @@ defmodule Squirrelixir.Codegen do
 
   defp maybe_add_rows_helper(sources, queries) do
     if Enum.any?(queries, &(&1.returns != [])) do
+      types = runtime_types(queries)
+
       [
         """
           defp decode_rows(%Postgrex.Result{rows: rows}, columns) do
-            Enum.map(rows, &row_to_map(&1, columns))
+            Enum.map(rows, &decode_row(&1, columns))
           end
 
-          defp row_to_map(row, columns) do
+          defp decode_row(row, columns) do
             columns
             |> Enum.zip(row)
-            |> Map.new()
+            |> Map.new(fn {{name, type, nullable?}, value} ->
+              {name, decode_value(value, type, nullable?)}
+            end)
+          end
+
+          defp decode_value(value, _type, true) when is_nil(value), do: nil
+          defp decode_value(value, type, _nullable?), do: decode_typed_value(value, type)
+
+          #{decode_type_clauses(types)}
+        """
+        | sources
+      ]
+    else
+      sources
+    end
+  end
+
+  defp decode_type_clauses(types) do
+    types
+    |> then(fn types ->
+      []
+      |> add_type_clause(types, :integer, "defp decode_typed_value(value, :integer), do: value")
+      |> add_type_clause(types, :string, "defp decode_typed_value(value, :string), do: value")
+      |> add_type_clause(types, :boolean, "defp decode_typed_value(value, :boolean), do: value")
+      |> add_type_clause(types, :float, "defp decode_typed_value(value, :float), do: value")
+      |> add_type_clause(types, :decimal, "defp decode_typed_value(value, :decimal), do: value")
+      |> add_type_clause(types, :binary, "defp decode_typed_value(value, :binary), do: value")
+      |> add_type_clause(types, :date, "defp decode_typed_value(value, :date), do: value")
+      |> add_type_clause(types, :time, "defp decode_typed_value(value, :time), do: value")
+      |> add_type_clause(
+        types,
+        :naive_datetime,
+        "defp decode_typed_value(value, :naive_datetime), do: value"
+      )
+      |> add_type_clause(
+        types,
+        :utc_datetime,
+        "defp decode_typed_value(value, :utc_datetime), do: value"
+      )
+      |> add_type_clause(
+        types,
+        :map,
+        """
+        defp decode_typed_value(value, :map) when is_map(value), do: value
+        defp decode_typed_value(value, :map) when is_binary(value), do: JSON.decode!(value)
+        """
+      )
+      |> add_type_clause(
+        types,
+        :uuid,
+        """
+        defp decode_typed_value(value, :uuid) when is_binary(value) and byte_size(value) == 16,
+          do: uuid_to_string(value)
+
+        defp decode_typed_value(value, :uuid), do: value
+        """
+      )
+      |> add_list_type_clauses(types)
+    end)
+    |> Enum.reverse()
+    |> Kernel.++([
+      "defp decode_typed_value(value, _type), do: value"
+    ])
+    |> Enum.join("\n")
+  end
+
+  defp add_type_clause(clauses, types, type, source) do
+    if MapSet.member?(types, type) or list_element_type?(types, type) do
+      [source | clauses]
+    else
+      clauses
+    end
+  end
+
+  defp add_list_type_clauses(clauses, types) do
+    types
+    |> Enum.filter(&match?({:list, _}, &1))
+    |> Enum.reduce(clauses, fn {:list, type}, clauses ->
+      if Enum.any?(clauses, &String.contains?(&1, "{:list, #{inspect(type)}}")) do
+        clauses
+      else
+        [
+          "defp decode_typed_value(value, {:list, #{inspect(type)}}) when is_list(value), do: Enum.map(value, &decode_typed_value(&1, #{inspect(type)}))"
+          | clauses
+        ]
+      end
+    end)
+  end
+
+  defp maybe_add_encode_helpers(sources, queries) do
+    if Enum.any?(queries, &(&1.params != [])) do
+      types = runtime_types(queries)
+
+      [
+        """
+          #{encode_type_clauses(types)}
+        """
+        | sources
+      ]
+    else
+      sources
+    end
+  end
+
+  defp encode_type_clauses(types) do
+    types
+    |> then(fn types ->
+      []
+      |> add_type_clause(types, :integer, "defp encode_param(value, :integer), do: value")
+      |> add_type_clause(types, :string, "defp encode_param(value, :string), do: value")
+      |> add_type_clause(types, :boolean, "defp encode_param(value, :boolean), do: value")
+      |> add_type_clause(types, :float, "defp encode_param(value, :float), do: value")
+      |> add_type_clause(types, :decimal, "defp encode_param(value, :decimal), do: value")
+      |> add_type_clause(types, :binary, "defp encode_param(value, :binary), do: value")
+      |> add_type_clause(types, :date, "defp encode_param(value, :date), do: value")
+      |> add_type_clause(types, :time, "defp encode_param(value, :time), do: value")
+      |> add_type_clause(
+        types,
+        :naive_datetime,
+        "defp encode_param(value, :naive_datetime), do: value"
+      )
+      |> add_type_clause(
+        types,
+        :utc_datetime,
+        "defp encode_param(value, :utc_datetime), do: value"
+      )
+      |> add_type_clause(
+        types,
+        :map,
+        "defp encode_param(value, :map) when is_map(value), do: JSON.encode!(value)"
+      )
+      |> add_type_clause(
+        types,
+        :uuid,
+        "defp encode_param(value, :uuid), do: uuid_from_string(value)"
+      )
+      |> add_list_encode_clauses(types)
+    end)
+    |> Enum.reverse()
+    |> Kernel.++([
+      "defp encode_param(nil, _type), do: nil",
+      "defp encode_param(value, _type), do: value"
+    ])
+    |> Enum.join("\n")
+  end
+
+  defp add_list_encode_clauses(clauses, types) do
+    types
+    |> Enum.filter(&match?({:list, _}, &1))
+    |> Enum.reduce(clauses, fn {:list, type}, clauses ->
+      if Enum.any?(clauses, &String.contains?(&1, "{:list, #{inspect(type)}}")) do
+        clauses
+      else
+        [
+          "defp encode_param(value, {:list, #{inspect(type)}}) when is_list(value), do: Enum.map(value, &encode_param(&1, #{inspect(type)}))"
+          | clauses
+        ]
+      end
+    end)
+  end
+
+  defp maybe_add_uuid_helpers(sources, types) do
+    if MapSet.member?(types, :uuid) or list_element_type?(types, :uuid) do
+      [
+        """
+          defp uuid_to_string(uuid) when is_binary(uuid) and byte_size(uuid) == 16 do
+            hex = Base.encode16(uuid, case: :lower)
+
+            <<part1::binary-size(8), part2::binary-size(4), part3::binary-size(4),
+              part4::binary-size(4), part5::binary>> = hex
+
+            "\#{part1}-\#{part2}-\#{part3}-\#{part4}-\#{part5}"
+          end
+
+          defp uuid_from_string(string) when is_binary(string) do
+            case Base.decode16(String.replace(string, "-", ""), case: :mixed) do
+              {:ok, <<_::128>> = uuid} ->
+                uuid
+
+              _ ->
+                raise ArgumentError, "invalid UUID: \#{inspect(string)}"
+            end
           end
         """
         | sources
@@ -234,8 +440,21 @@ defmodule Squirrelixir.Codegen do
     end
   end
 
+  defp list_element_type?(types, element_type) do
+    Enum.any?(types, fn
+      {:list, ^element_type} -> true
+      _ -> false
+    end)
+  end
+
   defp decode_call([]), do: "decode_command()"
-  defp decode_call(columns), do: "decode_rows(#{inspect(return_column_names(columns))})"
+  defp decode_call(columns), do: "decode_rows(#{inspect(return_column_specs(columns))})"
+
+  defp return_column_specs(columns) do
+    Enum.map(columns, fn column ->
+      {String.to_atom(column.name), column.type, column.nullable?}
+    end)
+  end
 
   defp argument_names(params) do
     params
@@ -348,10 +567,6 @@ defmodule Squirrelixir.Codegen do
     type = if column.nullable?, do: "#{type} | nil", else: type
 
     "required(#{inspect(String.to_atom(column.name))}) => #{type}"
-  end
-
-  defp return_column_names(columns) do
-    Enum.map(columns, &String.to_atom(&1.name))
   end
 
   defp type_spec(:integer), do: "integer()"

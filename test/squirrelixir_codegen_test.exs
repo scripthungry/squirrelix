@@ -33,39 +33,14 @@ defmodule SquirrelixirCodegenTest do
       )
     ]
 
-    assert Codegen.generate_module(MyApp.Accounts.SQL, queries, version: "v-test") == """
-           defmodule MyApp.Accounts.SQL do
-             @moduledoc \"\"\"
-             This module contains generated query functions.
+    code = Codegen.generate_module(MyApp.Accounts.SQL, queries, version: "v-test")
 
-             > This module was generated automatically using Squirrelixir v-test.
-             \"\"\"
-
-             @spec find_user(Postgrex.conn(), integer()) :: [%{required(:name) => String.t()}]
-             def find_user(connection, id) do
-               connection
-               |> Postgrex.query!("select * from users where id = $1", [id])
-               |> decode_rows([:name])
-             end
-
-             @spec z_last(Postgrex.conn()) :: [%{required(:id) => integer()}]
-             def z_last(connection) do
-               connection
-               |> Postgrex.query!("select * from users", [])
-               |> decode_rows([:id])
-             end
-
-             defp decode_rows(%Postgrex.Result{rows: rows}, columns) do
-               Enum.map(rows, &row_to_map(&1, columns))
-             end
-
-             defp row_to_map(row, columns) do
-               columns
-               |> Enum.zip(row)
-               |> Map.new()
-             end
-           end
-           """
+    assert code =~ "def find_user(connection, id)"
+    assert code =~ "encode_param(id, :integer)"
+    assert code =~ "decode_rows([{:name, :string, false}])"
+    assert code =~ "def z_last(connection)"
+    assert code =~ "decode_rows([{:id, :integer, false}])"
+    assert code =~ "defp decode_row("
   end
 
   test "generate_module uses fallback argument names when SQL inference could not name a parameter" do
@@ -89,7 +64,9 @@ defmodule SquirrelixirCodegenTest do
     code = Codegen.generate_module(MyApp.SQL, [query], version: "v-test")
 
     assert code =~ "def conflicting(connection, arg_1, arg_2, arg_3)"
-    assert code =~ ~s|Postgrex.query!("select $1, $2, $3", [arg_1, arg_2, arg_3])|
+    assert code =~ "encode_param(arg_1, :string)"
+    assert code =~ "encode_param(arg_2, :string)"
+    assert code =~ "encode_param(arg_3, :string)"
   end
 
   test "generate_module avoids Elixir reserved argument names" do
@@ -106,7 +83,9 @@ defmodule SquirrelixirCodegenTest do
       )
 
     assert code =~ "def reserved(connection, fn_, end_, type)"
-    assert code =~ ~s|Postgrex.query!("select $1, $2, $3", [fn_, end_, type])|
+    assert code =~ "encode_param(fn_, :string)"
+    assert code =~ "encode_param(end_, :string)"
+    assert code =~ "encode_param(type, :string)"
     assert [{Squirrelixir.GeneratedReservedNamesTest.SQL, _bytecode}] = Code.compile_string(code)
   end
 
@@ -121,7 +100,9 @@ defmodule SquirrelixirCodegenTest do
     code = Codegen.generate_module(MyApp.SQL, [query], version: "v-test")
 
     assert code =~ "def literals(connection, arg_1, arg_2, arg_3)"
-    assert code =~ ~s|Postgrex.query!("select $1, $2, $3", [arg_1, arg_2, arg_3])|
+    assert code =~ "encode_param(arg_1, :boolean)"
+    assert code =~ "encode_param(arg_2, :boolean)"
+    assert code =~ "encode_param(arg_3, :string)"
   end
 
   test "generate_module avoids invalid argument names" do
@@ -134,7 +115,8 @@ defmodule SquirrelixirCodegenTest do
     code = Codegen.generate_module(MyApp.SQL, [query], version: "v-test")
 
     assert code =~ "def invalid_names(connection, arg_1, arg_2)"
-    assert code =~ ~s|Postgrex.query!("select $1, $2", [arg_1, arg_2])|
+    assert code =~ "encode_param(arg_1, :string)"
+    assert code =~ "encode_param(arg_2, :string)"
   end
 
   test "generate_module renames arguments that would shadow decoder helpers" do
@@ -146,7 +128,7 @@ defmodule SquirrelixirCodegenTest do
     code = Codegen.generate_module(MyApp.SQL, [query], version: "v-test")
 
     assert code =~ "def shadow_decoder(connection, decoder_1)"
-    assert code =~ ~s|Postgrex.query!("select decoder where $1 = decoder", [decoder_1])|
+    assert code =~ "encode_param(decoder_1, :integer)"
   end
 
   test "generate_module renames arguments that would shadow encoder helpers" do
@@ -158,7 +140,7 @@ defmodule SquirrelixirCodegenTest do
     code = Codegen.generate_module(MyApp.SQL, [query], version: "v-test")
 
     assert code =~ "def shadow_encoder(connection, uuid_encoder_1)"
-    assert code =~ ~s|Postgrex.query!("select encoder where $1 = encoder", [uuid_encoder_1])|
+    assert code =~ "encode_param(uuid_encoder_1, :string)"
   end
 
   test "generate_module includes nullable columns in row specs" do
@@ -584,7 +566,9 @@ defmodule SquirrelixirCodegenTest do
 
     assert field_order(spec, :first) < field_order(spec, :second)
     assert field_order(spec, :second) < field_order(spec, :third)
-    assert code =~ "decode_rows([:first, :second, :third])"
+    assert code =~ "{:first, :boolean, false}"
+    assert code =~ "{:second, :integer, false}"
+    assert code =~ "{:third, :string, false}"
   end
 
   defp typespec_fragment(code, function_name) do

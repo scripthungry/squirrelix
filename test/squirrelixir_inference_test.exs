@@ -71,6 +71,34 @@ defmodule SquirrelixirInferenceTest do
              )
   end
 
+  test "from_query_directories normalizes postgres inference errors for the failing query" do
+    query = query("broken.sql", "broken", "select broken")
+
+    inference_error = %Squirrelixir.Error.PostgresInferenceError{
+      file: "other.sql",
+      starting_line: 99,
+      content: "stale content",
+      message: "constraint \"wobble\" for table \"squirrel\" does not exist",
+      code: :undefined_object,
+      position: nil
+    }
+
+    describer = fn ^query -> {:error, inference_error} end
+
+    assert [
+             %TypedQueryDirectory{
+               errors: [
+                 %Squirrelixir.Error.MissingPostgresConstraint{
+                   file: "broken.sql",
+                   content: "select broken",
+                   constraint: "wobble",
+                   table: "squirrel"
+                 }
+               ]
+             }
+           ] = Inference.from_query_directories([query_directory([query])], describer)
+  end
+
   defp query(file, name, content) do
     %Query{file: file, starting_line: 1, name: name, comment: [], content: content}
   end
