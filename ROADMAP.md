@@ -1,52 +1,89 @@
 # Squirrelixir Roadmap
 
-Squirrelixir aims to reimplement Gleam Squirrel's core behavior with an idiomatic Elixir API. Upstream Squirrel remains the compatibility reference for SQL discovery, inference behavior, generated-query ergonomics, and edge-case tests; Elixir conventions take precedence for public API shape and runtime return values.
+Squirrelixir reimplements [Gleam Squirrel](https://github.com/giacomocavalieri/squirrel)'s core
+SQL discovery, inference, and codegen behavior with an idiomatic **Elixir-native** public API.
+Upstream Squirrel remains the compatibility reference for query conventions and edge-case tests;
+Elixir conventions take precedence for API shape, `@spec` output, and runtime return values.
 
-## Compatibility Work
+**Elixir-native direction:** generated modules use stdlib typespecs (`String.t()`, `integer()`,
+`map()` with `required/1`, `term()` for JSON, and so on). Squirrelixir does **not** generate
+Gleam records, custom enum ADTs, or opaque tagged error values.
 
-- Query discovery and parsing
-  - Keep one-query-per-file behavior compatible with upstream.
-  - Preserve leading SQL comments as generated function docs.
-  - Continue porting invalid filename and suggested-name cases from upstream.
+## Completed
 
-- Parameter inference
-  - Match upstream inference around equality comparisons, comments, strings, nested block comments, quoted identifiers, and table-qualified identifiers.
-  - Port remaining upstream cases for repeated names, invalid inferred identifiers, keyword-like names, and ambiguous comparisons.
-  - Keep generated Elixir arguments valid and deconflicted against `connection` and other arguments.
+- **Query discovery and parsing**
+  - [x] One-query-per-file discovery under `lib/`, `test/`, and `dev/`.
+  - [x] Leading SQL comments become generated function `@doc` strings.
+  - [x] Invalid filename handling with suggested renames where possible.
 
-- Postgres inference
-  - Use Postgrex prepare metadata for parameters and result types.
-  - Expand nullability inference beyond simple table columns and outer joins to cover `using(...)`, CTEs, aliases, schemas, subqueries, expressions, and foreign-key-derived cases where practical.
-  - Improve structured errors for syntax errors, missing tables, missing columns, unsupported types, and connection failures.
+- **Parameter inference**
+  - [x] Equality comparisons, line and block comments, string literals, quoted identifiers,
+    and table-qualified identifiers.
+  - [x] Generated Elixir argument names deconflicted against `connection` and reserved names.
 
-- Type mapping
-  - Maintain Elixir-native types for scalar Postgres types.
-  - Add enum support with idiomatic Elixir representations.
-  - Decide and document behavior for domains, ranges, composite types, and unsupported built-ins.
-  - Keep arrays recursive and covered through live Postgrex tests.
+- **Postgres inference**
+  - [x] Postgrex prepare metadata for parameters and result types.
+  - [x] Nullability for table columns, outer joins, `using(...)`, CTEs, and foreign-key-derived
+    cases.
+  - [x] Structured errors for syntax errors, missing tables, missing columns, invalid enums,
+    and unsupported types.
 
-- Code generation
-  - Generate small modules that return decoded maps for row queries and `:ok` for command queries.
-  - Preserve safe overwrite/check behavior.
-  - Expand generated runtime coverage for multiple rows, no rows, nullable values, arrays, JSON, UUIDs, dates/times, and command results.
+- **Type mapping (Elixir-native)**
+  - [x] Scalar Postgres types mapped to Elixir stdlib typespecs.
+  - [x] Custom Postgres enums mapped to `String.t()` (not generated enum modules).
+  - [x] Custom domains mapped to their base type.
+  - [x] Recursive array support with live Postgrex tests.
+  - [x] JSON/JSONB mapped to `term()` in `@spec`s; composite/point types rejected with hints.
 
-- Mix tasks and configuration
-  - Keep metadata-file mode as a deterministic escape hatch.
-  - Continue improving `--infer` connection configuration around Postgrex environment defaults.
-  - Add task-level documentation once the DB inference surface settles.
+- **Code generation**
+  - [x] Per-query row `@type` definitions and `@spec`-annotated functions.
+  - [x] Row queries return decoded maps; command queries return `:ok`.
+  - [x] Safe overwrite and `mix squirrelixir.check` drift detection.
+  - [x] Runtime decode coverage for nullable values, arrays, JSON, UUIDs, dates/times, and
+    command results.
 
-- Upstream fixture porting
-  - Port Birdie snapshots into focused ExUnit cases by behavior rather than copying generated Gleam APIs.
-  - Prioritize cases that expose semantic compatibility gaps: joins, nullability, parameter names, unsupported types, duplicate columns, invalid names, and generation safety.
+- **Mix tasks and configuration**
+  - [x] Metadata-file mode (`squirrelixir.exs` or `--metadata`).
+  - [x] `--infer` mode with Postgrex connection options and `PG*` environment defaults.
+  - [x] `mix squirrelixir.gen` and `mix squirrelixir.check` task documentation.
+  - [x] Programmatic `Squirrelixir.generate/3` and `Squirrelixir.check/3` API.
 
-## Validation Discipline
+- **Package and docs**
+  - [x] Hex package metadata, Apache-2.0 license, and ExDoc module grouping.
+  - [x] README quick start, types section, and API overview.
+
+## Remaining
+
+- **Parameter inference**
+  - [ ] Port remaining upstream cases for repeated parameter names, invalid inferred identifiers,
+    keyword-like names, and ambiguous comparisons.
+
+- **Postgres inference**
+  - [ ] Expand nullability for schema-qualified tables, subqueries in select lists, and
+    expression-derived columns where practical.
+  - [ ] Improve structured errors for connection failures and timeouts.
+
+- **Type mapping**
+  - [ ] Document and finalize behavior for Postgres ranges and remaining unsupported built-ins.
+  - [ ] Revisit composite-type support policy (currently rejected with actionable hints).
+
+- **Upstream fixture porting**
+  - [ ] Port remaining Birdie snapshots into focused ExUnit cases by behavior rather than
+    copying generated Gleam APIs.
+  - [ ] Prioritize joins, duplicate columns, unsupported types, and generation safety edge cases
+    not yet covered.
+
+- **Release**
+  - [ ] Publish `0.1.0` to Hex and enable HexDocs at <https://hexdocs.pm/squirrelixir>.
+
+## Validation discipline
 
 Each completed slice should run:
 
 ```sh
-mix format
-mix test
-mix credo.strict
+mix precommit
 ```
+
+(`mix precommit` runs `mix format`, `mix credo.strict`, and `mix test`.)
 
 Commit only after validation passes.

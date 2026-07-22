@@ -10,13 +10,16 @@ Gleam-style records. See the [Gleam Squirrel](https://github.com/giacomocavalier
 project for the upstream SQL discovery, inference, and query conventions that
 Squirrelixir follows.
 
-## Quick start
+## Requirements
 
-Add Squirrelixir as a dependency, put queries under a `sql/` directory, and
-generate with Postgres type inference:
+- Elixir ~> 1.20
+- Postgrex ~> 0.22 (for generated query modules and optional `--infer` mode)
+
+## Installation
+
+Add Squirrelixir to your `mix.exs` dependencies:
 
 ```elixir
-# mix.exs
 def deps do
   [
     {:squirrelixir, "~> 0.1.0"},
@@ -24,6 +27,25 @@ def deps do
   ]
 end
 ```
+
+Before the first Hex release, depend on GitHub instead:
+
+```elixir
+def deps do
+  [
+    {:squirrelixir, github: "mward-sudo/squirrelixir"},
+    {:postgrex, "~> 0.22"}
+  ]
+end
+```
+
+Documentation is generated with [ExDoc](https://github.com/elixir-lang/ex_doc) and
+will be published at <https://hexdocs.pm/squirrelixir> after the initial Hex release.
+Browse module docs locally with `mix docs`.
+
+## Quick start
+
+Put queries under a `sql/` directory and generate with Postgres type inference:
 
 ```
 lib/my_app/
@@ -116,19 +138,19 @@ Discovery scans `lib/`, `test/`, and `dev/` for `**/sql/*.sql`. Each directory
 must contain exactly one SQL statement per file; leading SQL comments become
 `@doc` strings on the generated functions.
 
-## Installation
+## Development
 
-If [available in Hex](https://hex.pm/docs/publish), add `squirrelixir` to your
-dependencies:
+Clone the repository and run the full validation suite before committing:
 
-```elixir
-def deps do
-  [
-    {:squirrelixir, "~> 0.1.0"}
-  ]
-end
+```sh
+mix precommit
 ```
 
-Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
-and published on [HexDocs](https://hexdocs.pm). Once published, the docs can be
-found at <https://hexdocs.pm/squirrelixir>.
+See [ROADMAP.md](ROADMAP.md) for completed work and remaining compatibility slices.
+
+## License
+
+Squirrelixir is licensed under the Apache License 2.0. See [LICENSE](LICENSE).
+
+Squirrelixir is a port of [Gleam Squirrel](https://github.com/giacomocavalieri/squirrel),
+which is also licensed under Apache 2.0.
