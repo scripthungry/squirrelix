@@ -62,6 +62,17 @@ defmodule SquirrelixirSQLTest do
     assert SQL.infer_parameter_names(sql) == %{2 => "email"}
   end
 
+  test "infer_parameter_names ignores nested block comments" do
+    sql = """
+    select name
+    from users
+    /* $1 = id /* $1 = id */ */
+    where $1 = name
+    """
+
+    assert SQL.infer_parameter_names(sql) == %{1 => "name"}
+  end
+
   test "infer_parameter_names leaves unmatched parameters unnamed" do
     assert SQL.infer_parameter_names("select * from users where $1 is null") == %{}
   end

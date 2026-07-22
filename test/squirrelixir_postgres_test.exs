@@ -37,8 +37,8 @@ defmodule SquirrelixirPostgresTest do
             [
               params: [:string],
               returns: [
-                %Column{name: "id", type: :integer, nullable?: true},
-                %Column{name: "name", type: :string, nullable?: true}
+                %Column{name: "id", type: :integer, nullable?: false},
+                %Column{name: "name", type: :string, nullable?: false}
               ]
             ]} = Postgres.describe(conn, query)
   end
@@ -49,7 +49,7 @@ defmodule SquirrelixirPostgresTest do
     assert {:ok,
             [
               params: [{:list, :integer}],
-              returns: [%Column{name: "ids", type: {:list, :integer}, nullable?: true}]
+              returns: [%Column{name: "ids", type: {:list, :integer}, nullable?: false}]
             ]} = Postgres.describe(conn, query)
   end
 
@@ -64,8 +64,8 @@ defmodule SquirrelixirPostgresTest do
               [
                 params: [:string, {:list, :string}],
                 returns: [
-                  %Column{name: "mood", type: :string, nullable?: true},
-                  %Column{name: "moods", type: {:list, :string}, nullable?: true}
+                  %Column{name: "mood", type: :string, nullable?: false},
+                  %Column{name: "moods", type: {:list, :string}, nullable?: false}
                 ]
               ]} = Postgres.describe(conn, query)
     end)
@@ -82,8 +82,8 @@ defmodule SquirrelixirPostgresTest do
               [
                 params: [:string, {:list, :string}],
                 returns: [
-                  %Column{name: "email", type: :string, nullable?: true},
-                  %Column{name: "emails", type: {:list, :string}, nullable?: true}
+                  %Column{name: "email", type: :string, nullable?: false},
+                  %Column{name: "emails", type: {:list, :string}, nullable?: false}
                 ]
               ]} = Postgres.describe(conn, query)
     end)
@@ -235,7 +235,12 @@ defmodule SquirrelixirPostgresTest do
   @tag :cte
   test "describe infers nullability for CTE queries", %{conn: conn} do
     Postgrex.query!(conn, "drop table if exists squirrelixir_cte_users", [])
-    Postgrex.query!(conn, "create temporary table squirrelixir_cte_users (id integer not null, name text not null)", [])
+
+    Postgrex.query!(
+      conn,
+      "create temporary table squirrelixir_cte_users (id integer not null, name text not null)",
+      []
+    )
 
     query =
       query("""
@@ -259,8 +264,18 @@ defmodule SquirrelixirPostgresTest do
   test "describe infers nullability for CTE with left join", %{conn: conn} do
     Postgrex.query!(conn, "drop table if exists squirrelixir_cte_users", [])
     Postgrex.query!(conn, "drop table if exists squirrelixir_cte_members", [])
-    Postgrex.query!(conn, "create temporary table squirrelixir_cte_users (id integer not null, name text not null)", [])
-    Postgrex.query!(conn, "create temporary table squirrelixir_cte_members (team_id integer, name text)", [])
+
+    Postgrex.query!(
+      conn,
+      "create temporary table squirrelixir_cte_users (id integer not null, name text not null)",
+      []
+    )
+
+    Postgrex.query!(
+      conn,
+      "create temporary table squirrelixir_cte_members (team_id integer, name text)",
+      []
+    )
 
     query =
       query("""
@@ -296,7 +311,7 @@ defmodule SquirrelixirPostgresTest do
     assert {:ok,
             %Squirrelixir.TypedQuery{
               params: [%Parameter{name: nil, type: :string}],
-              returns: [%Column{name: "name", type: :string, nullable?: true}]
+              returns: [%Column{name: "name", type: :string, nullable?: false}]
             }} = Squirrelixir.TypedQuery.from_query(query, metadata)
   end
 
@@ -339,6 +354,71 @@ defmodule SquirrelixirPostgresTest do
               column: "missing_column",
               position: 8
             }} = Postgres.describe(conn, query)
+  end
+
+  test "describe infers nullability for parameterized left joins using foreign keys", %{
+    conn: conn
+  } do
+    Postgrex.query!(conn, "drop table if exists squirrelixir_items_fk", [])
+    Postgrex.query!(conn, "drop table if exists squirrelixir_categories_fk", [])
+
+    Postgrex.query!(
+      conn,
+      "create temporary table squirrelixir_categories_fk (category_id integer not null, name text not null)",
+      []
+    )
+
+    Postgrex.query!(
+      conn,
+      """
+      create temporary table squirrelixir_items_fk (
+        item_id integer not null,
+        site_id integer not null,
+        category_id integer
+      )
+      """,
+      []
+    )
+
+    query =
+      query("""
+      select
+        squirrelixir_items_fk.item_id,
+        squirrelixir_categories_fk.name
+      from squirrelixir_items_fk
+      left join squirrelixir_categories_fk using(category_id)
+      where squirrelixir_items_fk.site_id = $1
+      """)
+
+    assert {:ok,
+            [
+              params: [:integer],
+              returns: [
+                %Column{name: "item_id", type: :integer, nullable?: false},
+                %Column{name: "name", type: :string, nullable?: true}
+              ]
+            ]} = Postgres.describe(conn, query)
+  end
+
+  test "describe accepts queries starting with a semicolon", %{conn: conn} do
+    query = query(";select 1::int4 as result")
+
+    assert {:ok,
+            [
+              params: [],
+              returns: [%Column{name: "result", type: :integer, nullable?: true}]
+            ]} = Postgres.describe(conn, query)
+  end
+
+  test "describe accepts do blocks", %{conn: conn} do
+    query =
+      query("""
+      do $$ begin
+        select 1::int4 as value;
+      end $$;
+      """)
+
+    assert {:ok, [params: [], returns: []]} = Postgres.describe(conn, query)
   end
 
   test "describer can generate modules from a live Postgres connection", %{conn: conn} do

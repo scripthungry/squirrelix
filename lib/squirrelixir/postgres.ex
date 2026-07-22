@@ -146,7 +146,9 @@ defmodule Squirrelixir.Postgres do
   defp describe_returns(conn, prepared_query, query) do
     columns = prepared_query.columns || []
     result_oids = prepared_query.result_oids || []
-    {plan_available?, plan_nullables, column_sources} = infer_nullability(conn, query)
+
+    {plan_available?, plan_nullables, column_sources} =
+      infer_nullability(conn, query, prepared_query)
 
     with {:ok, types} <- describe_oids(conn, result_oids) do
       returns =
@@ -173,7 +175,7 @@ defmodule Squirrelixir.Postgres do
 
   # -- Plan-based nullability inference (mirrors upstream Gleam squirrel) --
 
-  defp infer_nullability(conn, query) do
+  defp infer_nullability(conn, query, _prepared_query) do
     case query_plan(conn, query) do
       {:ok, plan} ->
         {true, nullables_from_plan(plan), column_sources_from_plan(plan)}
@@ -184,19 +186,14 @@ defmodule Squirrelixir.Postgres do
   end
 
   defp query_plan(conn, query) do
-    # EXPLAIN doesn't work with parameterized queries ($1, $2).
-    # Skip plan-based nullability for parameterized queries; fall back to default (all nullable).
-    if String.contains?(query.content, "$") do
-      :error
-    else
-      explain_query = "explain (format json, verbose, generic_plan) " <> query.content
+    explain_query = "explain (format json, verbose, generic_plan) " <> query.content
 
-      with {:ok, %Postgrex.Result{rows: [[plan_json]]}} <- Postgrex.query(conn, explain_query, []),
-           {:ok, root_plan} <- decode_plan_json(plan_json) do
-        {:ok, parse_plan(root_plan)}
-      else
-        _ -> :error
-      end
+    with {:ok, %Postgrex.Result{rows: [[plan_json]]}} <-
+           Postgrex.query(conn, explain_query, [], query_type: :text),
+         {:ok, root_plan} <- decode_plan_json(plan_json) do
+      {:ok, parse_plan(root_plan)}
+    else
+      _ -> :error
     end
   end
 

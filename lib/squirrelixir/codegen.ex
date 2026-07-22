@@ -240,7 +240,7 @@ defmodule Squirrelixir.Codegen do
   defp argument_names(params) do
     params
     |> Enum.reduce({[], MapSet.new(["connection"])}, fn param, {names, used} ->
-      name = param |> preferred_argument_name() |> safe_argument_name(param.index)
+      name = param |> preferred_argument_name() |> safe_argument_name(param.index, used)
       name = unique_argument_name(name, used, param.index)
       {[name | names], MapSet.put(used, name)}
     end)
@@ -251,7 +251,7 @@ defmodule Squirrelixir.Codegen do
   defp preferred_argument_name(%Parameter{name: nil, index: index}), do: "arg_#{index}"
   defp preferred_argument_name(%Parameter{name: name}) when is_binary(name), do: name
 
-  defp safe_argument_name(name, index) do
+  defp safe_argument_name(name, index, used) do
     cond do
       not valid_argument_name?(name) ->
         "arg_#{index}"
@@ -262,8 +262,25 @@ defmodule Squirrelixir.Codegen do
       MapSet.member?(@reserved_argument_names, name) ->
         "#{name}_"
 
+      shadowing_helper_name?(name) ->
+        rename_shadowed_name(name, used)
+
       true ->
         name
+    end
+  end
+
+  defp shadowing_helper_name?(name) do
+    String.ends_with?(name, "decoder") or String.ends_with?(name, "encoder")
+  end
+
+  defp rename_shadowed_name(name, used, tries \\ 1) do
+    candidate = "#{name}_#{tries}"
+
+    if MapSet.member?(used, candidate) do
+      rename_shadowed_name(name, used, tries + 1)
+    else
+      candidate
     end
   end
 

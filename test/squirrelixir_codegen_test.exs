@@ -137,6 +137,30 @@ defmodule SquirrelixirCodegenTest do
     assert code =~ ~s|Postgrex.query!("select $1, $2", [arg_1, arg_2])|
   end
 
+  test "generate_module renames arguments that would shadow decoder helpers" do
+    query =
+      typed_query("shadow_decoder.sql", "shadow_decoder", "select decoder where $1 = decoder", [
+        %Parameter{index: 1, name: "decoder", type: :integer}
+      ])
+
+    code = Codegen.generate_module(MyApp.SQL, [query], version: "v-test")
+
+    assert code =~ "def shadow_decoder(connection, decoder_1)"
+    assert code =~ ~s|Postgrex.query!("select decoder where $1 = decoder", [decoder_1])|
+  end
+
+  test "generate_module renames arguments that would shadow encoder helpers" do
+    query =
+      typed_query("shadow_encoder.sql", "shadow_encoder", "select encoder where $1 = encoder", [
+        %Parameter{index: 1, name: "uuid_encoder", type: :string}
+      ])
+
+    code = Codegen.generate_module(MyApp.SQL, [query], version: "v-test")
+
+    assert code =~ "def shadow_encoder(connection, uuid_encoder_1)"
+    assert code =~ ~s|Postgrex.query!("select encoder where $1 = encoder", [uuid_encoder_1])|
+  end
+
   test "generate_module includes nullable columns in row specs" do
     query =
       typed_query("find_user.sql", "find_user", "select * from users", [], [
