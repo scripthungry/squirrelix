@@ -55,8 +55,9 @@ Gleam records, custom enum ADTs, or opaque tagged error values.
 ## Remaining
 
 - **Parameter inference**
-  - [ ] Port remaining upstream cases for repeated parameter names, invalid inferred identifiers,
+  - [x] Port remaining upstream cases for repeated parameter names, invalid inferred identifiers,
     keyword-like names, and ambiguous comparisons.
+  - [x] Rename inferred `connection` arguments to avoid shadowing the Postgrex connection param.
 
 - **Postgres inference**
   - [ ] Expand nullability for schema-qualified tables, subqueries in select lists, and
@@ -68,10 +69,10 @@ Gleam records, custom enum ADTs, or opaque tagged error values.
   - [ ] Revisit composite-type support policy (currently rejected with actionable hints).
 
 - **Upstream fixture porting**
-  - [ ] Port remaining Birdie snapshots into focused ExUnit cases by behavior rather than
-    copying generated Gleam APIs.
-  - [ ] Prioritize joins, duplicate columns, unsupported types, and generation safety edge cases
-    not yet covered.
+  - [x] Port remaining Birdie snapshots into focused ExUnit cases by behavior rather than
+    copying generated Gleam APIs (join nullability, select-list aliases, multi-helper codegen,
+    long enum names, enum arrays, connection shadowing).
+  - [x] Document intentional Gleam-only snapshot gaps in `squirrelixir_gleam_parity_test.exs`.
 
 - **Release**
   - [ ] Publish `0.1.0` to Hex and enable HexDocs at <https://hexdocs.pm/squirrelixir>.

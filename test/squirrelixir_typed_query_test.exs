@@ -254,6 +254,35 @@ defmodule SquirrelixirTypedQueryTest do
     assert TypedQuery.resolve_parameter_names(params) == ["uuid_decoder_1"]
   end
 
+  test "resolve_parameter_names renames inferred connection argument" do
+    params = [%Parameter{index: 1, name: "connection", type: :integer}]
+
+    assert TypedQuery.resolve_parameter_names(params) == ["connection_1"]
+  end
+
+  test "from_query renames inferred connection argument in generated params" do
+    query = %Query{
+      file: "shadow_connection.sql",
+      starting_line: 1,
+      name: "shadow_connection",
+      comment: [],
+      content: """
+      with wibble as (select 1 as connection)
+      select connection
+      from wibble
+      where $1 = connection
+      """
+    }
+
+    assert {:ok, %TypedQuery{params: params}} =
+             TypedQuery.from_query(query,
+               params: [:integer],
+               returns: [%{name: "connection", type: :integer, nullable?: false}]
+             )
+
+    assert TypedQuery.resolve_parameter_names(params) == ["connection_1"]
+  end
+
   test "resolve_parameter_names deconflicts duplicate inferred names" do
     params = [
       %Parameter{index: 1, name: "number", type: :integer},

@@ -276,6 +276,14 @@ defmodule SquirrelixirRuntimeDecodingTest do
 
       assert encode_params([[@uuid]], [{:list, :uuid}]) == [[@uuid_binary]]
     end
+
+    test "decodes and encodes postgres enum string arrays" do
+      assert decode_row([["red", "grey"]], [
+               %Column{name: "res", type: {:list, :string}, nullable?: false}
+             ]) == %{res: ["red", "grey"]}
+
+      assert encode_params([["red", "grey"]], [{:list, :string}]) == [["red", "grey"]]
+    end
   end
 
   describe "command queries" do
