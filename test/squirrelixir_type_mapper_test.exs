@@ -80,10 +80,12 @@ defmodule SquirrelixirTypeMapperTest do
   test "return_typespec builds map types with required keys" do
     assert TypeMapper.return_typespec([]) == ":ok"
 
-    assert TypeMapper.return_typespec([
-             {:name, :string, true},
-             {:age, :integer, false}
-           ]) == "[%{required(:name) => String.t() | nil, required(:age) => integer()}]"
+    columns = [{:name, :string, true}, {:age, :integer, false}]
+
+    assert TypeMapper.row_typespec(columns) ==
+             "%{required(:name) => String.t() | nil, required(:age) => integer()}"
+
+    assert TypeMapper.return_typespec(columns) == "[#{TypeMapper.row_typespec(columns)}]"
   end
 
   test "normalize_type accepts Elixir atoms and Postgres descriptors" do

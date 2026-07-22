@@ -91,15 +91,20 @@ defmodule Squirrelixir.TypeMapper do
     "required(#{inspect(name)}) => #{spec}"
   end
 
-  @spec return_typespec([] | [{atom(), elixir_type(), boolean()}]) :: String.t()
-  def return_typespec([]), do: ":ok"
-
-  def return_typespec(columns) when is_list(columns) do
+  @spec row_typespec([{atom(), elixir_type(), boolean()}]) :: String.t()
+  def row_typespec(columns) when is_list(columns) do
     columns
     |> Enum.map_join(", ", fn {name, type, nullable?} ->
       column_typespec(name, type, nullable?)
     end)
-    |> then(&"[%{#{&1}}]")
+    |> then(&"%{#{&1}}")
+  end
+
+  @spec return_typespec([] | [{atom(), elixir_type(), boolean()}]) :: String.t()
+  def return_typespec([]), do: ":ok"
+
+  def return_typespec(columns) when is_list(columns) do
+    "[#{row_typespec(columns)}]"
   end
 
   defp base_type(_name, "e", _base), do: {:ok, :string}

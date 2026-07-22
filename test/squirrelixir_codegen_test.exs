@@ -37,7 +37,7 @@ defmodule SquirrelixirCodegenTest do
     code = Codegen.generate_module(MyApp.Accounts.SQL, queries, version: "v-test")
 
     assert code =~ "def find_user(connection, id)"
-    assert code =~ "encode_param(id, :integer)"
+    assert code =~ "encode_value(id, :integer)"
     assert code =~ "decode_rows([{:name, :string, false}])"
     assert code =~ "def z_last(connection)"
     assert code =~ "decode_rows([{:id, :integer, false}])"
@@ -65,9 +65,9 @@ defmodule SquirrelixirCodegenTest do
     code = Codegen.generate_module(MyApp.SQL, [query], version: "v-test")
 
     assert code =~ "def conflicting(connection, connection_1, connection_2, arg_1)"
-    assert code =~ "encode_param(connection_1, :string)"
-    assert code =~ "encode_param(connection_2, :string)"
-    assert code =~ "encode_param(arg_1, :string)"
+    assert code =~ "encode_value(connection_1, :string)"
+    assert code =~ "encode_value(connection_2, :string)"
+    assert code =~ "encode_value(arg_1, :string)"
   end
 
   test "generate_module avoids Elixir reserved argument names" do
@@ -84,9 +84,9 @@ defmodule SquirrelixirCodegenTest do
       )
 
     assert code =~ "def reserved(connection, fn_, end_, type)"
-    assert code =~ "encode_param(fn_, :string)"
-    assert code =~ "encode_param(end_, :string)"
-    assert code =~ "encode_param(type, :string)"
+    assert code =~ "encode_value(fn_, :string)"
+    assert code =~ "encode_value(end_, :string)"
+    assert code =~ "encode_value(type, :string)"
     assert [{Squirrelixir.GeneratedReservedNamesTest.SQL, _bytecode}] = Code.compile_string(code)
   end
 
@@ -101,9 +101,9 @@ defmodule SquirrelixirCodegenTest do
     code = Codegen.generate_module(MyApp.SQL, [query], version: "v-test")
 
     assert code =~ "def literals(connection, arg_1, arg_2, arg_3)"
-    assert code =~ "encode_param(arg_1, :boolean)"
-    assert code =~ "encode_param(arg_2, :boolean)"
-    assert code =~ "encode_param(arg_3, :string)"
+    assert code =~ "encode_value(arg_1, :boolean)"
+    assert code =~ "encode_value(arg_2, :boolean)"
+    assert code =~ "encode_value(arg_3, :string)"
   end
 
   test "generate_module avoids invalid argument names" do
@@ -116,8 +116,8 @@ defmodule SquirrelixirCodegenTest do
     code = Codegen.generate_module(MyApp.SQL, [query], version: "v-test")
 
     assert code =~ "def invalid_names(connection, arg_1, arg_2)"
-    assert code =~ "encode_param(arg_1, :string)"
-    assert code =~ "encode_param(arg_2, :string)"
+    assert code =~ "encode_value(arg_1, :string)"
+    assert code =~ "encode_value(arg_2, :string)"
   end
 
   test "generate_module renames arguments that would shadow decoder helpers" do
@@ -129,7 +129,7 @@ defmodule SquirrelixirCodegenTest do
     code = Codegen.generate_module(MyApp.SQL, [query], version: "v-test")
 
     assert code =~ "def shadow_decoder(connection, decoder_1)"
-    assert code =~ "encode_param(decoder_1, :integer)"
+    assert code =~ "encode_value(decoder_1, :integer)"
   end
 
   test "generate_module renames arguments that would shadow encoder helpers" do
@@ -141,7 +141,7 @@ defmodule SquirrelixirCodegenTest do
     code = Codegen.generate_module(MyApp.SQL, [query], version: "v-test")
 
     assert code =~ "def shadow_encoder(connection, uuid_encoder_1)"
-    assert code =~ "encode_param(uuid_encoder_1, :string)"
+    assert code =~ "encode_value(uuid_encoder_1, :string)"
   end
 
   test "generate_module includes Elixir-native row specs via TypeMapper" do
@@ -152,17 +152,20 @@ defmodule SquirrelixirCodegenTest do
       ])
 
     code = Codegen.generate_module(MyApp.SQL, [query], version: "v-test")
+    row_type = row_type_fragment(code, "find_user")
     spec = typespec_fragment(code, "find_user")
 
-    assert spec =~ "required(:name) => String.t() | nil"
-    assert spec =~ "required(:age) => integer()"
+    assert row_type =~ "required(:name) => String.t() | nil"
+    assert row_type =~ "required(:age) => integer()"
 
-    assert String.replace(spec, ~r/\s+/, "") ==
+    assert String.replace(row_type, ~r/\s+/, "") ==
              String.replace(
-               TypeMapper.return_typespec([{:name, :string, true}, {:age, :integer, false}]),
+               TypeMapper.row_typespec([{:name, :string, true}, {:age, :integer, false}]),
                ~r/\s+/,
                ""
              )
+
+    assert spec == "[find_user_row()]"
   end
 
   test "generate_module includes nullable columns in row specs" do
@@ -174,7 +177,8 @@ defmodule SquirrelixirCodegenTest do
 
     code = Codegen.generate_module(MyApp.SQL, [query], version: "v-test")
 
-    assert code =~ "@spec find_user(Postgrex.conn()) ::"
+    assert code =~ "@type find_user_row ::"
+    assert code =~ "@spec find_user(Postgrex.conn()) :: [find_user_row()]"
     assert code =~ "required(:name) => String.t() | nil"
     assert code =~ "required(:age) => integer()"
   end
@@ -185,8 +189,10 @@ defmodule SquirrelixirCodegenTest do
         %Column{name: "occurred_at", type: :utc_datetime, nullable?: false}
       ])
 
-    assert Codegen.generate_module(MyApp.SQL, [query], version: "v-test") =~
-             "required(:occurred_at) => DateTime.t()"
+    code = Codegen.generate_module(MyApp.SQL, [query], version: "v-test")
+
+    assert code =~ "@type events_row :: %{required(:occurred_at) => DateTime.t()}"
+    assert code =~ "@spec events(Postgrex.conn()) :: [events_row()]"
   end
 
   test "generate_module output is classified as generated" do
@@ -514,8 +520,8 @@ defmodule SquirrelixirCodegenTest do
 
     code = Codegen.generate_module(MyApp.SQL, queries, version: "v-test")
 
-    assert code =~ ~r/end\n\n  @spec two\(Postgrex\.conn\(\)\)/
-    refute code =~ ~r/end\n\n\n  @spec two\(Postgrex\.conn\(\)\)/
+    assert code =~ ~r/end\n\n  @type two_row ::/
+    refute code =~ ~r/end\n\n\n  @type two_row ::/
   end
 
   test "query with many arguments returning nil" do
@@ -580,14 +586,14 @@ defmodule SquirrelixirCodegenTest do
 
     code = Codegen.generate_module(MyApp.SQL, [query], version: "v-test")
 
-    spec = typespec_fragment(code, "query")
+    row_type = row_type_fragment(code, "query")
 
-    assert spec =~ "required(:first) => boolean()"
-    assert spec =~ "required(:second) => integer()"
-    assert spec =~ "required(:third) => String.t()"
+    assert row_type =~ "required(:first) => boolean()"
+    assert row_type =~ "required(:second) => integer()"
+    assert row_type =~ "required(:third) => String.t()"
 
-    assert field_order(spec, :first) < field_order(spec, :second)
-    assert field_order(spec, :second) < field_order(spec, :third)
+    assert field_order(row_type, :first) < field_order(row_type, :second)
+    assert field_order(row_type, :second) < field_order(row_type, :third)
     assert code =~ "{:first, :boolean, false}"
     assert code =~ "{:second, :integer, false}"
     assert code =~ "{:third, :string, false}"
@@ -598,6 +604,13 @@ defmodule SquirrelixirCodegenTest do
       Regex.run(~r/@spec #{function_name}\([\s\S]*?\) :: ([\s\S]*?)\n  def /, code)
 
     String.trim(spec)
+  end
+
+  defp row_type_fragment(code, function_name) do
+    [_, row_type] =
+      Regex.run(~r/@type #{function_name}_row :: ([\s\S]*?)\n  @spec /, code)
+
+    String.trim(row_type)
   end
 
   defp field_order(spec, field) do
