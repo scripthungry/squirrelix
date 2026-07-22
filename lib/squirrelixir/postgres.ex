@@ -194,7 +194,8 @@ defmodule Squirrelixir.Postgres do
   end
 
   defp query_plan(conn, query) do
-    explain_query = "explain (format json, verbose, generic_plan) " <> query.content
+    explain_query =
+      "explain (format json, verbose, generic_plan) " <> explainable_query_content(query.content)
 
     with {:ok, %Postgrex.Result{rows: [[plan_json]]}} <-
            Postgrex.query(conn, explain_query, [], query_type: :text),
@@ -203,6 +204,12 @@ defmodule Squirrelixir.Postgres do
     else
       _ -> :error
     end
+  end
+
+  defp explainable_query_content(content) do
+    content
+    |> String.trim_leading()
+    |> String.replace(~r/^;+\s*/, "")
   end
 
   defp decode_plan_json(plan_json) when is_binary(plan_json) do

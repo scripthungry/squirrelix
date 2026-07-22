@@ -518,7 +518,145 @@ defmodule SquirrelixirPostgresTest do
     assert {:ok,
             [
               params: [],
-              returns: [%Column{name: "result", type: :integer, nullable?: true}]
+              returns: [%Column{name: "result", type: :integer, nullable?: false}]
+            ]} = Postgres.infer(conn, query)
+  end
+
+  # https://github.com/giacomocavalieri/squirrel/issues/41
+  test "infer keeps left joined not-null columns nullable", %{conn: conn} do
+    Postgrex.query!(conn, "drop table if exists profile_issue41 cascade", [])
+    Postgrex.query!(conn, "drop table if exists users_issue41 cascade", [])
+
+    Postgrex.query!(
+      conn,
+      "create temporary table users_issue41 (user_id bigserial primary key)",
+      []
+    )
+
+    Postgrex.query!(
+      conn,
+      """
+      create temporary table profile_issue41 (
+        profile_id bigserial primary key,
+        user_id bigint not null,
+        roles text not null
+      )
+      """,
+      []
+    )
+
+    query =
+      query("""
+      select
+        users_issue41.user_id,
+        profile_issue41.roles
+      from
+        users_issue41
+        left join profile_issue41
+          on profile_issue41.user_id = users_issue41.user_id
+      """)
+
+    assert {:ok,
+            [
+              params: [],
+              returns: [
+                %Column{name: "user_id", type: :integer, nullable?: false},
+                %Column{name: "roles", type: :string, nullable?: true}
+              ]
+            ]} = Postgres.infer(conn, query)
+  end
+
+  test "infer keeps aliased using join columns optional for outer joins", %{conn: conn} do
+    Postgrex.query!(conn, "drop table if exists squirrelixir_using_left", [])
+    Postgrex.query!(conn, "drop table if exists squirrelixir_using_right", [])
+
+    Postgrex.query!(
+      conn,
+      "create temporary table squirrelixir_using_left (name text primary key, acorns int)",
+      []
+    )
+
+    Postgrex.query!(
+      conn,
+      "create temporary table squirrelixir_using_right (name text primary key, acorns int)",
+      []
+    )
+
+    left_query =
+      query("""
+      select
+        s1.name as not_optional,
+        s2.name as optional
+      from
+        squirrelixir_using_left s1
+        left join squirrelixir_using_right s2 using(name)
+      """)
+
+    assert {:ok,
+            [
+              params: [],
+              returns: [
+                %Column{name: "not_optional", type: :string, nullable?: false},
+                %Column{name: "optional", type: :string, nullable?: true}
+              ]
+            ]} = Postgres.infer(conn, left_query)
+
+    right_query =
+      query("""
+      select
+        s1.name as optional,
+        s2.name as not_optional
+      from
+        squirrelixir_using_left s1
+        right join squirrelixir_using_right s2 using(name)
+      """)
+
+    assert {:ok,
+            [
+              params: [],
+              returns: [
+                %Column{name: "optional", type: :string, nullable?: true},
+                %Column{name: "not_optional", type: :string, nullable?: false}
+              ]
+            ]} = Postgres.infer(conn, right_query)
+
+    full_query =
+      query("""
+      select
+        s1.name as optional1,
+        s2.name as optional2
+      from
+        squirrelixir_using_left s1
+        full join squirrelixir_using_right s2 using(name)
+      """)
+
+    assert {:ok,
+            [
+              params: [],
+              returns: [
+                %Column{name: "optional1", type: :string, nullable?: true},
+                %Column{name: "optional2", type: :string, nullable?: true}
+              ]
+            ]} = Postgres.infer(conn, full_query)
+  end
+
+  test "infer marks nullable table columns as optional", %{conn: conn} do
+    Postgrex.query!(conn, "drop table if exists squirrelixir_optional_acorns", [])
+
+    Postgrex.query!(
+      conn,
+      "create temporary table squirrelixir_optional_acorns (name text primary key, acorns int)",
+      []
+    )
+
+    query = query("select acorns from squirrelixir_optional_acorns")
+
+    assert {:ok,
+            [
+              params: [],
+              returns: [
+                %Column{name: "acorns", type: :integer, nullable?: true}
+              ]
             ]} = Postgres.infer(conn, query)
   end
 

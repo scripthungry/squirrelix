@@ -57,6 +57,8 @@ defmodule SquirrelixirErrorIsolationTest do
       assert formatted =~ "Invalid query [42601]"
       assert formatted =~ "query.sql"
       assert formatted =~ "syntax error at or near \"wobble\""
+      assert formatted =~ "wobble"
+      assert formatted =~ "╰─ syntax error at or near \"wobble\""
     end
 
     test "query_with_table_that_doesnt_exist returns a structured missing table error", %{
@@ -132,6 +134,8 @@ defmodule SquirrelixirErrorIsolationTest do
       formatted = Error.format(error)
       assert formatted =~ "Invalid query [42704]"
       assert formatted =~ "constraint \"wobble\" for table \"squirrel\" does not exist"
+      assert formatted =~ "query.sql"
+      assert formatted =~ "on conflict on constraint wobble do nothing"
     end
   end
 
