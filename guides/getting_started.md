@@ -77,7 +77,7 @@ where
   id = $1
 ```
 
-The filename (`find_user.sql`) becomes the function name (`find_user/2` — connection
+The filename (`find_user.sql`) becomes the function name (`find_user/2` — conn
 plus one parameter).
 
 ## Generate code

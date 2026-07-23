@@ -19,9 +19,9 @@ SquirrElix follows.
 If you need to talk with a database in Elixir you'll often write something like this:
 
 ```elixir
-def find_user(connection, id) do
+def find_user(conn, id) do
   Postgrex.query!(
-    connection,
+    conn,
     "select name, age from users where id = $1",
     [id]
   )
@@ -205,7 +205,7 @@ Example generated output:
 Find a user and their age given their id.
 """
 @spec find_user(Postgrex.conn(), integer()) :: [find_user_row()]
-def find_user(connection, id) do
+def find_user(conn, id) do
   # ...
 end
 ```

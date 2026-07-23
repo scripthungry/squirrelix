@@ -108,7 +108,7 @@ defmodule SquirrElix.TypedQuery do
   @spec resolve_parameter_names([Parameter.t()]) :: [String.t()]
   def resolve_parameter_names(params) when is_list(params) do
     params
-    |> Enum.reduce({[], MapSet.new(["connection"])}, fn param, {names, used} ->
+    |> Enum.reduce({[], MapSet.new(["conn"])}, fn param, {names, used} ->
       name = param |> preferred_argument_name() |> safe_argument_name(param.index, used)
       name = unique_argument_name(name, used, param.index)
       {[name | names], MapSet.put(used, name)}

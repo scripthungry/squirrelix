@@ -173,14 +173,14 @@ defmodule SquirrElix.Codegen do
 
   defp function_source(%TypedQuery{} = query, postgrex_module) do
     args = TypedQuery.resolve_parameter_names(query.params)
-    all_args = ["connection" | args]
+    all_args = ["conn" | args]
     encoded_params = encode_params_call(args, query.params)
 
     """
       #{doc_source(query)}
       #{row_type_source(query)}@spec #{query.name}(Postgrex.conn()#{spec_args(query.params)}) :: #{function_return_typespec(query)}
       def #{query.name}(#{Enum.join(all_args, ", ")}) do
-        connection
+        conn
         |> #{inspect(postgrex_module)}.query!(#{sql_string_literal(query.content)}, #{encoded_params})
         |> #{decode_call(query.returns)}
       end

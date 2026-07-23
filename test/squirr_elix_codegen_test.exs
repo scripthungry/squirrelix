@@ -28,10 +28,10 @@ defmodule SquirrElixCodegenTest do
 
     code = Codegen.generate_module(MyApp.Accounts.SQL, queries, version: "v-test")
 
-    assert code =~ "def find_user(connection, id)"
+    assert code =~ "def find_user(conn, id)"
     assert code =~ "encode_value(id, :integer)"
     assert code =~ "decode_rows([{:name, :string, false}])"
-    assert code =~ "def z_last(connection)"
+    assert code =~ "def z_last(conn)"
     assert code =~ "decode_rows([{:id, :integer, false}])"
     assert code =~ "defp decode_row("
     assert code =~ "@type column_spec ::"
@@ -185,22 +185,22 @@ defmodule SquirrElixCodegenTest do
       ])
 
     assert Codegen.generate_module(MyApp.SQL, [query], version: "v-test") =~
-             "def search(connection, arg_1)"
+             "def search(conn, arg_1)"
   end
 
   test "generate_module deconflicts argument names" do
     query =
       typed_query("conflicting.sql", "conflicting", "select $1, $2, $3", [
-        %Parameter{index: 1, name: "connection", type: :string},
-        %Parameter{index: 2, name: "connection", type: :string},
+        %Parameter{index: 1, name: "conn", type: :string},
+        %Parameter{index: 2, name: "conn", type: :string},
         %Parameter{index: 3, name: "arg_1", type: :string}
       ])
 
     code = Codegen.generate_module(MyApp.SQL, [query], version: "v-test")
 
-    assert code =~ "def conflicting(connection, connection_1, connection_2, arg_1)"
-    assert code =~ "encode_value(connection_1, :string)"
-    assert code =~ "encode_value(connection_2, :string)"
+    assert code =~ "def conflicting(conn, conn_1, conn_2, arg_1)"
+    assert code =~ "encode_value(conn_1, :string)"
+    assert code =~ "encode_value(conn_2, :string)"
     assert code =~ "encode_value(arg_1, :string)"
   end
 
@@ -217,7 +217,7 @@ defmodule SquirrElixCodegenTest do
         version: "v-test"
       )
 
-    assert code =~ "def reserved(connection, fn_, end_, type)"
+    assert code =~ "def reserved(conn, fn_, end_, type)"
     assert code =~ "encode_value(fn_, :string)"
     assert code =~ "encode_value(end_, :string)"
     assert code =~ "encode_value(type, :string)"
@@ -236,7 +236,7 @@ defmodule SquirrElixCodegenTest do
 
     code = Codegen.generate_module(MyApp.SQL, [query], version: "v-test")
 
-    assert code =~ "def literals(connection, arg_1, arg_2, arg_3)"
+    assert code =~ "def literals(conn, arg_1, arg_2, arg_3)"
     assert code =~ "encode_value(arg_1, :boolean)"
     assert code =~ "encode_value(arg_2, :boolean)"
     assert code =~ "encode_value(arg_3, :string)"
@@ -251,7 +251,7 @@ defmodule SquirrElixCodegenTest do
 
     code = Codegen.generate_module(MyApp.SQL, [query], version: "v-test")
 
-    assert code =~ "def invalid_names(connection, arg_1, arg_2)"
+    assert code =~ "def invalid_names(conn, arg_1, arg_2)"
     assert code =~ "encode_value(arg_1, :string)"
     assert code =~ "encode_value(arg_2, :string)"
   end
@@ -264,7 +264,7 @@ defmodule SquirrElixCodegenTest do
 
     code = Codegen.generate_module(MyApp.SQL, [query], version: "v-test")
 
-    assert code =~ "def shadow_decoder(connection, decoder_1)"
+    assert code =~ "def shadow_decoder(conn, decoder_1)"
     assert code =~ "encode_value(decoder_1, :integer)"
   end
 
@@ -276,7 +276,7 @@ defmodule SquirrElixCodegenTest do
 
     code = Codegen.generate_module(MyApp.SQL, [query], version: "v-test")
 
-    assert code =~ "def shadow_encoder(connection, uuid_encoder_1)"
+    assert code =~ "def shadow_encoder(conn, uuid_encoder_1)"
     assert code =~ "encode_value(uuid_encoder_1, :string)"
   end
 
@@ -456,7 +456,7 @@ defmodule SquirrElixCodegenTest do
     assert File.exists?(output_file)
 
     assert File.read!(output_file) =~ "defmodule AcornCounter.Accounts.SQL do"
-    assert File.read!(output_file) =~ "def find_user(connection)"
+    assert File.read!(output_file) =~ "def find_user(conn)"
   end
 
   test "write_directory returns error for sql directories outside project source roots" do
@@ -531,8 +531,8 @@ defmodule SquirrElixCodegenTest do
              {billing_dir, :ok, 1}
            ]
 
-    assert File.read!(Path.join(root, "lib/accounts/sql.ex")) =~ "def account(connection)"
-    assert File.read!(Path.join(root, "lib/billing/sql.ex")) =~ "def invoice(connection)"
+    assert File.read!(Path.join(root, "lib/accounts/sql.ex")) =~ "def account(conn)"
+    assert File.read!(Path.join(root, "lib/billing/sql.ex")) =~ "def invoice(conn)"
   end
 
   test "check_directories checks each typed query directory and returns outcomes" do
@@ -696,7 +696,7 @@ defmodule SquirrElixCodegenTest do
     assert code =~ ":: :ok"
 
     assert code =~
-             "def query(connection, arg_1, arg_2, arg_3, arg_4, arg_5, arg_6, arg_7, arg_8, arg_9)"
+             "def query(conn, arg_1, arg_2, arg_3, arg_4, arg_5, arg_6, arg_7, arg_8, arg_9)"
 
     assert code =~ "Postgrex.conn()"
     assert code =~ "String.t()"

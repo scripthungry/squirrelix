@@ -59,7 +59,7 @@ Generates:
 Find all active users ordered by name.
 """
 @spec list_active_users(Postgrex.conn()) :: [list_active_users_row()]
-def list_active_users(connection) do
+def list_active_users(conn) do
 ```
 
 Both `-- line comments` and `/* block comments */` are supported. Comments inside
@@ -104,10 +104,10 @@ where
   and email = $2
 ```
 
-Generates `find_user(connection, id, email)`.
+Generates `find_user(conn, id, email)`.
 
 Inference considers equality comparisons, ignores string literals and comments, and
-deconflicts names that would shadow the `connection` parameter or other reserved
+deconflicts names that would shadow the `conn` parameter or other reserved
 names.
 
 When the same parameter index appears more than once, SquirrElix renames arguments
@@ -217,7 +217,7 @@ delete from users where id = $1
 
 ```elixir
 @spec delete_user(Postgrex.conn(), integer()) :: :ok
-def delete_user(connection, id) do
+def delete_user(conn, id) do
 ```
 
 Queries with a `returning` clause produce row maps like any other select.
