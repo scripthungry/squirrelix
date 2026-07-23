@@ -21,8 +21,7 @@ defmodule SquirrElixRuntimeDecodingTest do
   setup do
     on_exit(fn ->
       for module <- @modules do
-        :code.delete(module)
-        :code.purge(module)
+        SquirrElix.TestSupport.unload_module(module)
       end
     end)
 
@@ -66,7 +65,7 @@ defmodule SquirrElixRuntimeDecodingTest do
       assert code =~ "required(:mood) => String.t()"
       assert code =~ "# --- Runtime helpers ---"
 
-      [{module, _bytecode}] = Code.compile_string(code)
+      [{module, _bytecode}] = SquirrElix.TestSupport.compile_string(code)
 
       assert module.update_mood(
                {RuntimeEnumMock, self(), %Postgrex.Result{columns: ["mood"], rows: [["sleepy"]]}},
@@ -106,7 +105,7 @@ defmodule SquirrElixRuntimeDecodingTest do
       refute code =~ "SquirrelMood"
       refute code =~ "SquirrelColour"
 
-      [{module, _bytecode}] = Code.compile_string(code)
+      [{module, _bytecode}] = SquirrElix.TestSupport.compile_string(code)
 
       assert module.find_by_mood(
                {RuntimeEnumMock, self(), %Postgrex.Result{columns: ["mood"], rows: [["happy"]]}},
@@ -309,7 +308,7 @@ defmodule SquirrElixRuntimeDecodingTest do
       refute code =~ "decode_rows"
       assert code =~ "@spec insert_squirrel(Postgrex.conn(), String.t(), integer()) :: :ok"
 
-      [{module, _bytecode}] = Code.compile_string(code)
+      [{module, _bytecode}] = SquirrElix.TestSupport.compile_string(code)
 
       assert module.insert_squirrel({RuntimeDecodingMock, self(), command: true}, "sandy", 1000) ==
                :ok
@@ -338,11 +337,11 @@ defmodule SquirrElixRuntimeDecodingTest do
           postgrex: RuntimeDecodingMock
         )
 
-      assert Regex.scan(~r/defp uuid_to_string\(/, code) |> length() == 1
+      refute code =~ "defp uuid_to_string("
       assert Regex.scan(~r/defp uuid_from_string\(/, code) |> length() == 1
       assert code =~ "# --- Runtime helpers ---"
 
-      [{module, _bytecode}] = Code.compile_string(code)
+      [{module, _bytecode}] = SquirrElix.TestSupport.compile_string(code)
 
       result =
         module.check_uuid(
@@ -366,7 +365,7 @@ defmodule SquirrElixRuntimeDecodingTest do
         postgrex: RuntimeDecodingMock
       )
 
-    [{module, _bytecode}] = Code.compile_string(code)
+    [{module, _bytecode}] = SquirrElix.TestSupport.compile_string(code)
 
     module.decode(
       {RuntimeDecodingMock, self(),
@@ -397,7 +396,7 @@ defmodule SquirrElixRuntimeDecodingTest do
         postgrex: RuntimeEncodingCaptureMock
       )
 
-    [{module, _bytecode}] = Code.compile_string(code)
+    [{module, _bytecode}] = SquirrElix.TestSupport.compile_string(code)
 
     flush_mailbox()
 

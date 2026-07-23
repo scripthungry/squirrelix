@@ -105,7 +105,7 @@ defmodule SquirrElixGleamParityTest do
 
     assert code =~ "defp uuid_to_string("
     assert code =~ "defp decode_scalar(value, :date)"
-    assert [{_module, _bytecode}] = Code.compile_string(code)
+    assert [{_module, _bytecode}] = SquirrElix.TestSupport.compile_string(code)
   end
 
   test "generate_module compiles when query uses a long postgres enum type name" do
@@ -125,7 +125,9 @@ defmodule SquirrElixGleamParityTest do
 
     assert code =~ "required(:#{long_enum}) => String.t()"
     refute code =~ "# --- Enums ---"
-    assert [{SquirrElix.GleamParityLongEnumTest.SQL, _bytecode}] = Code.compile_string(code)
+
+    assert [{SquirrElix.GleamParityLongEnumTest.SQL, _bytecode}] =
+             SquirrElix.TestSupport.compile_string(code)
   end
 
   defp typed_query(file, name, content, params, returns) do

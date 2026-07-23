@@ -1,11 +1,3 @@
-defmodule PostgrexRowsMock do
-  def query!({_module, owner, rows: rows}, sql, params) do
-    send(owner, {:query!, sql, params})
-
-    %Postgrex.Result{columns: ["name"], rows: rows}
-  end
-end
-
 defmodule SquirrElixCodegenTest do
   use ExUnit.Case, async: true
 
@@ -90,7 +82,7 @@ defmodule SquirrElixCodegenTest do
     code = Codegen.generate_module(MyApp.SQL, queries, version: "v-test")
 
     assert Regex.scan(~r/defp uuid_to_string\(/, code) |> length() == 1
-    assert Regex.scan(~r/defp uuid_from_string\(/, code) |> length() == 1
+    refute code =~ "defp uuid_from_string("
     assert function_position(code, "one") < function_position(code, "other")
   end
 
@@ -168,7 +160,7 @@ defmodule SquirrElixCodegenTest do
     refute code =~ "Mood"
     refute code =~ "enum"
 
-    [{module, _bytecode}] = Code.compile_string(code)
+    [{module, _bytecode}] = SquirrElix.TestSupport.compile_string(code)
 
     assert module.find_by_mood({PostgrexEnumMock, self()}, "happy") == [%{mood: "happy"}]
     assert_received {:query!, "select mood from squirrels where mood = $1", ["happy"]}
@@ -229,7 +221,9 @@ defmodule SquirrElixCodegenTest do
     assert code =~ "encode_value(fn_, :string)"
     assert code =~ "encode_value(end_, :string)"
     assert code =~ "encode_value(type, :string)"
-    assert [{SquirrElix.GeneratedReservedNamesTest.SQL, _bytecode}] = Code.compile_string(code)
+
+    assert [{SquirrElix.GeneratedReservedNamesTest.SQL, _bytecode}] =
+             SquirrElix.TestSupport.compile_string(code)
   end
 
   test "generate_module avoids SQL literal argument names" do
@@ -365,7 +359,10 @@ defmodule SquirrElixCodegenTest do
       Codegen.generate_module(SquirrElix.GeneratedCompileTest.SQL, [query], version: "v-test")
 
     assert Code.ensure_loaded?(Postgrex)
-    assert [{SquirrElix.GeneratedCompileTest.SQL, _bytecode}] = Code.compile_string(code)
+
+    assert [{SquirrElix.GeneratedCompileTest.SQL, _bytecode}] =
+             SquirrElix.TestSupport.compile_string(code)
+
     assert function_exported?(SquirrElix.GeneratedCompileTest.SQL, :find_user, 2)
   end
 
@@ -387,7 +384,7 @@ defmodule SquirrElixCodegenTest do
         postgrex: PostgrexMock
       )
 
-    [{module, _bytecode}] = Code.compile_string(code)
+    [{module, _bytecode}] = SquirrElix.TestSupport.compile_string(code)
 
     assert module.find_user({PostgrexMock, self()}, 123) == [%{name: "Ada"}]
 
@@ -406,7 +403,7 @@ defmodule SquirrElixCodegenTest do
         postgrex: PostgrexRowsMock
       )
 
-    [{module, _bytecode}] = Code.compile_string(code)
+    [{module, _bytecode}] = SquirrElix.TestSupport.compile_string(code)
 
     assert module.list_users({PostgrexRowsMock, self(), rows: [["Ada"], ["Grace"]]}) == [
              %{name: "Ada"},
@@ -434,7 +431,7 @@ defmodule SquirrElixCodegenTest do
 
     assert code =~ "@spec insert_user(Postgrex.conn(), String.t()) :: :ok"
 
-    [{module, _bytecode}] = Code.compile_string(code)
+    [{module, _bytecode}] = SquirrElix.TestSupport.compile_string(code)
 
     assert module.insert_user({PostgrexCommandMock, self()}, "Ada") == :ok
     assert_received {:query!, "insert into users(name) values ($1)", ["Ada"]}
@@ -645,7 +642,7 @@ defmodule SquirrElixCodegenTest do
         postgrex: PostgrexQuotedStringMock
       )
 
-    [{module, _bytecode}] = Code.compile_string(code)
+    [{module, _bytecode}] = SquirrElix.TestSupport.compile_string(code)
     assert module.query({PostgrexQuotedStringMock, self()}) == [%{result: 1}]
     assert_received {:query!, ~s|select 1 as "result"|, []}
   end
@@ -709,7 +706,7 @@ defmodule SquirrElixCodegenTest do
     end
 
     assert code =~ "decode_command()"
-    assert [{_module, _bytecode}] = Code.compile_string(code)
+    assert [{_module, _bytecode}] = SquirrElix.TestSupport.compile_string(code)
   end
 
   test "fields appear in the order they have in the select list" do
@@ -789,37 +786,5 @@ defmodule SquirrElixCodegenTest do
     """)
 
     path
-  end
-end
-
-defmodule PostgrexMock do
-  def query!({_module, owner}, sql, params) do
-    send(owner, {:query!, sql, params})
-
-    %Postgrex.Result{columns: ["name"], rows: [["Ada"]]}
-  end
-end
-
-defmodule PostgrexCommandMock do
-  def query!({_module, owner}, sql, params) do
-    send(owner, {:query!, sql, params})
-
-    %Postgrex.Result{command: :insert, columns: nil, rows: nil, num_rows: 1}
-  end
-end
-
-defmodule PostgrexQuotedStringMock do
-  def query!({_module, owner}, sql, params) do
-    send(owner, {:query!, sql, params})
-
-    %Postgrex.Result{columns: ["result"], rows: [[1]]}
-  end
-end
-
-defmodule PostgrexEnumMock do
-  def query!({_module, owner}, sql, params) do
-    send(owner, {:query!, sql, params})
-
-    %Postgrex.Result{columns: ["mood"], rows: [["happy"]]}
   end
 end

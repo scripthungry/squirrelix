@@ -218,21 +218,23 @@ defmodule SquirrElix.Codegen do
   end
 
   defp runtime_helper_sources(queries) do
-    types = runtime_types(queries)
-
     []
     |> maybe_add_command_helper(queries)
     |> maybe_add_rows_helper(queries)
     |> maybe_add_encode_helpers(queries)
-    |> maybe_add_uuid_helpers(types)
+    |> maybe_add_uuid_helpers(queries)
     |> Enum.reverse()
   end
 
-  defp runtime_types(queries) do
+  defp param_types(queries) do
     queries
-    |> Enum.flat_map(fn query ->
-      Enum.map(query.params, & &1.type) ++ Enum.map(query.returns, & &1.type)
-    end)
+    |> Enum.flat_map(fn query -> Enum.map(query.params, & &1.type) end)
+    |> MapSet.new()
+  end
+
+  defp return_types(queries) do
+    queries
+    |> Enum.flat_map(fn query -> Enum.map(query.returns, & &1.type) end)
     |> MapSet.new()
   end
 
@@ -253,7 +255,7 @@ defmodule SquirrElix.Codegen do
 
   defp maybe_add_rows_helper(sources, queries) do
     if Enum.any?(queries, &(&1.returns != [])) do
-      types = runtime_types(queries)
+      types = return_types(queries)
 
       [
         """
@@ -358,7 +360,7 @@ defmodule SquirrElix.Codegen do
 
   defp maybe_add_encode_helpers(sources, queries) do
     if Enum.any?(queries, &(&1.params != [])) do
-      types = runtime_types(queries)
+      types = param_types(queries)
 
       [
         """
@@ -406,10 +408,6 @@ defmodule SquirrElix.Codegen do
       |> add_list_encode_clauses(types)
     end)
     |> Enum.reverse()
-    |> Kernel.++([
-      "defp encode_value(nil, _type), do: nil",
-      "defp encode_value(value, _type), do: value"
-    ])
     |> Enum.join("\n")
   end
 
@@ -428,34 +426,73 @@ defmodule SquirrElix.Codegen do
     end)
   end
 
-  defp maybe_add_uuid_helpers(sources, types) do
-    if MapSet.member?(types, :uuid) or list_element_type?(types, :uuid) do
-      [
-        """
-          defp uuid_to_string(uuid) when is_binary(uuid) and byte_size(uuid) == 16 do
-            hex = Base.encode16(uuid, case: :lower)
+  defp maybe_add_uuid_helpers(sources, queries) do
+    param_type_set = param_types(queries)
+    return_type_set = return_types(queries)
 
-            <<part1::binary-size(8), part2::binary-size(4), part3::binary-size(4),
-              part4::binary-size(4), part5::binary>> = hex
+    encode_uuid? =
+      MapSet.member?(param_type_set, :uuid) or list_element_type?(param_type_set, :uuid)
 
-            "\#{part1}-\#{part2}-\#{part3}-\#{part4}-\#{part5}"
-          end
+    decode_uuid? =
+      MapSet.member?(return_type_set, :uuid) or list_element_type?(return_type_set, :uuid)
 
-          defp uuid_from_string(string) when is_binary(string) do
-            case Base.decode16(String.replace(string, "-", ""), case: :mixed) do
-              {:ok, <<_::128>> = uuid} ->
-                uuid
+    case {encode_uuid?, decode_uuid?} do
+      {false, false} ->
+        sources
 
-              _ ->
-                raise ArgumentError, "invalid UUID: \#{inspect(string)}"
-            end
-          end
-        """
-        | sources
-      ]
-    else
-      sources
+      {encode_uuid?, decode_uuid?} ->
+        [uuid_helper_source(encode_uuid?, decode_uuid?) | sources]
     end
+  end
+
+  defp uuid_helper_source(true, true) do
+    """
+      defp uuid_to_string(uuid) when is_binary(uuid) and byte_size(uuid) == 16 do
+        hex = Base.encode16(uuid, case: :lower)
+
+        <<part1::binary-size(8), part2::binary-size(4), part3::binary-size(4),
+          part4::binary-size(4), part5::binary>> = hex
+
+        "\#{part1}-\#{part2}-\#{part3}-\#{part4}-\#{part5}"
+      end
+
+      defp uuid_from_string(string) when is_binary(string) do
+        case Base.decode16(String.replace(string, "-", ""), case: :mixed) do
+          {:ok, <<_::128>> = uuid} ->
+            uuid
+
+          _ ->
+            raise ArgumentError, "invalid UUID: \#{inspect(string)}"
+        end
+      end
+    """
+  end
+
+  defp uuid_helper_source(true, false) do
+    """
+      defp uuid_from_string(string) when is_binary(string) do
+        case Base.decode16(String.replace(string, "-", ""), case: :mixed) do
+          {:ok, <<_::128>> = uuid} ->
+            uuid
+
+          _ ->
+            raise ArgumentError, "invalid UUID: \#{inspect(string)}"
+        end
+      end
+    """
+  end
+
+  defp uuid_helper_source(false, true) do
+    """
+      defp uuid_to_string(uuid) when is_binary(uuid) and byte_size(uuid) == 16 do
+        hex = Base.encode16(uuid, case: :lower)
+
+        <<part1::binary-size(8), part2::binary-size(4), part3::binary-size(4),
+          part4::binary-size(4), part5::binary>> = hex
+
+        "\#{part1}-\#{part2}-\#{part3}-\#{part4}-\#{part5}"
+      end
+    """
   end
 
   defp list_element_type?(types, element_type) do

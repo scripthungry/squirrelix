@@ -19,7 +19,7 @@ defmodule SquirrElixIntegrationTest do
       with or without `--infer`.
 
   These tests exercise the full Elixir path: temp Mix project → `SquirrElix.generate/3`
-  → sibling `sql.ex` on disk → `Code.compile_string/1` → invoke generated functions.
+  → sibling `sql.ex` on disk → `SquirrElix.TestSupport.compile_string/1` → invoke generated functions.
   Live Postgres coverage is optional (`@tag :postgres`) and skips when no local DB
   is available; the default integration tests use static metadata or a stub inferrer
   plus a Postgrex mock so CI does not require a database.
@@ -65,7 +65,7 @@ defmodule SquirrElixIntegrationTest do
 
     assert Code.ensure_loaded?(Postgrex)
 
-    assert [{module, _bytecode}] = Code.compile_string(code)
+    assert [{module, _bytecode}] = SquirrElix.TestSupport.compile_string(code)
     assert function_exported?(module, :find_account, 2)
 
     assert module.find_account({IntegrationPostgrexMock, self()}, 42) == [
@@ -113,7 +113,7 @@ defmodule SquirrElixIntegrationTest do
            }
 
     code = File.read!(Path.join(root, "lib/accounts/sql.ex"))
-    assert [{module, _bytecode}] = Code.compile_string(code)
+    assert [{module, _bytecode}] = SquirrElix.TestSupport.compile_string(code)
 
     assert module.find_account({IntegrationPostgrexMock, self()}, 7) == [
              %{name: "Ada"}
@@ -139,7 +139,7 @@ defmodule SquirrElixIntegrationTest do
     code = File.read!(Path.join(root, "lib/accounts/sql.ex"))
     assert code =~ "required(:value) => integer()"
 
-    assert [{module, _bytecode}] = Code.compile_string(code)
+    assert [{module, _bytecode}] = SquirrElix.TestSupport.compile_string(code)
 
     assert module.scalar(conn, 42) == [%{value: 42}]
   end
