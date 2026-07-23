@@ -52,6 +52,8 @@ defmodule SquirrElix.MixTask do
   end
 
   defp with_postgres_inferrer!(opts, callback) do
+    {:ok, _} = Application.ensure_all_started(:postgrex)
+
     case Postgrex.start_link(connection_opts(opts)) do
       {:ok, conn} ->
         try do
