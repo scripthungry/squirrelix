@@ -3,7 +3,7 @@ Logger.configure(level: :info)
 
 ExUnit.start()
 
-defmodule SquirrElix.TestSupport do
+defmodule Squirrelix.TestSupport do
   @moduledoc false
 
   def tmp_dir!(prefix) when is_binary(prefix) do
@@ -61,5 +61,51 @@ defmodule SquirrElix.TestSupport do
     """)
 
     path
+  end
+
+  @doc """
+  Postgrex options for live Postgres tests.
+
+  Prefers standard `PG*` environment variables (as used in CI). Falls back to
+  peer-auth style local defaults (`USER` / `postgres` database).
+  """
+  def postgres_opts(extra \\ []) when is_list(extra) do
+    [
+      hostname: System.get_env("PGHOST") || "localhost",
+      port: parse_port(System.get_env("PGPORT")),
+      username: System.get_env("PGUSER") || System.get_env("USER") || "postgres",
+      password: System.get_env("PGPASSWORD"),
+      database: System.get_env("PGDATABASE") || "postgres",
+      log: false
+    ]
+    |> Enum.reject(fn {_key, value} -> value in [nil, ""] end)
+    |> Keyword.merge(extra)
+  end
+
+  def postgres_url do
+    opts = postgres_opts()
+    user = Keyword.fetch!(opts, :username)
+    host = Keyword.get(opts, :hostname, "localhost")
+    port = Keyword.get(opts, :port, 5432)
+    database = Keyword.fetch!(opts, :database)
+    password = Keyword.get(opts, :password)
+
+    auth =
+      if password in [nil, ""] do
+        user
+      else
+        "#{user}:#{password}"
+      end
+
+    "postgres://#{auth}@#{host}:#{port}/#{database}"
+  end
+
+  defp parse_port(nil), do: 5432
+
+  defp parse_port(port) when is_binary(port) do
+    case Integer.parse(port) do
+      {value, ""} -> value
+      _ -> 5432
+    end
   end
 end

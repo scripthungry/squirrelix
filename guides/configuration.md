@@ -1,12 +1,12 @@
 # Configuration
 
-SquirrElix is intentionally minimal: convention over configuration. This guide
+Squirrelix is intentionally minimal: convention over configuration. This guide
 covers the two query sources (Postgres inference and metadata files), connection
 settings, Mix task options, and the programmatic API.
 
 ## Query sources
 
-Every generation or check pass needs type information for each query. SquirrElix
+Every generation or check pass needs type information for each query. Squirrelix
 accepts one of two sources:
 
 | Mode | When to use | How to enable |
@@ -14,7 +14,7 @@ accepts one of two sources:
 | **Postgres inferrer** | Schema is available locally or in CI | `--infer` |
 | **Metadata file** | No database at generation time | Default (requires `squirr_elix.exs`) |
 
-Both `mix squirr_elix.gen` and `mix squirr_elix.check` use the same source for a
+Both `mix squirrelix.gen` and `mix squirrelix.check` use the same source for a
 given invocation.
 
 ## Postgres inference
@@ -23,7 +23,7 @@ Pass `--infer` to connect to a live database and read types from Postgrex prepar
 metadata:
 
 ```sh
-mix squirr_elix.gen --infer --database my_app_dev
+mix squirrelix.gen --infer --database my_app_dev
 ```
 
 The database must exist, be reachable, and have the schema your queries reference
@@ -31,18 +31,24 @@ The database must exist, be reachable, and have the schema your queries referenc
 
 ### Connection URL
 
+Prefer putting secrets in the environment (`PGPASSWORD`) rather than in a URL or
+`--password` flag — both appear in process listings and shell history.
+
 ```sh
-mix squirr_elix.gen --infer \
-  --url postgres://user:password@host:5432/database?connect_timeout=5
+mix squirrelix.gen --infer \
+  --url postgres://user@host:5432/database?connect_timeout=5
 ```
 
 Supported URL schemes: `postgres://` and `postgresql://`.
 
 The `connect_timeout` query parameter sets the connection timeout in seconds.
 
+`--infer` runs your `.sql` files against a real database (prepare + EXPLAIN). Only
+point it at trusted SQL and a database you intend to use for codegen.
+
 ### Environment variables
 
-When no URL is provided, SquirrElix reads standard
+Squirrelix reads standard
 [libpq environment variables](https://www.postgresql.org/docs/current/libpq-envars.html):
 
 | Variable | Default |
@@ -60,35 +66,33 @@ Example with `direnv`:
 # .envrc
 export PGDATABASE=my_app_dev
 export PGUSER=postgres
+export PGPASSWORD=secret
 ```
 
 ```sh
 direnv allow
-mix squirr_elix.gen --infer
+mix squirrelix.gen --infer
 ```
 
-SquirrElix does not read `.env` files directly. Use your shell, `direnv`, or
+Squirrelix does not read `.env` files directly. Use your shell, `direnv`, or
 similar tools to load environment variables.
 
 ### CLI flags
 
-Individual flags override environment variables:
-
 ```sh
-mix squirr_elix.gen --infer \
+mix squirrelix.gen --infer \
   --hostname db.example.com \
   --port 5433 \
   --username app \
-  --password secret \
   --database my_app_dev
 ```
 
-Flag precedence (highest first): CLI flags → URL parameters → environment variables
-→ defaults.
+Connection precedence (highest first): CLI flags → `--url` → `PG*` environment
+variables → defaults. Prefer `PGPASSWORD` over `--password`.
 
 ## Metadata files
 
-When `--infer` is not passed, SquirrElix loads a metadata file that maps query file
+When `--infer` is not passed, Squirrelix loads a metadata file that maps query file
 paths to parameter and return type descriptors.
 
 Default path: `squirr_elix.exs` in the project root.
@@ -96,13 +100,14 @@ Default path: `squirr_elix.exs` in the project root.
 Custom path:
 
 ```sh
-mix squirr_elix.gen --metadata config/squirr_elix.exs
-mix squirr_elix.check --metadata config/squirr_elix.exs
+mix squirrelix.gen --metadata config/squirr_elix.exs
+mix squirrelix.check --metadata config/squirr_elix.exs
 ```
 
 ### Format
 
-The file is evaluated as Elixir and must return a map:
+The file is **evaluated as Elixir** (like `mix.exs`) and must return a map. Only
+load trusted, project-local metadata — never evaluate untrusted paths.
 
 ```elixir
 %{
@@ -136,7 +141,7 @@ Every discovered `.sql` file must have a metadata entry, or generation fails wit
 
 ## Mix task options
 
-Both `mix squirr_elix.gen` and `mix squirr_elix.check` accept:
+Both `mix squirrelix.gen` and `mix squirrelix.check` accept:
 
 | Option | Description |
 | --- | --- |
@@ -146,12 +151,12 @@ Both `mix squirr_elix.gen` and `mix squirr_elix.check` accept:
 | `--database NAME` | Database name |
 | `--hostname HOST` | Database host |
 | `--username USER` | Database user |
-| `--password PASS` | Database password |
+| `--password PASS` | Database password (prefer `PGPASSWORD`) |
 | `--port PORT` | Database port |
 
 ## Programmatic API
 
-Use `SquirrElix.generate/3` and `SquirrElix.check/3` from Elixir code:
+Use `Squirrelix.generate/3` and `Squirrelix.check/3` from Elixir code:
 
 ```elixir
 # Metadata map
@@ -162,13 +167,13 @@ metadata = %{
   ]
 }
 
-SquirrElix.generate("/path/to/project", metadata, version: "v0.1.0")
+Squirrelix.generate("/path/to/project", metadata, version: "v0.1.0")
 
-# Postgres inferrer (function or module implementing SquirrElix.Inference.Inferrer)
+# Postgres inferrer (function or module implementing Squirrelix.Inference.Inferrer)
 {:ok, conn} = Postgrex.start_link(database: "my_app_dev")
 
 try do
-  SquirrElix.generate("/path/to/project", SquirrElix.Postgres.inferrer(conn),
+  Squirrelix.generate("/path/to/project", Squirrelix.Postgres.inferrer(conn),
     version: "v0.1.0"
   )
 after
@@ -183,8 +188,8 @@ Options:
 
 Returns:
 
-- `SquirrElix.generate/3` → `%SquirrElix.CodegenSummary{}`
-- `SquirrElix.check/3` → `%SquirrElix.CodegenCheckSummary{}`
+- `Squirrelix.generate/3` → `%Squirrelix.CodegenSummary{}`
+- `Squirrelix.check/3` → `%Squirrelix.CodegenCheckSummary{}`
 
 ## CI setup
 
@@ -194,12 +199,12 @@ A typical CI step runs the check task after migrations:
 - name: Apply migrations
   run: mix ecto.migrate
 
-- name: Check SquirrElix output
+- name: Check Squirrelix output
   env:
     PGDATABASE: my_app_test
     PGHOST: localhost
     PGUSER: postgres
-  run: mix squirr_elix.check --infer
+  run: mix squirrelix.check --infer
 ```
 
 Commit generated `sql.ex` files alongside your `.sql` sources so CI verifies they
@@ -207,9 +212,9 @@ stay in sync.
 
 ## Safe overwrite rules
 
-SquirrElix only overwrites files it recognises as previously generated (containing
-the SquirrElix generation marker). If a `sql.ex` file exists and was written by
-hand, generation fails with `CannotOverwriteFile`.
+Squirrelix only overwrites files whose header contains the Squirrelix generation
+marker (written into `@moduledoc`). If a `sql.ex` file exists without that header
+marker, generation fails with `CannotOverwriteFile`.
 
 During check, an outdated generated file produces `OutdatedFile`.
 

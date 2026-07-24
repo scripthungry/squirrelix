@@ -1,15 +1,15 @@
-defmodule SquirrElix.MixProject do
+defmodule Squirrelix.MixProject do
   use Mix.Project
 
   @version "0.1.0"
-  @source_url "https://github.com/mward-sudo/squirrelixir"
+  @source_url "https://github.com/scripthungry/squirrelix"
 
   def project do
     [
       app: :squirr_elix,
       version: @version,
       elixir: "~> 1.20",
-      name: "SquirrElix",
+      name: "Squirrelix",
       description:
         "Generates typed Elixir query modules from plain SQL files using Postgres inference or static metadata.",
       start_permanent: Mix.env() == :prod,
@@ -57,15 +57,17 @@ defmodule SquirrElix.MixProject do
         "GitHub" => @source_url,
         "Upstream Squirrel" => "https://github.com/giacomocavalieri/squirrel"
       },
-      files: ~w(lib mix.exs README.md LICENSE NOTICE ROADMAP.md guides .formatter.exs)
+      files:
+        ~w(lib mix.exs README.md LICENSE NOTICE ROADMAP.md CHANGELOG.md guides .formatter.exs)
     ]
   end
 
   defp docs do
     [
-      main: "SquirrElix",
+      main: "Squirrelix",
       extras: [
         "README.md",
+        "CHANGELOG.md",
         "ROADMAP.md",
         "guides/getting_started.md",
         "guides/writing_queries.md",
@@ -79,31 +81,31 @@ defmodule SquirrElix.MixProject do
       source_ref: "v#{@version}",
       groups_for_modules: [
         "Core API": [
-          SquirrElix,
-          SquirrElix.CLI,
-          SquirrElix.Project
+          Squirrelix,
+          Squirrelix.CLI,
+          Squirrelix.Project
         ],
         "Query discovery": [
-          SquirrElix.Query,
-          SquirrElix.QueryDirectory,
-          SquirrElix.TypedQuery,
-          SquirrElix.TypedQueryDirectory,
-          SquirrElix.SQL
+          Squirrelix.Query,
+          Squirrelix.QueryDirectory,
+          Squirrelix.TypedQuery,
+          Squirrelix.TypedQueryDirectory,
+          Squirrelix.SQL
         ],
         Inference: [
-          SquirrElix.Inference,
-          SquirrElix.Postgres,
-          SquirrElix.TypeMapper,
-          SquirrElix.Metadata,
-          SquirrElix.ConnectionOptions
+          Squirrelix.Inference,
+          Squirrelix.Postgres,
+          Squirrelix.TypeMapper,
+          Squirrelix.Metadata,
+          Squirrelix.ConnectionOptions
         ],
         Codegen: [
-          SquirrElix.Codegen,
-          SquirrElix.Output
+          Squirrelix.Codegen,
+          Squirrelix.Output
         ],
         "Mix tasks": [
-          Mix.Tasks.SquirrElix.Gen,
-          Mix.Tasks.SquirrElix.Check
+          Mix.Tasks.Squirrelix.Gen,
+          Mix.Tasks.Squirrelix.Check
         ]
       ]
     ]

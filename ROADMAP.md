@@ -1,12 +1,12 @@
-# SquirrElix Roadmap
+# Squirrelix Roadmap
 
-SquirrElix reimplements [Gleam Squirrel](https://github.com/giacomocavalieri/squirrel)'s core
+Squirrelix reimplements [Gleam Squirrel](https://github.com/giacomocavalieri/squirrel)'s core
 SQL discovery, inference, and codegen behavior with an idiomatic **Elixir-native** public API.
 Upstream Squirrel remains the compatibility reference for query conventions and edge-case tests;
 Elixir conventions take precedence for API shape, `@spec` output, and runtime return values.
 
 **Elixir-native direction:** generated modules use stdlib typespecs (`String.t()`, `integer()`,
-`map()` with `required/1`, `term()` for JSON, and so on). SquirrElix does **not** generate
+`map()` with `required/1`, `term()` for JSON, and so on). Squirrelix does **not** generate
 Gleam records, custom enum ADTs, or opaque tagged error values.
 
 ## Completed
@@ -38,15 +38,15 @@ Gleam records, custom enum ADTs, or opaque tagged error values.
 - **Code generation**
   - [x] Per-query row `@type` definitions and `@spec`-annotated functions.
   - [x] Row queries return decoded maps; command queries return `:ok`.
-  - [x] Safe overwrite and `mix squirr_elix.check` drift detection.
+  - [x] Safe overwrite and `mix squirrelix.check` drift detection.
   - [x] Runtime decode coverage for nullable values, arrays, JSON, UUIDs, dates/times, and
     command results.
 
 - **Mix tasks and configuration**
   - [x] Metadata-file mode (`squirr_elix.exs` or `--metadata`).
   - [x] `--infer` mode with Postgrex connection options and `PG*` environment defaults.
-  - [x] `mix squirr_elix.gen` and `mix squirr_elix.check` task documentation.
-  - [x] Programmatic `SquirrElix.generate/3` and `SquirrElix.check/3` API.
+  - [x] `mix squirrelix.gen` and `mix squirrelix.check` task documentation.
+  - [x] Programmatic `Squirrelix.generate/3` and `Squirrelix.check/3` API.
 
 - **Package and docs**
   - [x] Hex package metadata, Apache-2.0 license, and ExDoc module grouping.
@@ -84,6 +84,7 @@ Gleam records, custom enum ADTs, or opaque tagged error values.
     `timestamptz` mapped to `DateTime.t()`, function-name sorting only when file/name differ.
 
 - **Release**
+  - [x] Harden codegen escaping, EXPLAIN path, overwrite markers, and release docs.
   - [ ] Publish `0.1.0` to Hex and enable HexDocs at <https://hexdocs.pm/squirr_elix>.
 
 ## Validation discipline

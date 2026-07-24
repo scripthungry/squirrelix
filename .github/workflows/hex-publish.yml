@@ -1,0 +1,61 @@
+name: Hex Publish
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "publish" to publish the current mix.exs version to Hex'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish to Hex
+    runs-on: ubuntu-latest
+    if: github.repository == 'scripthungry/squirrelix'
+    env:
+      MIX_ENV: prod
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.20.0"
+          otp-version: "28.0"
+
+      - name: Confirm manual publish
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if [ "${{ inputs.confirm }}" != "publish" ]; then
+            echo "Refusing to publish: confirmation was not exactly 'publish'"
+            exit 1
+          fi
+
+      - name: Verify tag matches mix.exs version
+        if: github.event_name == 'push'
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version="$(mix run -e 'IO.write(Mix.Project.config()[:version])')"
+          if [ "$tag" != "$version" ]; then
+            echo "Tag v$tag does not match mix.exs version $version"
+            exit 1
+          fi
+
+      - run: mix deps.get
+      - run: mix compile --warnings-as-errors
+
+      - name: Publish package
+        env:
+          HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
+        run: |
+          if [ -z "$HEX_API_KEY" ]; then
+            echo "HEX_API_KEY secret is not set"
+            exit 1
+          fi
+          mix hex.publish --yes

@@ -1,11 +1,11 @@
 # Getting Started
 
-This guide walks through adding SquirrElix to a Mix project, writing your first
+This guide walks through adding Squirrelix to a Mix project, writing your first
 query, and generating typed Elixir modules.
 
 ## Add the dependency
 
-Add SquirrElix and Postgrex to your `mix.exs`:
+Add Squirrelix and Postgrex to your `mix.exs`:
 
 ```elixir
 def deps do
@@ -16,24 +16,18 @@ def deps do
 end
 ```
 
-Before the initial Hex release:
-
-```elixir
-{:squirr_elix, github: "mward-sudo/squirr_elix"}
-```
-
 Then run:
 
 ```sh
 mix deps.get
 ```
 
-SquirrElix is typically a **dev dependency** — you run code generation at build or
+Squirrelix is typically a **dev dependency** — you run code generation at build or
 CI time rather than at runtime in production. Add it under `only: :dev` if you prefer.
 
 ## Project layout
 
-SquirrElix discovers queries under `lib/`, `test/`, and `dev/` in directories
+Squirrelix discovers queries under `lib/`, `test/`, and `dev/` in directories
 named `sql/`:
 
 ```txt
@@ -84,13 +78,13 @@ plus one parameter).
 
 ### With Postgres inference (recommended)
 
-Point SquirrElix at a database that has your schema applied (migrations run):
+Point Squirrelix at a database that has your schema applied (migrations run):
 
 ```sh
-mix squirr_elix.gen --infer --database my_app_dev
+mix squirrelix.gen --infer --database my_app_dev
 ```
 
-SquirrElix connects to Postgres, prepares each query, and reads parameter and
+Squirrelix connects to Postgres, prepares each query, and reads parameter and
 column types from Postgrex metadata.
 
 Set connection details via environment variables or flags:
@@ -100,13 +94,13 @@ export PGHOST=localhost
 export PGDATABASE=my_app_dev
 export PGUSER=postgres
 
-mix squirr_elix.gen --infer
+mix squirrelix.gen --infer
 ```
 
 Or pass a URL:
 
 ```sh
-mix squirr_elix.gen --infer --url postgres://postgres@localhost/my_app_dev
+mix squirrelix.gen --infer --url postgres://postgres@localhost/my_app_dev
 ```
 
 ### With a metadata file
@@ -128,7 +122,7 @@ If you cannot connect to Postgres during generation, provide types manually in
 ```
 
 ```sh
-mix squirr_elix.gen
+mix squirrelix.gen
 ```
 
 See [Configuration](configuration.md) for the full metadata format.
@@ -164,11 +158,11 @@ Command queries (no returned rows) return `:ok`:
 Run the check task in CI to catch stale generated files:
 
 ```sh
-mix squirr_elix.check --infer --database my_app_dev
+mix squirrelix.check --infer --database my_app_dev
 ```
 
 If SQL changed but `sql.ex` was not regenerated, the check fails with an
-`OutdatedFile` error. Fix it by running `mix squirr_elix.gen` again and committing
+`OutdatedFile` error. Fix it by running `mix squirrelix.gen` again and committing
 the updated `sql.ex`.
 
 ## Next steps
