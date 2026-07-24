@@ -12,18 +12,11 @@
 
 ## One-time setup
 
-### 1. GitHub (repo already transferred or to transfer)
+### 1. GitHub
+
+Repo is at https://github.com/scripthungry/squirrelix (public). Local remote:
 
 ```sh
-# Re-auth if needed
-gh auth refresh -h github.com -s repo,workflow,read:org
-
-# Transfer + rename (from mward-sudo/squirrelixir → scripthungry/squirrelix)
-gh repo rename squirrelix --repo mward-sudo/squirrelixir   # optional first
-# Then transfer via GitHub UI: Settings → General → Transfer ownership → scripthungry
-# Or after transfer rename under scripthungry.
-
-# After transfer, update local remote:
 git remote set-url origin https://github.com/scripthungry/squirrelix.git
 ```
 
