@@ -15,6 +15,15 @@ defmodule Squirrelix.TypeMapper do
   Postgrex may return maps, lists, or primitives depending on the stored payload.
   `term()` matches Elixir 1.20 practice for dynamically typed JSON columns; row
   result maps still use `map()` with `required/1` keys via `row_typespec/1`.
+
+  ## Composite types
+
+  Postgres composite types (`kind: "c"`, including `create type ... as (...)`)
+  are **intentionally unsupported**. Squirrelix rejects them with an
+  `UnsupportedPostgresType` error and an actionable hint (select individual
+  fields, or cast to `json`/`jsonb`/`text`). This matches Gleam Squirrel and
+  keeps generated Elixir APIs limited to stdlib typespecs and flat row maps —
+  no nested composite modules or opaque encodings.
   """
 
   alias Squirrelix.Error.UnsupportedPostgresType
@@ -43,10 +52,17 @@ defmodule Squirrelix.TypeMapper do
     "timestamptz" => :utc_datetime
   }
 
+  @composite_hint "Postgres composite types are not supported. Select individual fields " <>
+                    "(for example `(value).field`), or cast to `json`/`jsonb`/`text` in the query."
+
+  @point_hint "Postgres geometric types such as `point` are not supported. Prefer separate " <>
+                "numeric columns, or cast to `text`/`json` if you only need a string representation."
+
   @type_hints %{
     "timestamptz" =>
       "In Postgres a timestamptz is converted to a regular timestamp using the connection's " <>
-        "time zone. This is very error prone and should be avoided in favour of using regular timestamps."
+        "time zone. This is very error prone and should be avoided in favour of using regular timestamps.",
+    "point" => @point_hint
   }
 
   @elixir_types MapSet.new([
@@ -127,11 +143,19 @@ defmodule Squirrelix.TypeMapper do
     base_type(base, nil, nil)
   end
 
+  defp base_type(name, "c", _base) do
+    {:error, unsupported_composite(name)}
+  end
+
   defp base_type(name, _kind, _base) do
     case Map.fetch(@base_types, name) do
       {:ok, type} -> {:ok, type}
       :error -> {:error, unsupported_type(name)}
     end
+  end
+
+  defp unsupported_composite(name) do
+    %UnsupportedPostgresType{name: name, hint: @composite_hint}
   end
 
   defp unsupported_type(name) do

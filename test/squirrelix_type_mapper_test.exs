@@ -45,14 +45,17 @@ defmodule SquirrelixTypeMapperTest do
            ) == {:ok, {:list, :string}}
   end
 
-  test "from_postgres rejects unsupported types" do
-    assert TypeMapper.from_postgres("point") ==
-             {:error, %UnsupportedPostgresType{name: "point", hint: nil}}
+  test "from_postgres rejects unsupported types with actionable hints" do
+    assert {:error, %UnsupportedPostgresType{name: "point", hint: hint}} =
+             TypeMapper.from_postgres("point")
+
+    assert hint =~ "point"
+    assert hint =~ ~r/text|json|numeric/i
   end
 
-  test "hint_for returns timestamptz guidance from upstream Squirrel" do
+  test "hint_for returns guidance for timestamptz and point" do
     assert TypeMapper.hint_for("timestamptz") =~ "time zone"
-    assert TypeMapper.hint_for("point") == nil
+    assert TypeMapper.hint_for("point") =~ "point"
   end
 
   test "validate_enum accepts any enum name and variant strings" do
@@ -122,12 +125,45 @@ defmodule SquirrelixTypeMapperTest do
       assert hint =~ "regular timestamps"
     end
 
-    test "from_postgres rejects point and composite-like types" do
-      assert TypeMapper.from_postgres("point") ==
-               {:error, %UnsupportedPostgresType{name: "point", hint: nil}}
+    test "from_postgres rejects point with an actionable geometric-type hint" do
+      assert {:error, %UnsupportedPostgresType{name: "point", hint: hint}} =
+               TypeMapper.from_postgres("point")
 
-      assert TypeMapper.from_postgres("squirr_elix_point") ==
-               {:error, %UnsupportedPostgresType{name: "squirr_elix_point", hint: nil}}
+      assert hint =~ "point"
+      assert hint =~ ~r/text|json|numeric/i
+    end
+
+    test "from_postgres rejects composite kinds with an actionable composite-type hint" do
+      assert {:error, %UnsupportedPostgresType{name: "squirr_elix_point", hint: hint}} =
+               TypeMapper.from_postgres("squirr_elix_point", kind: "c")
+
+      assert hint =~ "composite"
+      assert hint =~ ~r/field|json|text/i
+
+      assert {:error, %UnsupportedPostgresType{name: "squirr_elix_point", hint: ^hint}} =
+               TypeMapper.from_postgres("squirr_elix_point", kind: "c", array_dimensions: 1)
+    end
+
+    test "normalize_type rejects composite Postgres descriptors with hints" do
+      assert {:error, %UnsupportedPostgresType{name: "address", hint: hint}} =
+               TypeMapper.normalize_type(%{postgres: "address", kind: "c"})
+
+      assert hint =~ "composite"
+    end
+  end
+
+  describe "composite type policy" do
+    test "composites remain unsupported rather than mapping to maps or generated types" do
+      # Policy (issue #4): reject-with-hints. Do not map composites to map()/term()
+      # or generate nested row modules — that would expand the Elixir-native surface
+      # beyond Gleam Squirrel and dilute typed row maps.
+      assert {:error, %UnsupportedPostgresType{hint: hint}} =
+               TypeMapper.from_postgres("inventory_item", kind: "c")
+
+      refute hint == nil
+      assert hint =~ "composite"
+      refute match?({:ok, :map}, TypeMapper.from_postgres("inventory_item", kind: "c"))
+      refute match?({:ok, :string}, TypeMapper.from_postgres("inventory_item", kind: "c"))
     end
   end
 end

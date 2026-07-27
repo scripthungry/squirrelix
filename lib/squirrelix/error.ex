@@ -124,7 +124,11 @@ end
 
 defmodule Squirrelix.Error.UnsupportedPostgresType do
   @moduledoc """
-  Error returned when a Postgres type has no Elixir mapping yet.
+  Error returned when a Postgres type has no Elixir mapping.
+
+  Composite types (`create type ... as (...)`) and some built-ins such as
+  `point` are intentionally unsupported; `hint` carries actionable guidance when
+  available (see `Squirrelix.TypeMapper`).
   """
 
   @enforce_keys [:name]
