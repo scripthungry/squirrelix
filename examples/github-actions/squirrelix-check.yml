@@ -1,0 +1,83 @@
+# Adopter example: fail CI when committed sql.ex drifts from sql/ + schema.
+#
+# Copy into your app as `.github/workflows/squirrelix-check.yml` (or merge the
+# job into an existing workflow). Adjust Elixir/OTP versions, database name,
+# and migrate steps to match your project.
+#
+# Prerequisites:
+# - squirr_elix in Mix deps for :dev and :test (runtime: false)
+# - Generated sql.ex files committed alongside .sql sources
+# - Schema applied before check (Ecto migrate, or equivalent)
+#
+# Prefer live --infer when CI can run Postgres (this file). Prefer a committed
+# squirr_elix.exs from --write-metadata when jobs cannot reach Postgres — see
+# squirrelix-check-offline.yml and the Configuration guide.
+#
+# Docs: https://hexdocs.pm/squirr_elix/phoenix.html#ci-with-mix-squirrelix-check
+
+name: Squirrelix check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: squirrelix-check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  squirrelix:
+    name: mix squirrelix.check --infer
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: my_app_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      MIX_ENV: test
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/my_app_test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: erlef/setup-beam@v1
+        with:
+          # Match your app (Squirrelix requires Elixir ~> 1.20).
+          elixir-version: "1.20.0"
+          otp-version: "28.0"
+
+      - name: Cache deps and build
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-mix-${{ hashFiles('mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-mix-
+
+      - run: mix deps.get
+      - run: mix compile --warnings-as-errors
+
+      - name: Create and migrate database
+        run: |
+          mix ecto.create --quiet
+          mix ecto.migrate
+
+      - name: Check Squirrelix generated modules
+        # Non-zero exit when any sql/ directory has query errors or sql.ex drift.
+        # Equivalent with Mix aliases from the Phoenix cookbook: mix sql.check
+        run: mix squirrelix.check --infer

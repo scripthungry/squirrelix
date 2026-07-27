@@ -151,6 +151,12 @@ Verify generated code is current in CI:
 mix squirrelix.check --infer --database my_app_dev
 ```
 
+Copy-pasteable GitHub Actions workflows (Postgres + `--infer`, or offline
+metadata) are in
+[`examples/github-actions/`](examples/github-actions/). See the
+[Phoenix + CI Cookbook](guides/phoenix.md#ci-with-mix-squirrelix-check) for Mix
+aliases and when to prefer metadata export over live infer.
+
 See the [Getting Started guide](guides/getting_started.md) for a full walkthrough.
 
 ## Writing SQL queries
@@ -497,6 +503,7 @@ See [ROADMAP.md](ROADMAP.md) for completed work and remaining compatibility slic
 - [Types](guides/types.md)
 - [Configuration](guides/configuration.md)
 - [Phoenix + CI Cookbook](guides/phoenix.md)
+- [Adopter CI workflows](examples/github-actions/) — copy-pasteable GitHub Actions for `squirrelix.check`
 
 ## License
 

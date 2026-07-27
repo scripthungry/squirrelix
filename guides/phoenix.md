@@ -171,6 +171,12 @@ integration layer, build a thin wrapper in your app — it is not part of Squirr
 Commit generated `sql.ex` files. In CI, apply migrations, then fail the job when
 SQL and generated Elixir drift apart.
 
+**Copy-pasteable workflows** live in
+[`examples/github-actions/`](https://github.com/scripthungry/squirrelix/tree/main/examples/github-actions)
+(Postgres + `--infer`, and an offline metadata variant). Drop
+[`squirrelix-check.yml`](https://github.com/scripthungry/squirrelix/blob/main/examples/github-actions/squirrelix-check.yml)
+into your app’s `.github/workflows/` or merge the job into an existing pipeline.
+
 Example GitHub Actions job fragment (Postgres service + Mix):
 
 ```yaml
@@ -213,6 +219,10 @@ Notes:
   consistent with hosted Phoenix configs.
 - Generation is project-wide atomic: any query error fails the whole check. See
   [Configuration](configuration.md#atomic-generate-and-check).
+- Prefer live `--infer` when CI can run Postgres. Prefer a committed metadata
+  file from `--write-metadata` when jobs cannot reach the database — see
+  [Configuration](configuration.md#exporting-inferred-metadata) and
+  [`squirrelix-check-offline.yml`](https://github.com/scripthungry/squirrelix/blob/main/examples/github-actions/squirrelix-check-offline.yml).
 
 A shorter variant when aliases are defined:
 
@@ -236,3 +246,4 @@ A shorter variant when aliases are defined:
 - [Writing Queries](writing_queries.md) — naming, comments, nullable parameters
 - [Configuration](configuration.md) — SSL, metadata mode, programmatic API
 - [Types](types.md) — Postgres → Elixir mapping
+- [Adopter CI workflows](https://github.com/scripthungry/squirrelix/tree/main/examples/github-actions) — full GitHub Actions YAML
