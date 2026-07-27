@@ -297,18 +297,24 @@ defmodule Squirrelix.Error do
   @moduledoc """
   Formatting and normalization helpers for Squirrelix errors.
 
-  Connection failures and timeouts during `--infer` are classified with
-  `connection_error/2` into `CannotConnectToPostgres` or
-  `PostgresConnectionTimeout`, then formatted like other structured diagnostics.
+  User-facing failures (codegen, check, metadata, connection) format through
+  `format/1` with titles and actionable hints where possible. Connection failures
+  and timeouts during `--infer` are classified with `connection_error/2` into
+  `CannotConnectToPostgres` or `PostgresConnectionTimeout`.
   """
 
   alias Squirrelix.ConnectionOptions
   alias Squirrelix.Error.CannotConnectToPostgres
   alias Squirrelix.Error.CannotOverwriteFile
+  alias Squirrelix.Error.CannotReadFile
+  alias Squirrelix.Error.CannotWriteFile
   alias Squirrelix.Error.DuplicateReturnColumns
+  alias Squirrelix.Error.InvalidQueryMetadataFile
   alias Squirrelix.Error.MissingPostgresColumn
   alias Squirrelix.Error.MissingPostgresConstraint
   alias Squirrelix.Error.MissingPostgresTable
+  alias Squirrelix.Error.MissingQueryMetadata
+  alias Squirrelix.Error.MissingQueryMetadataField
   alias Squirrelix.Error.OutdatedFile
   alias Squirrelix.Error.PostgresConnectionTimeout
   alias Squirrelix.Error.PostgresInferenceError
@@ -454,6 +460,16 @@ defmodule Squirrelix.Error do
   defp do_format(%UnsupportedPostgresType{} = error), do: format_unsupported_type_error(error)
   defp do_format(%OutdatedFile{} = error), do: format_outdated_file_error(error)
   defp do_format(%CannotOverwriteFile{} = error), do: format_cannot_overwrite_file_error(error)
+  defp do_format(%CannotReadFile{} = error), do: format_cannot_read_file_error(error)
+  defp do_format(%CannotWriteFile{} = error), do: format_cannot_write_file_error(error)
+  defp do_format(%MissingQueryMetadata{} = error), do: format_missing_query_metadata_error(error)
+
+  defp do_format(%MissingQueryMetadataField{} = error),
+    do: format_missing_query_metadata_field_error(error)
+
+  defp do_format(%InvalidQueryMetadataFile{} = error),
+    do: format_invalid_query_metadata_file_error(error)
+
   defp do_format(%PostgresConnectionTimeout{} = error), do: format_connection_timeout_error(error)
   defp do_format(%CannotConnectToPostgres{} = error), do: format_cannot_connect_error(error)
 
@@ -597,6 +613,54 @@ defmodule Squirrelix.Error do
     |> Enum.join("\n")
   end
 
+  defp format_cannot_read_file_error(%CannotReadFile{} = error) do
+    [
+      "Error: Cannot read file",
+      "",
+      "I couldn't read #{error.file} because of the following error: #{posix_reason(error.reason)}."
+    ]
+    |> Enum.join("\n")
+  end
+
+  defp format_cannot_write_file_error(%CannotWriteFile{} = error) do
+    [
+      "Error: Cannot write to file",
+      "",
+      "I couldn't write to #{error.file} because of the following error: #{posix_reason(error.reason)}."
+    ]
+    |> Enum.join("\n")
+  end
+
+  defp format_missing_query_metadata_error(%MissingQueryMetadata{} = error) do
+    [
+      "Error: Missing query metadata",
+      "",
+      "I couldn't find type metadata for #{error.file}.",
+      "Hint: Add an entry to `squirr_elix.exs`, or run with `--infer` to infer types from Postgres."
+    ]
+    |> Enum.join("\n")
+  end
+
+  defp format_missing_query_metadata_field_error(%MissingQueryMetadataField{} = error) do
+    [
+      "Error: Incomplete query metadata",
+      "",
+      "The metadata for #{error.file} is missing the `#{error.field}` field.",
+      "Hint: Each metadata entry needs both `params:` and `returns:` lists."
+    ]
+    |> Enum.join("\n")
+  end
+
+  defp format_invalid_query_metadata_file_error(%InvalidQueryMetadataFile{} = error) do
+    [
+      "Error: Invalid query metadata file",
+      "",
+      "I couldn't load query metadata from #{error.file}: #{metadata_file_reason(error.reason)}.",
+      "Hint: The metadata file must evaluate to a map of query paths to `%{params: ..., returns: ...}` entries. Prefer `--write-metadata` after a successful `--infer` pass."
+    ]
+    |> Enum.join("\n")
+  end
+
   defp format_connection_timeout_error(%PostgresConnectionTimeout{} = error) do
     [
       "Error: Connection timed out",
@@ -736,6 +800,19 @@ defmodule Squirrelix.Error do
   defp connection_detail_message(nil), do: nil
   defp connection_detail_message(message) when is_binary(message), do: message
   defp connection_detail_message(other), do: inspect(other)
+
+  defp posix_reason(reason) when is_atom(reason) do
+    reason
+    |> :file.format_error()
+    |> IO.chardata_to_string()
+  end
+
+  defp posix_reason(reason), do: inspect(reason)
+
+  defp metadata_file_reason(:not_a_map), do: "it did not evaluate to a map"
+  defp metadata_file_reason(reason) when is_exception(reason), do: Exception.message(reason)
+  defp metadata_file_reason(reason) when is_binary(reason), do: reason
+  defp metadata_file_reason(reason), do: inspect(reason)
 
   defp code_block(
          %{file: file, content: content, starting_line: starting_line} = error,

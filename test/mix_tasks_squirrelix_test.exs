@@ -115,11 +115,17 @@ defmodule MixTasksSquirrelixTest do
     root = tmp_project(:acorn_counter)
     write_query(root, "select $1::text as name")
 
-    assert_raise Mix.Error, "Invalid Postgres connection URL", fn ->
-      File.cd!(root, fn ->
-        Mix.Task.run("squirrelix.gen", ["--infer", "--url", "mysql://localhost/postgres"])
-      end)
-    end
+    error =
+      assert_raise Mix.Error, fn ->
+        File.cd!(root, fn ->
+          Mix.Task.run("squirrelix.gen", ["--infer", "--url", "mysql://localhost/postgres"])
+        end)
+      end
+
+    message = Exception.message(error)
+    assert message =~ "Invalid Postgres connection URL"
+    assert message =~ "Hint:"
+    assert message =~ "postgres://"
   end
 
   test "mix squirrelix.gen rejects invalid DATABASE_URL" do
@@ -130,14 +136,66 @@ defmodule MixTasksSquirrelixTest do
     try do
       System.put_env("DATABASE_URL", "mysql://localhost/postgres")
 
-      assert_raise Mix.Error, "Invalid Postgres connection URL", fn ->
-        File.cd!(root, fn ->
-          Mix.Task.run("squirrelix.gen", ["--infer"])
-        end)
-      end
+      error =
+        assert_raise Mix.Error, fn ->
+          File.cd!(root, fn ->
+            Mix.Task.run("squirrelix.gen", ["--infer"])
+          end)
+        end
+
+      message = Exception.message(error)
+      assert message =~ "Invalid Postgres connection URL"
+      assert message =~ "Hint:"
     after
       restore_env("DATABASE_URL", previous)
     end
+  end
+
+  test "mix squirrelix.gen reports structured missing metadata errors" do
+    root = tmp_project(:acorn_counter)
+    write_query(root)
+    File.write!(Path.join(root, "squirr_elix.exs"), "%{}\n")
+
+    error =
+      assert_raise Mix.Error, fn ->
+        File.cd!(root, fn -> Mix.Task.run("squirrelix.gen", []) end)
+      end
+
+    message = Exception.message(error)
+    assert message =~ "Squirrelix generation failed"
+    assert message =~ "Missing query metadata"
+    assert message =~ "Hint:"
+    assert message =~ "--infer"
+    refute message =~ "%Squirrelix.Error.MissingQueryMetadata"
+  end
+
+  test "mix squirrelix.gen reports structured invalid metadata file errors" do
+    root = tmp_project(:acorn_counter)
+    write_query(root)
+    File.write!(Path.join(root, "squirr_elix.exs"), ":not_a_map\n")
+
+    error =
+      assert_raise Mix.Error, fn ->
+        File.cd!(root, fn -> Mix.Task.run("squirrelix.gen", []) end)
+      end
+
+    message = Exception.message(error)
+    assert message =~ "Could not load Squirrelix metadata"
+    assert message =~ "Invalid query metadata file"
+    assert message =~ "Hint:"
+    refute message =~ "%Squirrelix.Error.InvalidQueryMetadataFile"
+  end
+
+  test "mix squirrelix.gen rejects invalid options without inspect dumps" do
+    error =
+      assert_raise Mix.Error, fn ->
+        Mix.Task.run("squirrelix.gen", ["--not-a-real-flag"])
+      end
+
+    message = Exception.message(error)
+    assert message =~ "Invalid options"
+    assert message =~ "--not-a-real-flag"
+    refute message =~ "{--"
   end
 
   test "mix squirrelix.gen --infer reports structured connection refused errors" do

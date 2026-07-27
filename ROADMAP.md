@@ -88,7 +88,7 @@ cookbook, and Hex `0.1.0` / `0.2.0` / `0.3.0` / `0.4.0` releases.
 - [ ] Dialyzer-friendly generated modules (#19)
 - [ ] Public API surface audit (#20)
 - [x] Adopter CI workflow example (#21)
-- [ ] User-facing error consistency pass (#22)
+- [x] User-facing error consistency pass (#22)
 - [ ] Test coverage metrics in CI (#33)
 
 ### [v1.0.0](https://github.com/scripthungry/squirrelix/milestone/5) — Stability promise

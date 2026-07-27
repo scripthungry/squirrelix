@@ -453,13 +453,18 @@ Squirrelix reports structured errors during generation and checking. Common case
 | `QueryFileHasInvalidName` | Filename is not a valid Elixir function name | Rename the `.sql` file (a suggested name may be shown) |
 | `UnsupportedPostgresType` | Postgres type not mapped (ranges, geometric, …) | Check the Types guide; errors include actionable hints |
 | `MissingQueryMetadata` | No metadata entry for a query file | Add an entry to `squirr_elix.exs` or use `--infer` |
+| `MissingQueryMetadataField` | Metadata entry lacks `params` or `returns` | Complete both fields in `squirr_elix.exs` |
+| `InvalidQueryMetadataFile` | Metadata file is not a map / fails to evaluate | Fix `squirr_elix.exs`, or regenerate with `--write-metadata` |
+| `CannotReadFile` / `CannotWriteFile` | Filesystem read/write failure | Check paths and permissions |
 | `CannotConnectToPostgres` | `--infer` cannot reach Postgres or auth/catalog fails | Check `PG*` / `--hostname` / credentials; or use metadata mode |
 | `PostgresConnectionTimeout` | Connection attempt exceeded `PGCONNECT_TIMEOUT` / `connect_timeout` | Increase the timeout, verify host reachability, or use metadata mode |
 
-Connection failures and timeouts during `--infer` raise Mix errors with the same
-structured formatting as query diagnostics (actionable titles and hints), not raw
-Postgrex/`DBConnection` dumps. Verify `PG*` variables or `--url`, ensure Postgres
-is running, and confirm the database exists and has the expected schema.
+Generation, check, metadata, and connection failures raise Mix errors with the same
+structured formatting (actionable titles and hints), not raw `inspect/1` dumps as the
+primary message. CLI option-parse failures (`Unexpected arguments`, `Invalid options`)
+and watch-backend startup messages stay as plain Mix raises by design. Verify `PG*`
+variables or `--url`, ensure Postgres is running, and confirm the database exists and
+has the expected schema.
 
 Generation is project-wide atomic: if any `sql/` directory has query errors,
 `mix squirrelix.gen` writes nothing (no partial codegen). `mix squirrelix.check`

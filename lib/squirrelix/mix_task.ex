@@ -174,8 +174,15 @@ defmodule Squirrelix.MixTask do
   # Precedence (highest first): flags → --url → DATABASE_URL → PG* → defaults.
   defp build_connection_options(opts) do
     case CLI.resolve_connection_options(System.get_env(), opts) do
-      {:ok, connection_options} -> connection_options
-      {:error, :invalid_url} -> Mix.raise("Invalid Postgres connection URL")
+      {:ok, connection_options} ->
+        connection_options
+
+      {:error, :invalid_url} ->
+        Mix.raise("""
+        Invalid Postgres connection URL
+
+        Hint: Use a Postgres URL such as `postgres://username:password@host:port/database_name` (or `postgresql://...`).
+        """)
     end
   end
 
@@ -195,8 +202,15 @@ defmodule Squirrelix.MixTask do
     case OptionParser.parse(args, strict: @switches) do
       {opts, [], []} -> opts
       {_opts, extra, []} -> Mix.raise("Unexpected arguments: #{Enum.join(extra, " ")}")
-      {_opts, _extra, invalid} -> Mix.raise("Invalid options: #{inspect(invalid)}")
+      {_opts, _extra, invalid} -> Mix.raise("Invalid options: #{format_invalid_options(invalid)}")
     end
+  end
+
+  defp format_invalid_options(invalid) do
+    Enum.map_join(invalid, ", ", fn
+      {option, nil} -> option
+      {option, value} -> "#{option}=#{value}"
+    end)
   end
 
   defp report_generate_summary(%CodegenSummary{status: :ok, generated_count: count}) do
