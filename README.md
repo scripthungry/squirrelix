@@ -205,6 +205,11 @@ end
 Row-returning queries produce `[map()]`. Command queries (for example `insert`,
 `update`, or `delete` with no `returning` clause) return `:ok`.
 
+Each generated query also has an **additive** soft companion named `<name>_ok/arity`
+that calls `Postgrex.query/3` and returns `{:ok, result} | {:error, Exception.t()}`
+instead of raising. Soft command companions return `{:ok, num_rows}` (affected-row
+count). The raising API is unchanged — this is not a breaking change.
+
 Generated modules include a runtime helpers section with shared encode/decode
 functions. You should treat `sql.ex` as generated code — edit the `.sql` files and
 re-run `mix squirrelix.gen` instead of editing the Elixir module directly.
@@ -305,8 +310,10 @@ You can also pass individual flags: `--hostname`, `--port`, `--username`, `--pas
 and `--database`. Precedence (highest first): flags → `--url` → `DATABASE_URL` →
 `PG*` → defaults.
 
-Generated functions call `Postgrex.query!/3` and raise on database errors. Metadata
-files are evaluated Elixir — only load trusted paths.
+Generated functions call `Postgrex.query!/3` and raise on database errors. Soft
+companions (`<name>_ok/arity`) call `Postgrex.query/3` and return
+`{:ok, result} | {:error, Exception.t()}` instead. Metadata files are evaluated
+Elixir — only load trusted paths.
 
 See the [Configuration guide](guides/configuration.md) for metadata mode, the
 programmatic API, and CI setup.

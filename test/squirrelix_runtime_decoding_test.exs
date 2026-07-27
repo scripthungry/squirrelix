@@ -315,6 +315,38 @@ defmodule SquirrelixRuntimeDecodingTest do
 
       assert_received {:query!, "insert into squirrel values ($1, $2)", ["sandy", 1000]}
     end
+
+    test "soft companion returns affected row count" do
+      query =
+        typed_query(
+          "insert_squirrel.sql",
+          "insert_squirrel",
+          "insert into squirrel values ($1, $2)",
+          [
+            %Parameter{index: 1, name: "name", type: :string},
+            %Parameter{index: 2, name: "acorns", type: :integer}
+          ],
+          []
+        )
+
+      code =
+        Codegen.generate_module(Squirrelix.RuntimeSoftCommandTest.SQL, [query],
+          version: "v-test",
+          postgrex: RuntimeDecodingMock
+        )
+
+      assert code =~ "decode_command_num_rows"
+
+      [{module, _bytecode}] = Squirrelix.TestSupport.compile_string(code)
+
+      assert module.insert_squirrel_ok(
+               {RuntimeDecodingMock, self(), command: true},
+               "sandy",
+               1000
+             ) == {:ok, 1}
+
+      assert_received {:query, "insert into squirrel values ($1, $2)", ["sandy", 1000]}
+    end
   end
 
   describe "generated query functions" do
@@ -442,6 +474,16 @@ defmodule RuntimeDecodingMock do
     send(owner, {:query!, sql, params})
     %Postgrex.Result{command: :insert, columns: nil, rows: nil, num_rows: 1}
   end
+
+  def query({_module, owner, %Postgrex.Result{} = result}, sql, params) do
+    send(owner, {:query, sql, params})
+    SoftQueryResult.ok(result)
+  end
+
+  def query({_module, owner, command: true}, sql, params) do
+    send(owner, {:query, sql, params})
+    SoftQueryResult.ok(%Postgrex.Result{command: :insert, columns: nil, rows: nil, num_rows: 1})
+  end
 end
 
 defmodule RuntimeEncodingCaptureMock do
@@ -449,11 +491,21 @@ defmodule RuntimeEncodingCaptureMock do
     send(owner, {:query!, sql, params})
     %Postgrex.Result{command: :select, columns: nil, rows: nil, num_rows: 0}
   end
+
+  def query({_module, owner}, sql, params) do
+    send(owner, {:query, sql, params})
+    SoftQueryResult.ok(%Postgrex.Result{command: :select, columns: nil, rows: nil, num_rows: 0})
+  end
 end
 
 defmodule RuntimeEnumMock do
   def query!({_module, owner, %Postgrex.Result{} = result}, sql, params) do
     send(owner, {:query!, sql, params})
     result
+  end
+
+  def query({_module, owner, %Postgrex.Result{} = result}, sql, params) do
+    send(owner, {:query, sql, params})
+    SoftQueryResult.ok(result)
   end
 end

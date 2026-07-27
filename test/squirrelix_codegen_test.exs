@@ -464,6 +464,146 @@ defmodule SquirrelixCodegenTest do
     assert_received {:query!, "insert into users(name) values ($1)", ["Ada"]}
   end
 
+  test "generated soft companions use query/3 and keep raising API unchanged" do
+    query =
+      typed_query(
+        "find_user.sql",
+        "find_user",
+        "select name from users where id = $1",
+        [%Parameter{index: 1, name: "id", type: :integer}],
+        [%Column{name: "name", type: :string, nullable?: false}]
+      )
+
+    code =
+      Codegen.generate_module(Squirrelix.GeneratedSoftRowTest.SQL, [query],
+        version: "v-test",
+        postgrex: PostgrexMock
+      )
+
+    assert code =~ "@spec find_user(Postgrex.conn(), integer()) :: [find_user_row()]"
+    assert code =~ "def find_user(conn, id)"
+    assert code =~ "query!("
+    assert code =~ "def find_user_ok(conn, id)"
+    assert code =~ ".query("
+
+    assert soft_typespec(code, "find_user_ok") =~
+             ~r/\{:ok, \[find_user_row\(\)\]\} \| \{:error, Exception\.t\(\)\}/
+
+    [{module, _bytecode}] = Squirrelix.TestSupport.compile_string(code)
+
+    assert module.find_user({PostgrexMock, self()}, 123) == [%{name: "Ada"}]
+    assert_received {:query!, "select name from users where id = $1", [123]}
+
+    assert module.find_user_ok({PostgrexMock, self()}, 123) == {:ok, [%{name: "Ada"}]}
+    assert_received {:query, "select name from users where id = $1", [123]}
+  end
+
+  test "generated soft command companions return ok with num_rows" do
+    query =
+      typed_query(
+        "insert_user.sql",
+        "insert_user",
+        "insert into users(name) values ($1)",
+        [%Parameter{index: 1, name: "name", type: :string}],
+        []
+      )
+
+    code =
+      Codegen.generate_module(Squirrelix.GeneratedSoftCommandTest.SQL, [query],
+        version: "v-test",
+        postgrex: PostgrexCommandMock
+      )
+
+    assert code =~ "@spec insert_user(Postgrex.conn(), String.t()) :: :ok"
+
+    assert soft_typespec(code, "insert_user_ok") =~
+             ~r/\{:ok, non_neg_integer\(\)\} \| \{:error, Exception\.t\(\)\}/
+
+    [{module, _bytecode}] = Squirrelix.TestSupport.compile_string(code)
+
+    assert module.insert_user({PostgrexCommandMock, self()}, "Ada") == :ok
+    assert_received {:query!, "insert into users(name) values ($1)", ["Ada"]}
+
+    assert module.insert_user_ok({PostgrexCommandMock, self()}, "Ada") == {:ok, 1}
+    assert_received {:query, "insert into users(name) values ($1)", ["Ada"]}
+  end
+
+  test "soft companions return error tuples without raising" do
+    query =
+      typed_query(
+        "find_user.sql",
+        "find_user",
+        "select name from users where id = $1",
+        [%Parameter{index: 1, name: "id", type: :integer}],
+        [%Column{name: "name", type: :string, nullable?: false}]
+      )
+
+    code =
+      Codegen.generate_module(Squirrelix.GeneratedSoftErrorTest.SQL, [query],
+        version: "v-test",
+        postgrex: PostgrexSoftErrorMock
+      )
+
+    [{module, _bytecode}] = Squirrelix.TestSupport.compile_string(code)
+
+    assert {:error, %Postgrex.Error{message: "boom"}} =
+             module.find_user_ok({PostgrexSoftErrorMock, self()}, 1)
+
+    assert_received {:query, "select name from users where id = $1", [1]}
+  end
+
+  test "soft companion for bang-named query strips trailing bang" do
+    query =
+      typed_query(
+        "save!.sql",
+        "save!",
+        "insert into users(name) values ($1)",
+        [%Parameter{index: 1, name: "name", type: :string}],
+        []
+      )
+
+    code =
+      Codegen.generate_module(Squirrelix.GeneratedSoftBangNameTest.SQL, [query],
+        version: "v-test",
+        postgrex: PostgrexCommandMock
+      )
+
+    assert code =~ "def save!(conn, name)"
+    assert code =~ "def save_ok(conn, name)"
+    refute code =~ "def save!_ok("
+  end
+
+  test "soft companion is omitted when name collides with another query" do
+    queries = [
+      typed_query(
+        "find_user.sql",
+        "find_user",
+        "select name from users",
+        [],
+        [%Column{name: "name", type: :string, nullable?: false}]
+      ),
+      typed_query(
+        "find_user_ok.sql",
+        "find_user_ok",
+        "select name from users",
+        [],
+        [%Column{name: "name", type: :string, nullable?: false}]
+      )
+    ]
+
+    code =
+      Codegen.generate_module(Squirrelix.GeneratedSoftCollisionTest.SQL, queries,
+        version: "v-test"
+      )
+
+    assert code =~ "def find_user(conn)"
+    assert code =~ "def find_user_ok(conn)"
+    # Soft for find_user would be find_user_ok — skipped due to collision.
+    # Soft for find_user_ok is find_user_ok_ok.
+    assert code =~ "def find_user_ok_ok(conn)"
+    assert length(Regex.scan(~r/def find_user_ok\(/, code)) == 1
+  end
+
   test "write_directory writes a generated module next to the sql directory" do
     root = tmp_project(:acorn_counter)
     sql_directory = Path.join(root, "lib/accounts/sql")
@@ -774,6 +914,13 @@ defmodule SquirrelixCodegenTest do
       Regex.run(~r/@spec #{function_name}\([\s\S]*?\) :: ([\s\S]*?)\n  def /, code)
 
     String.trim(spec)
+  end
+
+  defp soft_typespec(code, function_name) do
+    [_, spec] =
+      Regex.run(~r/@spec #{function_name}\([\s\S]*?\) ::\s*([\s\S]*?)\n  def /, code)
+
+    spec |> String.replace(~r/\s+/, " ") |> String.trim()
   end
 
   defp row_type_fragment(code, function_name) do

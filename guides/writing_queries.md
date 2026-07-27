@@ -239,7 +239,7 @@ the column accepts `null`.
 ## Command queries
 
 Queries that do not return rows — for example `insert`, `update`, or `delete` without
-a `returning` clause — generate functions that return `:ok`:
+a `returning` clause — generate raising functions that return `:ok`:
 
 ```sql
 -- delete_user.sql
@@ -249,7 +249,35 @@ delete from users where id = $1
 ```elixir
 @spec delete_user(Postgrex.conn(), integer()) :: :ok
 def delete_user(conn, id) do
+  # ...
+end
 ```
+
+## Soft companions (additive)
+
+Every query also gets a soft companion named `<name>_ok/arity` that uses
+`Postgrex.query/3` and returns `{:ok, result} | {:error, Exception.t()}` instead of
+raising. This is **additive** — existing raising functions keep the same names and
+return shapes.
+
+```elixir
+@spec find_user_ok(Postgrex.conn(), integer()) ::
+        {:ok, [find_user_row()]} | {:error, Exception.t()}
+def find_user_ok(conn, id) do
+  # ...
+end
+
+@spec delete_user_ok(Postgrex.conn(), integer()) ::
+        {:ok, non_neg_integer()} | {:error, Exception.t()}
+def delete_user_ok(conn, id) do
+  # ...
+end
+```
+
+Soft command companions return the affected-row count as `{:ok, num_rows}`. Soft
+companions for query names ending in `!` or `?` strip that suffix before adding
+`_ok` (for example `save!` → `save_ok`). If `<name>_ok` already exists as another
+query in the same module, the soft companion is omitted to avoid a name collision.
 
 Queries with a `returning` clause produce row maps like any other select.
 

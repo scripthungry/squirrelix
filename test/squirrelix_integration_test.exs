@@ -175,4 +175,9 @@ defmodule IntegrationPostgrexMock do
 
     %Postgrex.Result{columns: ["name"], rows: [["Ada"]]}
   end
+
+  def query({_module, owner}, sql, params) do
+    send(owner, {:query, sql, params})
+    SoftQueryResult.ok(%Postgrex.Result{columns: ["name"], rows: [["Ada"]]})
+  end
 end
