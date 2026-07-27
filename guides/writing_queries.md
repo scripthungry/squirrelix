@@ -64,9 +64,9 @@ def list_active_users(conn) do
 
 Only leading `-- line comments` become the generated function `@doc`. Block comments
 (`/* ... */`) are ignored for docs, but both line and block comments (including nested
-blocks) are stripped when inferring parameter names from equality comparisons and
-`INSERT` column lists. Comments inside string literals are ignored for parameter-name
-inference as well.
+blocks) are stripped when inferring parameter names from comparisons, `INSERT` column
+lists, and `SET (columns) = (...)` bindings. Comments inside string literals are
+ignored for parameter-name inference as well.
 
 ## File and function naming
 
@@ -98,7 +98,8 @@ from
 Squirrelix infers Elixir argument names from how `$1`, `$2`, ... appear in your
 query.
 
-**Equality comparisons** (including `UPDATE ... SET`):
+**Comparisons** (including `UPDATE ... SET col = $n` and `DELETE`/`UPDATE`/`SELECT`
+`WHERE` clauses):
 
 ```sql
 update users
@@ -109,6 +110,17 @@ where
 ```
 
 Generates `update_email(conn, email, id)`.
+
+Also names parameters beside `<>`, `!=`, `<`, `>`, `<=`, `>=`, and `LIKE` /
+`ILIKE` (including `NOT LIKE` / `NOT ILIKE`):
+
+```sql
+select name from users
+where id > $1
+  and name ilike $2
+```
+
+Generates `list_users(conn, id, name)`.
 
 **`INSERT` column lists with `VALUES`:**
 
@@ -123,15 +135,43 @@ Placeholders are paired with columns by position. Literals, `DEFAULT`, and other
 non-placeholder values are skipped for naming. Multi-row `VALUES` reuse the same
 column list for each row.
 
-Inference ignores string literals and comments. When equality and `INSERT`
-inference both name the same parameter index, the equality name wins. Names that
-would shadow the `conn` parameter or other reserved names are deconflicted.
+**`SET (columns) = (...)` lists** (including `ON CONFLICT ... DO UPDATE SET`):
+
+```sql
+update users
+set (name, email) = ($1, $2)
+where id = $3
+```
+
+Generates `patch_user(conn, name, email, id)`.
+
+`ROW($1, $2)` on the right-hand side is supported the same way.
+
+Inference ignores string literals and comments. When comparison/equality naming
+and a column-list shape (`INSERT` or `SET (...)`) both name the same parameter
+index, the comparison/equality name wins. Names that would shadow the `conn`
+parameter or other reserved names are deconflicted.
 
 When the same parameter index appears more than once, Squirrelix renames arguments
 to keep generated code valid.
 
-Parameters that cannot be named from SQL fall back to `arg_1`, `arg_2`, and so on
-(for example `INSERT ... SELECT $1` without a column/placeholder pairing).
+### Naming inventory (in scope vs leftovers)
+
+| Shape | Named? |
+| --- | --- |
+| `col = $n` / `$n = col` (incl. `UPDATE ... SET`) | Yes |
+| `col` with `<>`, `!=`, `<`, `>`, `<=`, `>=` | Yes |
+| `col LIKE` / `ILIKE` / `NOT LIKE` / `NOT ILIKE $n` | Yes |
+| `INSERT (cols) VALUES (...)` placeholders | Yes |
+| `SET (cols) = ($n…)` / `ROW($n…)` (incl. `ON CONFLICT DO UPDATE`) | Yes |
+| `INSERT ... VALUES` without a column list | No → `arg_n` |
+| `INSERT ... SELECT $n` | No → `arg_n` |
+| `IN ($n…)`, `BETWEEN $n AND $m`, `= ANY($n)` | No → `arg_n` |
+| Function-wrapped columns (`lower(email) = $n`) | No → `arg_n` |
+| JSON operators (`data->>'k' = $n`) | No → `arg_n` |
+| Bare `$n IS NULL` | No → `arg_n` |
+
+Parameters that cannot be named from SQL fall back to `arg_1`, `arg_2`, and so on.
 
 ## Sort order in generated modules
 

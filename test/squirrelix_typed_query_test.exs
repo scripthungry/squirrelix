@@ -302,6 +302,35 @@ defmodule SquirrelixTypedQueryTest do
              )
   end
 
+  test "from_query infers comparison, LIKE, and SET column-list parameter names" do
+    query = %Query{
+      file: "search_and_patch_users.sql",
+      starting_line: 1,
+      name: "search_and_patch_users",
+      comment: [],
+      content: """
+      update users
+      set (name, email) = ($1, $2)
+      where id > $3
+        and bio ilike $4
+      """
+    }
+
+    assert {:ok,
+            %TypedQuery{
+              params: [
+                %Parameter{index: 1, name: "name", type: :string},
+                %Parameter{index: 2, name: "email", type: :string},
+                %Parameter{index: 3, name: "id", type: :integer},
+                %Parameter{index: 4, name: "bio", type: :string}
+              ]
+            }} =
+             TypedQuery.from_query(query,
+               params: [:string, :string, :integer, :string],
+               returns: []
+             )
+  end
+
   test "resolve_parameter_names renames arguments that would shadow decoder helpers" do
     params = [%Parameter{index: 1, name: "uuid_decoder", type: :string}]
 

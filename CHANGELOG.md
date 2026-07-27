@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Broader structural parameter naming beyond `INSERT`: comparison operators
+  (`<>`, `!=`, `<`, `>`, `<=`, `>=`), `LIKE`/`ILIKE` (including `NOT`), and
+  `SET (columns) = (...)` / `ROW(...)` lists (including `ON CONFLICT ... DO UPDATE SET`).
+  Comparison/equality names still win over column-list inference; existing
+  `UPDATE ... SET col = $n` and `INSERT (cols) VALUES` naming are unchanged.
+
 ## [0.3.0] — 2026-07-27
 
 ### Added
