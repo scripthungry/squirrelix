@@ -132,6 +132,18 @@ mix squirrelix.gen
 
 See [Configuration](configuration.md) for the full metadata format.
 
+## Watch while editing
+
+To regenerate whenever a discovered `.sql` file changes:
+
+```sh
+mix squirrelix.gen --watch
+mix squirrelix.gen --infer --watch
+```
+
+Watch uses the same metadata / `--infer` connection options as a one-shot generate.
+Press Ctrl-C to stop. See [Configuration](configuration.md#watch-mode) for details.
+
 ## Use the generated module
 
 After generation, call functions from the generated module with a Postgrex connection:

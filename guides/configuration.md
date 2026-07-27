@@ -213,6 +213,33 @@ Both `mix squirrelix.gen` and `mix squirrelix.check` accept:
 | `--password PASS` | Database password (prefer `PGPASSWORD`) |
 | `--port PORT` | Database port |
 
+`mix squirrelix.gen` also accepts:
+
+| Option | Description |
+| --- | --- |
+| `--watch` | After the initial generate, watch `{lib,test,dev}/**/sql/*.sql` and regenerate on change |
+
+## Watch mode
+
+While editing queries, keep generation in sync without re-running the Mix task by hand:
+
+```sh
+mix squirrelix.gen --watch
+mix squirrelix.gen --infer --watch
+mix squirrelix.gen --metadata config/squirr_elix.exs --watch
+```
+
+Watch mode:
+
+1. Runs a normal generate once (same query source and connection options as without `--watch`).
+2. Watches existing `lib/`, `test/`, and `dev/` trees for changes to `.sql` files that live
+   directly in a `sql/` directory.
+3. Debounces rapid editor events, then regenerates.
+4. Logs success or failure for each regenerate; failures do **not** stop the watcher.
+5. Stops cleanly on Ctrl-C.
+
+`--watch` is not supported by `mix squirrelix.check` (use check in CI for drift detection).
+
 ## Programmatic API
 
 Use `Squirrelix.generate/3` and `Squirrelix.check/3` from Elixir code:

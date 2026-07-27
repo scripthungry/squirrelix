@@ -44,6 +44,7 @@ defmodule Squirrelix.MixProject do
     [
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.37", only: :dev, runtime: false},
+      {:file_system, "~> 1.0"},
       {:postgrex, "~> 0.22"}
     ]
   end

@@ -14,6 +14,8 @@ defmodule Mix.Tasks.Squirrelix.Gen do
       mix squirrelix.gen --metadata config/squirr_elix.exs
       mix squirrelix.gen --infer --database my_app_dev
       mix squirrelix.gen --infer --write-metadata squirr_elix.exs
+      mix squirrelix.gen --watch
+      mix squirrelix.gen --infer --watch
 
   ## Options
 
@@ -23,6 +25,10 @@ defmodule Mix.Tasks.Squirrelix.Gen do
     * `--infer` — infer types from a live Postgres database instead of a metadata file
     * `--write-metadata PATH` — after a successful `--infer` pass, write inferred
       types to a metadata file for offline `gen` / `check` (requires `--infer`)
+    * `--watch` — after the initial generate, watch `{lib,test,dev}/**/sql/*.sql` and
+      regenerate when those files change. Press Ctrl-C to stop. Uses the same query
+      source / connection options as a one-shot generate; regenerate failures are
+      logged and watching continues.
     * `--url URL` — Postgres connection URL (also reads `DATABASE_URL` and `PG*`
       environment variables)
     * `--database NAME` — database name when inferring
