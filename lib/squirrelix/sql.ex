@@ -5,22 +5,44 @@ defmodule Squirrelix.SQL do
 
   @identifier ~S/(?:"(?:[^"]|"")*"|[A-Za-z_][A-Za-z0-9_]*)(?:\.(?:"(?:[^"]|"")*"|[A-Za-z_][A-Za-z0-9_]*))?/
   @horizontal_space ~S/[ \t\r]*/
+  # Longer operators first so `<=` / `>=` / `<>` / `!=` are not split into `<` / `>` / `=`.
+  @comparison_op ~S/(?:<>|!=|<=|>=|<|>|=)/
+  @like_op "(?:not" <> @horizontal_space <> ")?(?:i?like)\\b"
 
-  @left_equality Regex.compile!(
-                   "(?<identifier>" <>
-                     @identifier <>
-                     ")" <> @horizontal_space <> "=" <> @horizontal_space <> "\\$(?<index>\\d+)"
-                 )
+  @left_comparison Regex.compile!(
+                     "(?<identifier>" <>
+                       @identifier <>
+                       ")" <>
+                       @horizontal_space <>
+                       @comparison_op <>
+                       @horizontal_space <>
+                       "\\$(?<index>\\d+)"
+                   )
 
-  @right_equality Regex.compile!(
-                    "\\$(?<index>\\d+)" <>
-                      @horizontal_space <>
-                      "=" <> @horizontal_space <> "(?<identifier>" <> @identifier <> ")"
-                  )
+  @right_comparison Regex.compile!(
+                      "\\$(?<index>\\d+)" <>
+                        @horizontal_space <>
+                        @comparison_op <>
+                        @horizontal_space <>
+                        "(?<identifier>" <> @identifier <> ")"
+                    )
+
+  @left_like Regex.compile!(
+               "(?<identifier>" <>
+                 @identifier <>
+                 ")" <>
+                 @horizontal_space <>
+                 @like_op <>
+                 @horizontal_space <>
+                 "\\$(?<index>\\d+)",
+               "i"
+             )
 
   @insert_into Regex.compile!(
                  ~S/(?i)\binsert\s+into\s+(?:"(?:[^"]|"")+"|[A-Za-z_][\w$]*(?:\s*\.\s*(?:"(?:[^"]|"")+"|[A-Za-z_][\w$]*))?)\s*\(/
                )
+
+  @set_list Regex.compile!(~S/(?i)\bset\s*\(/)
 
   @placeholder_value ~r/\A\$(\d+)\z/
 
@@ -58,8 +80,9 @@ defmodule Squirrelix.SQL do
     stripped_sql = strip_comments_and_strings(sql)
 
     stripped_sql
-    |> equality_parameter_names()
+    |> comparison_parameter_names()
     |> merge_insert_parameter_names(stripped_sql)
+    |> merge_set_list_parameter_names(stripped_sql)
   end
 
   @doc """
@@ -78,8 +101,8 @@ defmodule Squirrelix.SQL do
     |> then(&(not String.contains?(&1, ";")))
   end
 
-  defp equality_parameter_names(stripped_sql) do
-    [@left_equality, @right_equality]
+  defp comparison_parameter_names(stripped_sql) do
+    [@left_comparison, @right_comparison, @left_like]
     |> Enum.flat_map(&Regex.scan(&1, stripped_sql, capture: :all_names))
     |> Enum.reduce(%{}, fn [identifier, index], names ->
       put_inferred_name(names, String.to_integer(index), identifier)
@@ -88,6 +111,12 @@ defmodule Squirrelix.SQL do
 
   defp merge_insert_parameter_names(names, stripped_sql) do
     Enum.reduce(insert_parameter_names(stripped_sql), names, fn {index, name}, acc ->
+      Map.put_new(acc, index, name)
+    end)
+  end
+
+  defp merge_set_list_parameter_names(names, stripped_sql) do
+    Enum.reduce(set_list_parameter_names(stripped_sql), names, fn {index, name}, acc ->
       Map.put_new(acc, index, name)
     end)
   end
@@ -108,6 +137,22 @@ defmodule Squirrelix.SQL do
     end)
   end
 
+  defp set_list_parameter_names(stripped_sql) do
+    @set_list
+    |> Regex.scan(stripped_sql, return: :index)
+    |> Enum.flat_map(fn [{start, length}] ->
+      after_open = start + length
+
+      columns_and_rest =
+        binary_part(stripped_sql, after_open, byte_size(stripped_sql) - after_open)
+
+      case extract_set_list_pairs(columns_and_rest) do
+        {:ok, pairs} -> pairs
+        :error -> []
+      end
+    end)
+  end
+
   defp extract_insert_pairs(sql_after_open_paren) do
     with {:ok, columns_sql, after_columns} <- take_balanced_group(sql_after_open_paren),
          {:ok, after_values} <- expect_values_keyword(after_columns),
@@ -117,7 +162,22 @@ defmodule Squirrelix.SQL do
       pairs =
         value_groups
         |> Enum.flat_map(&pair_columns_with_placeholders(columns, &1))
-        |> Enum.flat_map(&normalized_insert_pair/1)
+        |> Enum.flat_map(&normalized_column_pair/1)
+
+      {:ok, pairs}
+    end
+  end
+
+  defp extract_set_list_pairs(sql_after_open_paren) do
+    with {:ok, columns_sql, after_columns} <- take_balanced_group(sql_after_open_paren),
+         {:ok, after_eq} <- expect_equals(after_columns),
+         {:ok, values_sql, _rest} <- take_set_list_values(after_eq) do
+      columns = parse_sql_list(columns_sql)
+
+      pairs =
+        columns
+        |> pair_columns_with_placeholders(values_sql)
+        |> Enum.flat_map(&normalized_column_pair/1)
 
       {:ok, pairs}
     end
@@ -130,6 +190,27 @@ defmodule Squirrelix.SQL do
 
       nil ->
         :error
+    end
+  end
+
+  defp expect_equals(sql) do
+    case Regex.run(~r/\A\s*=/, sql) do
+      [matched] ->
+        {:ok, binary_part(sql, byte_size(matched), byte_size(sql) - byte_size(matched))}
+
+      nil ->
+        :error
+    end
+  end
+
+  defp take_set_list_values(sql) do
+    case Regex.run(~r/\A\s*row\b/i, sql) do
+      [matched] ->
+        rest = binary_part(sql, byte_size(matched), byte_size(sql) - byte_size(matched))
+        take_paren_group(rest)
+
+      nil ->
+        take_paren_group(sql)
     end
   end
 
@@ -231,7 +312,7 @@ defmodule Squirrelix.SQL do
     end)
   end
 
-  defp normalized_insert_pair({index, identifier}) do
+  defp normalized_column_pair({index, identifier}) do
     name = normalize_identifier(identifier)
     if valid_identifier?(name), do: [{index, name}], else: []
   end

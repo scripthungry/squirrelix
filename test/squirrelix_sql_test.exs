@@ -190,6 +190,93 @@ defmodule SquirrelixSQLTest do
     assert SQL.infer_parameter_names("insert into users (name) select $1") == %{}
   end
 
+  test "infer_parameter_names infers names from comparison operators" do
+    sql = """
+    select name from users
+    where id > $1
+      and created_at <= $2
+      and status <> $3
+      and score != $4
+      and $5 < max_score
+    """
+
+    assert SQL.infer_parameter_names(sql) == %{
+             1 => "id",
+             2 => "created_at",
+             3 => "status",
+             4 => "score",
+             5 => "max_score"
+           }
+  end
+
+  test "infer_parameter_names infers names from LIKE and ILIKE" do
+    sql = """
+    select name from users
+    where name like $1
+      and email ilike $2
+      and bio not like $3
+    """
+
+    assert SQL.infer_parameter_names(sql) == %{1 => "name", 2 => "email", 3 => "bio"}
+  end
+
+  test "infer_parameter_names infers names from UPDATE SET column lists" do
+    sql = """
+    update users
+    set (name, email) = ($1, $2)
+    where id = $3
+    """
+
+    assert SQL.infer_parameter_names(sql) == %{1 => "name", 2 => "email", 3 => "id"}
+  end
+
+  test "infer_parameter_names infers names from SET column lists with ROW" do
+    sql = """
+    update users
+    set (name, email) = row($1, $2)
+    where id = $3
+    """
+
+    assert SQL.infer_parameter_names(sql) == %{1 => "name", 2 => "email", 3 => "id"}
+  end
+
+  test "infer_parameter_names infers ON CONFLICT DO UPDATE SET column lists" do
+    sql = """
+    insert into users (name, email)
+    values ($1, $2)
+    on conflict (email) do update
+    set (name, active) = ($3, $4)
+    where users.id = $5
+    """
+
+    assert SQL.infer_parameter_names(sql) == %{
+             1 => "name",
+             2 => "email",
+             3 => "name",
+             4 => "active",
+             5 => "users_id"
+           }
+  end
+
+  test "infer_parameter_names prefers equality over SET list and INSERT names" do
+    sql = """
+    insert into users (name, email)
+    values ($1, $2)
+    on conflict (email) do update
+    set (name, email) = ($3, $1)
+    where users.id = $3
+    """
+
+    assert SQL.infer_parameter_names(sql) == %{1 => "name", 2 => "email", 3 => "users_id"}
+  end
+
+  test "infer_parameter_names leaves IN, BETWEEN, and function-wrapped params unnamed" do
+    assert SQL.infer_parameter_names("select * from users where id in ($1)") == %{}
+    assert SQL.infer_parameter_names("select * from users where id between $1 and $2") == %{}
+    assert SQL.infer_parameter_names("select * from users where lower(email) = $1") == %{}
+    assert SQL.infer_parameter_names("insert into users values ($1, $2)") == %{}
+  end
+
   test "valid_identifier? accepts lowercase identifiers" do
     assert SQL.valid_identifier?("squirrel_user_name")
     refute SQL.valid_identifier?("123_invalid")
