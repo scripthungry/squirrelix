@@ -250,6 +250,58 @@ defmodule SquirrelixTypedQueryTest do
              )
   end
 
+  test "from_query infers parameter names from INSERT column lists" do
+    query = %Query{
+      file: "insert_user.sql",
+      starting_line: 1,
+      name: "insert_user",
+      comment: ["Creates a user"],
+      content: "insert into users (name, email) values ($1, $2)"
+    }
+
+    assert {:ok,
+            %TypedQuery{
+              params: [
+                %Parameter{index: 1, name: "name", type: :string},
+                %Parameter{index: 2, name: "email", type: :string}
+              ]
+            }} =
+             TypedQuery.from_query(query,
+               params: [:string, :string],
+               returns: []
+             )
+  end
+
+  test "from_query keeps UPDATE SET inference and deconflicts INSERT with equality" do
+    query = %Query{
+      file: "upsert_user.sql",
+      starting_line: 1,
+      name: "upsert_user",
+      comment: [],
+      content: """
+      insert into users (name, email)
+      values ($1, $2)
+      on conflict (email) do update
+      set name = $3
+      where users.id = $4
+      """
+    }
+
+    assert {:ok,
+            %TypedQuery{
+              params: [
+                %Parameter{index: 1, name: "name", type: :string},
+                %Parameter{index: 2, name: "email", type: :string},
+                %Parameter{index: 3, name: "name", type: :string},
+                %Parameter{index: 4, name: "users_id", type: :integer}
+              ]
+            }} =
+             TypedQuery.from_query(query,
+               params: [:string, :string, :string, :integer],
+               returns: []
+             )
+  end
+
   test "resolve_parameter_names renames arguments that would shadow decoder helpers" do
     params = [%Parameter{index: 1, name: "uuid_decoder", type: :string}]
 
