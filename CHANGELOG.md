@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `DATABASE_URL` → `PG*` → defaults. URL/`PGSSLMODE` `sslmode` (and `ssl=true` /
   `ssl=false`) map into Postgrex `:ssl` options.
 
+### Changed
+
+- Project-wide atomic codegen (Gleam squirrel 4.5+ parity): if any `sql/` directory
+  has query errors, `mix squirrelix.gen` / `Squirrelix.generate/3` write nothing.
+  `mix squirrelix.check` fails globally when any directory has errors or drift.
+
 ## [0.2.0] — 2026-07-27
 
 ### Added

@@ -226,6 +226,172 @@ defmodule SquirrelixGenerateTest do
     refute File.exists?(Path.join(root, "lib/accounts/sql.ex"))
   end
 
+  test "generate refuses all writes when any sql directory has query errors" do
+    root = tmp_project(:acorn_counter)
+    good_dir = Path.join(root, "lib/accounts/sql")
+    bad_dir = Path.join(root, "lib/billing/sql")
+    File.mkdir_p!(good_dir)
+    File.mkdir_p!(bad_dir)
+
+    good_query = Path.join(good_dir, "find_account.sql")
+    bad_query = Path.join(bad_dir, "01 invalid.sql")
+
+    File.write!(good_query, "select name from accounts where id = $1")
+    File.write!(bad_query, "select 1")
+
+    metadata = %{
+      good_query => [
+        params: [:integer],
+        returns: [%{name: "name", type: :string, nullable?: false}]
+      ]
+    }
+
+    assert %CodegenSummary{
+             generated_count: 0,
+             errors: [{^bad_dir, [_error]}],
+             status: :error
+           } = Squirrelix.generate(root, metadata, version: "v-test")
+
+    refute File.exists?(Path.join(root, "lib/accounts/sql.ex"))
+    refute File.exists?(Path.join(root, "lib/billing/sql.ex"))
+  end
+
+  test "generate refuses all writes when any directory is missing metadata" do
+    root = tmp_project(:acorn_counter)
+    accounts_dir = Path.join(root, "lib/accounts/sql")
+    billing_dir = Path.join(root, "lib/billing/sql")
+    File.mkdir_p!(accounts_dir)
+    File.mkdir_p!(billing_dir)
+
+    accounts_query = Path.join(accounts_dir, "find_account.sql")
+    billing_query = Path.join(billing_dir, "find_invoice.sql")
+
+    File.write!(accounts_query, "select name from accounts where id = $1")
+    File.write!(billing_query, "select total from invoices where id = $1")
+
+    metadata = %{
+      accounts_query => [
+        params: [:integer],
+        returns: [%{name: "name", type: :string, nullable?: false}]
+      ]
+    }
+
+    assert %CodegenSummary{
+             generated_count: 0,
+             errors: [
+               {^billing_dir, [%Squirrelix.Error.MissingQueryMetadata{file: ^billing_query}]}
+             ],
+             status: :error
+           } = Squirrelix.generate(root, metadata, version: "v-test")
+
+    refute File.exists?(Path.join(root, "lib/accounts/sql.ex"))
+    refute File.exists?(Path.join(root, "lib/billing/sql.ex"))
+  end
+
+  test "check fails globally when any sql directory has query errors" do
+    root = tmp_project(:acorn_counter)
+    good_dir = Path.join(root, "lib/accounts/sql")
+    bad_dir = Path.join(root, "lib/billing/sql")
+    File.mkdir_p!(good_dir)
+    File.mkdir_p!(bad_dir)
+
+    good_query = Path.join(good_dir, "find_account.sql")
+    bad_query = Path.join(bad_dir, "find_invoice.sql")
+
+    File.write!(good_query, "select name from accounts where id = $1")
+    File.write!(bad_query, "select total from invoices where id = $1")
+
+    good_metadata = [
+      params: [:integer],
+      returns: [%{name: "name", type: :string, nullable?: false}]
+    ]
+
+    bad_metadata = [
+      params: [:integer],
+      returns: [%{name: "total", type: :integer, nullable?: false}]
+    ]
+
+    assert Squirrelix.generate(
+             root,
+             %{good_query => good_metadata, bad_query => bad_metadata},
+             version: "v-test"
+           ).status == :ok
+
+    assert %CodegenCheckSummary{
+             checked_count: 1,
+             errors: [
+               {^bad_dir, [%Squirrelix.Error.MissingQueryMetadata{file: ^bad_query}]}
+             ],
+             status: :error
+           } = Squirrelix.check(root, %{good_query => good_metadata}, version: "v-test")
+
+    assert File.exists?(Path.join(root, "lib/accounts/sql.ex"))
+    assert File.exists?(Path.join(root, "lib/billing/sql.ex"))
+  end
+
+  test "generate reports every directory error and writes nothing" do
+    root = tmp_project(:acorn_counter)
+    accounts_dir = Path.join(root, "lib/accounts/sql")
+    billing_dir = Path.join(root, "lib/billing/sql")
+    File.mkdir_p!(accounts_dir)
+    File.mkdir_p!(billing_dir)
+
+    accounts_query = Path.join(accounts_dir, "find_account.sql")
+    billing_query = Path.join(billing_dir, "find_invoice.sql")
+
+    File.write!(accounts_query, "select name from accounts where id = $1")
+    File.write!(billing_query, "select total from invoices where id = $1")
+
+    assert %CodegenSummary{
+             generated_count: 0,
+             errors: [
+               {^accounts_dir, [%Squirrelix.Error.MissingQueryMetadata{file: ^accounts_query}]},
+               {^billing_dir, [%Squirrelix.Error.MissingQueryMetadata{file: ^billing_query}]}
+             ],
+             status: :error
+           } = Squirrelix.generate(root, %{}, version: "v-test")
+
+    refute File.exists?(Path.join(root, "lib/accounts/sql.ex"))
+    refute File.exists?(Path.join(root, "lib/billing/sql.ex"))
+  end
+
+  test "generate writes every directory when all queries succeed" do
+    root = tmp_project(:acorn_counter)
+    accounts_dir = Path.join(root, "lib/accounts/sql")
+    billing_dir = Path.join(root, "lib/billing/sql")
+    File.mkdir_p!(accounts_dir)
+    File.mkdir_p!(billing_dir)
+
+    accounts_query = Path.join(accounts_dir, "find_account.sql")
+    billing_query = Path.join(billing_dir, "find_invoice.sql")
+
+    File.write!(accounts_query, "select name from accounts where id = $1")
+    File.write!(billing_query, "select total from invoices where id = $1")
+
+    metadata = %{
+      accounts_query => [
+        params: [:integer],
+        returns: [%{name: "name", type: :string, nullable?: false}]
+      ],
+      billing_query => [
+        params: [:integer],
+        returns: [%{name: "total", type: :integer, nullable?: false}]
+      ]
+    }
+
+    assert Squirrelix.generate(root, metadata, version: "v-test") == %CodegenSummary{
+             generated_count: 2,
+             errors: [],
+             status: :ok
+           }
+
+    assert File.read!(Path.join(root, "lib/accounts/sql.ex")) =~
+             "defmodule AcornCounter.Accounts.SQL do"
+
+    assert File.read!(Path.join(root, "lib/billing/sql.ex")) =~
+             "defmodule AcornCounter.Billing.SQL do"
+  end
+
   defp tmp_project(app) do
     path = Squirrelix.TestSupport.tmp_dir!("squirr_elix-generate")
 
