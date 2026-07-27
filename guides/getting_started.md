@@ -88,9 +88,13 @@ mix squirrelix.gen --infer --database my_app_dev
 Squirrelix connects to Postgres, prepares each query, and reads parameter and
 column types from Postgrex metadata.
 
-Set connection details via environment variables or flags:
+Set connection details via `DATABASE_URL`, `PG*` environment variables, or flags:
 
 ```sh
+export DATABASE_URL=postgres://postgres@localhost/my_app_dev
+mix squirrelix.gen --infer
+
+# or:
 export PGHOST=localhost
 export PGDATABASE=my_app_dev
 export PGUSER=postgres

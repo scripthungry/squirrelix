@@ -17,15 +17,16 @@ defmodule Mix.Tasks.Squirrelix.Check do
     * `--metadata PATH` — metadata file (default: `squirr_elix.exs`). Evaluated as
       Elixir — only load trusted files.
     * `--infer` — infer types from Postgres instead of reading a metadata file
-    * `--url URL` — Postgres connection URL
+    * `--url URL` — Postgres connection URL (also reads `DATABASE_URL` and `PG*`)
     * `--database NAME` — database name when inferring
     * `--hostname HOST` — database host when inferring
     * `--username USER` — database user when inferring
     * `--password PASS` — database password when inferring (prefer `PGPASSWORD`)
     * `--port PORT` — database port when inferring
 
-  Connection precedence (highest first): CLI flags → `--url` → `PG*` environment
-  variables → defaults.
+  Connection precedence (highest first): flags → `--url` → `DATABASE_URL` → `PG*` → defaults.
+
+  URLs may include `sslmode` / `ssl` query parameters. See the Configuration guide.
   """
 
   use Mix.Task

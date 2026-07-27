@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Parameter name inference from `INSERT ... (columns) VALUES (...)` placeholders
   (equality / `UPDATE ... SET` naming unchanged; equality wins on conflicts).
+- `--infer` honors `DATABASE_URL` with documented precedence: flags → `--url` →
+  `DATABASE_URL` → `PG*` → defaults. URL/`PGSSLMODE` `sslmode` (and `ssl=true` /
+  `ssl=false`) map into Postgrex `:ssl` options.
 
 ## [0.2.0] — 2026-07-27
 

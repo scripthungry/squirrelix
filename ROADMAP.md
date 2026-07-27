@@ -73,9 +73,9 @@ parameter-name/Gleam parity ports, and Hex `0.1.0` / `0.2.0` releases.
 
 ### [v0.3.0](https://github.com/scripthungry/squirrelix/milestone/2) — Phoenix/Mix adoption DX
 
-- [ ] `DATABASE_URL` + SSL for `--infer` (#9)
+- [x] `DATABASE_URL` + SSL for `--infer` (#9)
 - [ ] Project-wide atomic generate/check (#10)
-- [ ] INSERT/VALUES parameter names (#11)
+- [x] INSERT/VALUES parameter names (#11)
 - [ ] Generated runtime ergonomics: soft errors and/or command row counts (#12)
 - [ ] Docs/ROADMAP hygiene for 0.3.0 (#13)
 

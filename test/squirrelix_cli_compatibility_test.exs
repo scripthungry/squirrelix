@@ -14,7 +14,8 @@ defmodule SquirrelixCliCompatibilityTest do
               user: "user",
               password: "pass",
               database: "my_db",
-              timeout_seconds: 11
+              timeout_seconds: 11,
+              ssl: nil
             }} =
              CLI.parse_connection_url("postgres://user:pass@db:5433/my_db?connect_timeout=11")
 
@@ -25,7 +26,8 @@ defmodule SquirrelixCliCompatibilityTest do
               user: "user",
               password: "pass",
               database: "my_db",
-              timeout_seconds: 11
+              timeout_seconds: 11,
+              ssl: nil
             }} =
              CLI.parse_connection_url("postgresql://user:pass@db:5433/my_db?connect_timeout=11")
   end
@@ -43,7 +45,8 @@ defmodule SquirrelixCliCompatibilityTest do
               user: "postgres",
               password: "",
               database: "database",
-              timeout_seconds: 5
+              timeout_seconds: 5,
+              ssl: nil
             }} = CLI.parse_connection_url("postgres://")
   end
 
@@ -64,7 +67,8 @@ defmodule SquirrelixCliCompatibilityTest do
                user: "alice",
                password: "secret",
                database: "app_db",
-               timeout_seconds: 8
+               timeout_seconds: 8,
+               ssl: false
              }
   end
 
@@ -76,7 +80,8 @@ defmodule SquirrelixCliCompatibilityTest do
                user: "postgres",
                password: "",
                database: "squirr_elix",
-               timeout_seconds: 5
+               timeout_seconds: 5,
+               ssl: false
              }
 
     assert CLI.connection_options_from_variables(%{}, nil) ==
@@ -86,7 +91,8 @@ defmodule SquirrelixCliCompatibilityTest do
                user: "postgres",
                password: "",
                database: "database",
-               timeout_seconds: 5
+               timeout_seconds: 5,
+               ssl: false
              }
   end
 

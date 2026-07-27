@@ -119,7 +119,11 @@ defmodule Squirrelix.Postgres do
     end
   end
 
-  defp postgrex_opts(%ConnectionOptions{} = connection_options) do
+  @doc """
+  Converts Squirrelix connection options into a Postgrex `start_link/1` keyword list.
+  """
+  @spec postgrex_opts(ConnectionOptions.t()) :: keyword()
+  def postgrex_opts(%ConnectionOptions{} = connection_options) do
     [
       hostname: connection_options.host,
       port: connection_options.port,
@@ -128,6 +132,7 @@ defmodule Squirrelix.Postgres do
       database: connection_options.database,
       timeout: connection_options.timeout_seconds * 1000,
       connect_timeout: connection_options.timeout_seconds * 1000,
+      ssl: connection_options.ssl || false,
       types: Postgrex.DefaultTypes
     ]
     |> Enum.reject(fn {_key, value} -> is_nil(value) end)

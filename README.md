@@ -255,12 +255,14 @@ mix squirrelix.gen --metadata config/squirr_elix.exs
 ```
 
 **Postgres inferrer** — connects to a database, prepares each query, and reads
-parameter and column types from Postgrex. Pass connection options on the CLI or
-via `PG*` environment variables:
+parameter and column types from Postgrex. Pass connection options on the CLI,
+via `DATABASE_URL`, or via `PG*` environment variables:
 
 ```sh
 mix squirrelix.gen --infer --database my_app_dev
 mix squirrelix.gen --infer --url postgres://localhost/my_app_dev
+export DATABASE_URL=postgres://localhost/my_app_dev?sslmode=require
+mix squirrelix.gen --infer
 ```
 
 The programmatic API mirrors this split — see `Squirrelix.generate/3` and
@@ -271,28 +273,37 @@ The programmatic API mirrors this split — see `Squirrelix.generate/3` and
 In order to understand the type of your queries, Squirrelix needs to connect to
 the Postgres server where the database schema is defined when you use `--infer`.
 
-Pass a connection URL on the CLI (prefer `PGPASSWORD` over embedding passwords in
-the URL or `--password`):
+Pass a connection URL on the CLI, or set `DATABASE_URL` (prefer env secrets over
+embedding passwords in a URL or `--password`):
 
 ```sh
+export DATABASE_URL=postgres://user@host:5432/database?sslmode=require
+mix squirrelix.gen --infer
+
+# or:
 mix squirrelix.gen --infer --url postgres://user@host:5432/database?connect_timeout=5
 ```
+
+URL `sslmode` / `ssl` query parameters map into Postgrex `:ssl` options (see the
+[Configuration](guides/configuration.md) guide). Unix sockets are not supported.
 
 Or set [Postgres environment variables](https://www.postgresql.org/docs/current/libpq-envars.html).
 When a value is not set, Squirrelix uses these defaults:
 
 | Variable | Default |
 | --- | --- |
+| `DATABASE_URL` | _(unset — fall back to `PG*`)_ |
 | `PGHOST` | `"localhost"` |
 | `PGPORT` | `5432` |
 | `PGUSER` | `"postgres"` |
 | `PGDATABASE` | `"postgres"` |
 | `PGPASSWORD` | `""` |
 | `PGCONNECT_TIMEOUT` | `5` seconds |
+| `PGSSLMODE` | _(no SSL)_ |
 
 You can also pass individual flags: `--hostname`, `--port`, `--username`, `--password`,
-and `--database`. Precedence (highest first): CLI flags → `--url` → environment →
-defaults.
+and `--database`. Precedence (highest first): flags → `--url` → `DATABASE_URL` →
+`PG*` → defaults.
 
 Generated functions call `Postgrex.query!/3` and raise on database errors. Metadata
 files are evaluated Elixir — only load trusted paths.
