@@ -108,6 +108,88 @@ defmodule SquirrelixSQLTest do
     assert SQL.infer_parameter_names(sql) == %{1 => long_name}
   end
 
+  test "infer_parameter_names infers names from INSERT column lists and VALUES" do
+    sql = """
+    insert into users (name, email)
+    values ($1, $2)
+    """
+
+    assert SQL.infer_parameter_names(sql) == %{1 => "name", 2 => "email"}
+  end
+
+  test "infer_parameter_names infers UPDATE SET names via equality" do
+    sql = """
+    update users
+    set name = $1, email = $2
+    where id = $3
+    """
+
+    assert SQL.infer_parameter_names(sql) == %{1 => "name", 2 => "email", 3 => "id"}
+  end
+
+  test "infer_parameter_names handles quoted and table-qualified INSERT columns" do
+    sql = ~s|insert into users (users.name, "special id") values ($1, $2)|
+
+    assert SQL.infer_parameter_names(sql) == %{1 => "users_name", 2 => "special_id"}
+  end
+
+  test "infer_parameter_names pairs INSERT columns with placeholders amid literals" do
+    sql = """
+    insert into users (name, active, email)
+    values ($1, true, $2)
+    """
+
+    assert SQL.infer_parameter_names(sql) == %{1 => "name", 2 => "email"}
+  end
+
+  test "infer_parameter_names maps multi-row INSERT VALUES to the column list" do
+    sql = """
+    insert into users (name, email)
+    values ($1, $2), ($3, $4)
+    """
+
+    assert SQL.infer_parameter_names(sql) == %{
+             1 => "name",
+             2 => "email",
+             3 => "name",
+             4 => "email"
+           }
+  end
+
+  test "infer_parameter_names prefers equality names over INSERT column names" do
+    sql = """
+    insert into users (name, email)
+    values ($1, $2)
+    on conflict (email) do update
+    set name = $1
+    where users.id = $3
+    """
+
+    assert SQL.infer_parameter_names(sql) == %{1 => "name", 2 => "email", 3 => "users_id"}
+  end
+
+  test "infer_parameter_names ignores INSERT comments when naming parameters" do
+    sql = """
+    insert into users (
+      -- not_a_column
+      name,
+      email
+    )
+    values (
+      /* $1 = fake */
+      $1,
+      $2
+    )
+    """
+
+    assert SQL.infer_parameter_names(sql) == %{1 => "name", 2 => "email"}
+  end
+
+  test "infer_parameter_names leaves non-placeholder INSERT values unnamed" do
+    assert SQL.infer_parameter_names("insert into users (name) values (default)") == %{}
+    assert SQL.infer_parameter_names("insert into users (name) select $1") == %{}
+  end
+
   test "valid_identifier? accepts lowercase identifiers" do
     assert SQL.valid_identifier?("squirrel_user_name")
     refute SQL.valid_identifier?("123_invalid")

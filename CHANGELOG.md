@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Parameter name inference from `INSERT ... (columns) VALUES (...)` placeholders
+  (equality / `UPDATE ... SET` naming unchanged; equality wins on conflicts).
+
 ## [0.2.0] — 2026-07-27
 
 ### Added

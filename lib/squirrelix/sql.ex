@@ -18,6 +18,12 @@ defmodule Squirrelix.SQL do
                       "=" <> @horizontal_space <> "(?<identifier>" <> @identifier <> ")"
                   )
 
+  @insert_into Regex.compile!(
+                 ~S/(?i)\binsert\s+into\s+(?:"(?:[^"]|"")+"|[A-Za-z_][\w$]*(?:\s*\.\s*(?:"(?:[^"]|"")+"|[A-Za-z_][\w$]*))?)\s*\(/
+               )
+
+  @placeholder_value ~r/\A\$(\d+)\z/
+
   @spec valid_identifier?(String.t()) :: boolean()
   def valid_identifier?(identifier) when is_binary(identifier) do
     String.match?(identifier, ~r/\A[a-z_][A-Za-z0-9_]*\z/)
@@ -51,17 +57,9 @@ defmodule Squirrelix.SQL do
   def infer_parameter_names(sql) when is_binary(sql) do
     stripped_sql = strip_comments_and_strings(sql)
 
-    [@left_equality, @right_equality]
-    |> Enum.flat_map(&Regex.scan(&1, stripped_sql, capture: :all_names))
-    |> Enum.reduce(%{}, fn [identifier, index], names ->
-      name = normalize_identifier(identifier)
-
-      if valid_identifier?(name) do
-        Map.put_new(names, String.to_integer(index), name)
-      else
-        names
-      end
-    end)
+    stripped_sql
+    |> equality_parameter_names()
+    |> merge_insert_parameter_names(stripped_sql)
   end
 
   @doc """
@@ -78,6 +76,218 @@ defmodule Squirrelix.SQL do
     |> String.trim_trailing(";")
     |> String.trim()
     |> then(&(not String.contains?(&1, ";")))
+  end
+
+  defp equality_parameter_names(stripped_sql) do
+    [@left_equality, @right_equality]
+    |> Enum.flat_map(&Regex.scan(&1, stripped_sql, capture: :all_names))
+    |> Enum.reduce(%{}, fn [identifier, index], names ->
+      put_inferred_name(names, String.to_integer(index), identifier)
+    end)
+  end
+
+  defp merge_insert_parameter_names(names, stripped_sql) do
+    Enum.reduce(insert_parameter_names(stripped_sql), names, fn {index, name}, acc ->
+      Map.put_new(acc, index, name)
+    end)
+  end
+
+  defp insert_parameter_names(stripped_sql) do
+    @insert_into
+    |> Regex.scan(stripped_sql, return: :index)
+    |> Enum.flat_map(fn [{start, length}] ->
+      after_open = start + length
+
+      columns_and_rest =
+        binary_part(stripped_sql, after_open, byte_size(stripped_sql) - after_open)
+
+      case extract_insert_pairs(columns_and_rest) do
+        {:ok, pairs} -> pairs
+        :error -> []
+      end
+    end)
+  end
+
+  defp extract_insert_pairs(sql_after_open_paren) do
+    with {:ok, columns_sql, after_columns} <- take_balanced_group(sql_after_open_paren),
+         {:ok, after_values} <- expect_values_keyword(after_columns),
+         {:ok, value_groups} <- take_value_groups(after_values) do
+      columns = parse_sql_list(columns_sql)
+
+      pairs =
+        value_groups
+        |> Enum.flat_map(&pair_columns_with_placeholders(columns, &1))
+        |> Enum.flat_map(&normalized_insert_pair/1)
+
+      {:ok, pairs}
+    end
+  end
+
+  defp expect_values_keyword(sql) do
+    case Regex.run(~r/\A\s*values\b/i, sql) do
+      [matched] ->
+        {:ok, binary_part(sql, byte_size(matched), byte_size(sql) - byte_size(matched))}
+
+      nil ->
+        :error
+    end
+  end
+
+  defp take_value_groups(sql) do
+    case take_paren_group(sql) do
+      {:ok, first, rest} -> collect_value_groups(rest, [first])
+      :error -> :error
+    end
+  end
+
+  defp collect_value_groups(sql, groups) do
+    case Regex.run(~r/\A\s*,/, sql) do
+      [matched] ->
+        rest = binary_part(sql, byte_size(matched), byte_size(sql) - byte_size(matched))
+
+        case take_paren_group(rest) do
+          {:ok, group, rest_after} -> collect_value_groups(rest_after, [group | groups])
+          :error -> {:ok, Enum.reverse(groups)}
+        end
+
+      nil ->
+        {:ok, Enum.reverse(groups)}
+    end
+  end
+
+  defp take_paren_group(sql) do
+    case Regex.run(~r/\A\s*\(/, sql) do
+      [matched] ->
+        rest = binary_part(sql, byte_size(matched), byte_size(sql) - byte_size(matched))
+        take_balanced_group(rest)
+
+      nil ->
+        :error
+    end
+  end
+
+  defp take_balanced_group(sql) do
+    sql
+    |> String.to_charlist()
+    |> take_until_matching_paren(1, [])
+  end
+
+  defp take_until_matching_paren([], _depth, _acc), do: :error
+
+  defp take_until_matching_paren([?( | rest], depth, acc) do
+    take_until_matching_paren(rest, depth + 1, [?( | acc])
+  end
+
+  defp take_until_matching_paren([?) | rest], 1, acc) do
+    {:ok, acc |> Enum.reverse() |> List.to_string(), List.to_string(rest)}
+  end
+
+  defp take_until_matching_paren([?) | rest], depth, acc) do
+    take_until_matching_paren(rest, depth - 1, [?) | acc])
+  end
+
+  defp take_until_matching_paren([?" | rest], depth, acc) do
+    case take_quoted_identifier(rest, [?" | acc]) do
+      {:ok, quoted_acc, rest} -> take_until_matching_paren(rest, depth, quoted_acc)
+      :error -> :error
+    end
+  end
+
+  defp take_until_matching_paren([char | rest], depth, acc) do
+    take_until_matching_paren(rest, depth, [char | acc])
+  end
+
+  defp take_quoted_identifier([], _acc), do: :error
+
+  defp take_quoted_identifier([?", ?" | rest], acc) do
+    take_quoted_identifier(rest, [?", ?" | acc])
+  end
+
+  defp take_quoted_identifier([?" | rest], acc) do
+    {:ok, [?" | acc], rest}
+  end
+
+  defp take_quoted_identifier([char | rest], acc) do
+    take_quoted_identifier(rest, [char | acc])
+  end
+
+  defp parse_sql_list(list_sql) do
+    list_sql
+    |> split_sql_list()
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+  end
+
+  defp pair_columns_with_placeholders(columns, values_sql) do
+    values = parse_sql_list(values_sql)
+
+    columns
+    |> Enum.zip(values)
+    |> Enum.flat_map(fn {column, value} ->
+      case Regex.run(@placeholder_value, value) do
+        [_, index] -> [{String.to_integer(index), column}]
+        nil -> []
+      end
+    end)
+  end
+
+  defp normalized_insert_pair({index, identifier}) do
+    name = normalize_identifier(identifier)
+    if valid_identifier?(name), do: [{index, name}], else: []
+  end
+
+  defp put_inferred_name(names, index, identifier) do
+    name = normalize_identifier(identifier)
+
+    if valid_identifier?(name) do
+      Map.put_new(names, index, name)
+    else
+      names
+    end
+  end
+
+  defp split_sql_list(list) do
+    list
+    |> String.to_charlist()
+    |> split_sql_list_chars(0, false, [], [])
+    |> Enum.reverse()
+    |> Enum.map(&List.to_string/1)
+  end
+
+  defp split_sql_list_chars([], _depth, _in_quote, current, parts) do
+    [Enum.reverse(current) | parts]
+  end
+
+  defp split_sql_list_chars([?" | rest], depth, false, current, parts) do
+    split_sql_list_chars(rest, depth, true, [?" | current], parts)
+  end
+
+  defp split_sql_list_chars([?", ?" | rest], depth, true, current, parts) do
+    split_sql_list_chars(rest, depth, true, [?", ?" | current], parts)
+  end
+
+  defp split_sql_list_chars([?" | rest], depth, true, current, parts) do
+    split_sql_list_chars(rest, depth, false, [?" | current], parts)
+  end
+
+  defp split_sql_list_chars([char | rest], depth, true, current, parts) do
+    split_sql_list_chars(rest, depth, true, [char | current], parts)
+  end
+
+  defp split_sql_list_chars([?( | rest], depth, false, current, parts) do
+    split_sql_list_chars(rest, depth + 1, false, [?( | current], parts)
+  end
+
+  defp split_sql_list_chars([?) | rest], depth, false, current, parts) when depth > 0 do
+    split_sql_list_chars(rest, depth - 1, false, [?) | current], parts)
+  end
+
+  defp split_sql_list_chars([?, | rest], 0, false, current, parts) do
+    split_sql_list_chars(rest, 0, false, [], [Enum.reverse(current) | parts])
+  end
+
+  defp split_sql_list_chars([char | rest], depth, false, current, parts) do
+    split_sql_list_chars(rest, depth, false, [char | current], parts)
   end
 
   defp normalize_identifier(identifier) do

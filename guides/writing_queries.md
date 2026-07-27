@@ -64,8 +64,9 @@ def list_active_users(conn) do
 
 Only leading `-- line comments` become the generated function `@doc`. Block comments
 (`/* ... */`) are ignored for docs, but both line and block comments (including nested
-blocks) are stripped when inferring parameter names from equality comparisons. Comments
-inside string literals are ignored for parameter-name inference as well.
+blocks) are stripped when inferring parameter names from equality comparisons and
+`INSERT` column lists. Comments inside string literals are ignored for parameter-name
+inference as well.
 
 ## File and function naming
 
@@ -95,25 +96,42 @@ from
 ## Parameter naming
 
 Squirrelix infers Elixir argument names from how `$1`, `$2`, ... appear in your
-query. For example:
+query.
+
+**Equality comparisons** (including `UPDATE ... SET`):
 
 ```sql
-select *
-from
-  users
+update users
+set
+  email = $1
 where
-  id = $1
-  and email = $2
+  id = $2
 ```
 
-Generates `find_user(conn, id, email)`.
+Generates `update_email(conn, email, id)`.
 
-Inference considers equality comparisons, ignores string literals and comments, and
-deconflicts names that would shadow the `conn` parameter or other reserved
-names.
+**`INSERT` column lists with `VALUES`:**
+
+```sql
+insert into users (name, email)
+values ($1, $2)
+```
+
+Generates `insert_user(conn, name, email)`.
+
+Placeholders are paired with columns by position. Literals, `DEFAULT`, and other
+non-placeholder values are skipped for naming. Multi-row `VALUES` reuse the same
+column list for each row.
+
+Inference ignores string literals and comments. When equality and `INSERT`
+inference both name the same parameter index, the equality name wins. Names that
+would shadow the `conn` parameter or other reserved names are deconflicted.
 
 When the same parameter index appears more than once, Squirrelix renames arguments
 to keep generated code valid.
+
+Parameters that cannot be named from SQL fall back to `arg_1`, `arg_2`, and so on
+(for example `INSERT ... SELECT $1` without a column/placeholder pairing).
 
 ## Sort order in generated modules
 
