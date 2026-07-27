@@ -240,6 +240,9 @@ Watch mode:
 
 `--watch` is not supported by `mix squirrelix.check` (use check in CI for drift detection).
 
+On Linux, watch mode needs [inotify-tools](https://github.com/rvoicilas/inotify-tools/wiki)
+(e.g. `apt install inotify-tools`). macOS and Windows use built-in file-system backends.
+
 ## Programmatic API
 
 Use `Squirrelix.generate/3` and `Squirrelix.check/3` from Elixir code:

@@ -46,7 +46,7 @@ defmodule Squirrelix.Watch do
           [dirs: dirs]
           |> Keyword.merge(Application.get_env(:squirr_elix, :watch_filesystem_opts, []))
 
-        {:ok, watcher_pid} = FileSystem.start_link(filesystem_opts)
+        watcher_pid = start_filesystem!(filesystem_opts)
         FileSystem.subscribe(watcher_pid)
 
         if is_function(after_start, 1) do
@@ -60,6 +60,24 @@ defmodule Squirrelix.Watch do
           timer: nil,
           on_change: on_change
         })
+    end
+  end
+
+  defp start_filesystem!(filesystem_opts) do
+    case FileSystem.start_link(filesystem_opts) do
+      {:ok, pid} ->
+        pid
+
+      :ignore ->
+        Mix.raise("""
+        Could not start the file watcher (FileSystem returned :ignore).
+
+        On Linux, install inotify-tools (e.g. `apt install inotify-tools`).
+        See https://github.com/rvoicilas/inotify-tools/wiki
+        """)
+
+      {:error, reason} ->
+        Mix.raise("Could not start the file watcher: #{inspect(reason)}")
     end
   end
 
