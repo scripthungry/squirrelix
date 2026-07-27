@@ -85,7 +85,7 @@ Gleam records, custom enum ADTs, or opaque tagged error values.
 
 - **Release**
   - [x] Harden codegen escaping, EXPLAIN path, overwrite markers, and release docs.
-  - [ ] Publish `0.1.0` to Hex and enable HexDocs at <https://hexdocs.pm/squirr_elix>.
+  - [x] Publish `0.1.0` to Hex and enable HexDocs at <https://hexdocs.pm/squirr_elix>.
 
 ## Validation discipline
 

@@ -94,16 +94,20 @@ and it's pretty-printed, standard Elixir code. So now you get the best of both w
 
 ## Installation
 
-Add Squirrelix to your `mix.exs` dependencies:
+Add Squirrelix as a **dev/test** dependency (codegen Mix tool) and keep Postgrex as a
+**runtime** dependency for generated query modules:
 
 ```elixir
 def deps do
   [
-    {:squirr_elix, "~> 0.1.0"},
+    {:squirr_elix, "~> 0.1.0", only: [:dev, :test], runtime: false},
     {:postgrex, "~> 0.22"}
   ]
 end
 ```
+
+`only: [:dev, :test]` keeps the generator out of production while still available for
+`mix squirrelix.check` in CI. `runtime: false` prevents starting it with your app.
 
 Then fetch dependencies:
 

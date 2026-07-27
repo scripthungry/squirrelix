@@ -5,25 +5,26 @@ query, and generating typed Elixir modules.
 
 ## Add the dependency
 
-Add Squirrelix and Postgrex to your `mix.exs`:
+Squirrelix is a **codegen Mix tool** — keep it out of production. Postgrex stays a
+**runtime** dependency because generated modules call it:
 
 ```elixir
 def deps do
   [
-    {:squirr_elix, "~> 0.1.0"},
+    {:squirr_elix, "~> 0.1.0", only: [:dev, :test], runtime: false},
     {:postgrex, "~> 0.22"}
   ]
 end
 ```
+
+Include `:test` so `mix squirrelix.check` works in CI (`MIX_ENV=test`). Use
+`runtime: false` so Squirrelix is not started with your application.
 
 Then run:
 
 ```sh
 mix deps.get
 ```
-
-Squirrelix is typically a **dev dependency** — you run code generation at build or
-CI time rather than at runtime in production. Add it under `only: :dev` if you prefer.
 
 ## Project layout
 
