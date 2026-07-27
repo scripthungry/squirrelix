@@ -52,6 +52,9 @@ Gleam records, custom enum ADTs, or opaque tagged error values.
 - **Mix tasks and configuration**
   - [x] Metadata-file mode (`squirr_elix.exs` or `--metadata`).
   - [x] `--infer` mode with Postgrex connection options and `PG*` environment defaults.
+  - [x] `--infer` honors `DATABASE_URL` / SSL (`sslmode`) with documented precedence.
+  - [x] Project-wide atomic generate/check (refuse all writes if any query errors).
+  - [x] INSERT/VALUES structural parameter naming.
   - [x] `mix squirrelix.gen` and `mix squirrelix.check` task documentation.
   - [x] Programmatic `Squirrelix.generate/3` and `Squirrelix.check/3` API.
 
@@ -69,17 +72,11 @@ Gleam-aligned where intentional, with a SemVer stability promise — not infinit
 
 ### Shipped slices (folded into Completed above)
 
-Post-0.1 roadmap items through **v0.2.0** are done: nullability expansion, structured
+Post-0.1 roadmap items through **v0.3.0** are done: nullability expansion, structured
 connection/timeout errors, ranges/unsupported built-ins, composite reject-with-hints,
-parameter-name/Gleam parity ports, and Hex `0.1.0` / `0.2.0` releases.
-
-### [v0.3.0](https://github.com/scripthungry/squirrelix/milestone/2) — Phoenix/Mix adoption DX
-
-- [x] `DATABASE_URL` + SSL for `--infer` (#9)
-- [x] Project-wide atomic generate/check (#10)
-- [x] INSERT/VALUES parameter names (#11)
-- [x] Generated runtime ergonomics: soft errors and/or command row counts (#12)
-- [ ] Docs/ROADMAP hygiene for 0.3.0 (#13)
+parameter-name/Gleam parity ports, Phoenix-ready `DATABASE_URL`/SSL `--infer`, atomic
+codegen, INSERT/VALUES parameter names, additive soft query companions with command
+row counts, and Hex `0.1.0` / `0.2.0` / `0.3.0` releases.
 
 ### [v0.4.0](https://github.com/scripthungry/squirrelix/milestone/3) — Day-to-day workflow & adoption docs
 

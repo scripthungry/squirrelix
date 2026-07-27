@@ -115,8 +115,6 @@ type for both inference and code generation.
 
 ## Unsupported types
 
-## Unsupported types
-
 Some Postgres types are intentionally unsupported. When inference encounters them,
 Squirrelix returns `UnsupportedPostgresType` with the type name and an actionable
 hint where one is defined.
