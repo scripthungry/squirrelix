@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Nullability inference for schema-qualified tables, scalar subqueries in select
   lists, and expression-derived columns (see Writing Queries guide).
+- Structured errors for `--infer` connection failures and timeouts
+  (`CannotConnectToPostgres`, `PostgresConnectionTimeout`) with actionable hints
+  for `PG*` env vars, CLI flags, and metadata-file fallback.
 
 ### Changed
 

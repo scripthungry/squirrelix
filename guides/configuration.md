@@ -29,6 +29,12 @@ mix squirrelix.gen --infer --database my_app_dev
 The database must exist, be reachable, and have the schema your queries reference
 (migrations applied).
 
+If connection fails, Squirrelix reports a structured error (refused host/port,
+timeout, invalid credentials, or missing database) with hints for `PG*` variables
+and Mix flags. Timeouts are reported separately from other connection failures.
+When you cannot reach Postgres at generation time, use a metadata file instead of
+`--infer` (see below).
+
 ### Connection URL
 
 Prefer putting secrets in the environment (`PGPASSWORD`) rather than in a URL or

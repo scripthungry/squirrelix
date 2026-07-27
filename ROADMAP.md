@@ -69,7 +69,7 @@ Gleam records, custom enum ADTs, or opaque tagged error values.
 - **Postgres inference**
   - [x] Expand nullability for schema-qualified tables, subqueries in select lists, and
     expression-derived columns where practical.
-  - [ ] Improve structured errors for connection failures and timeouts.
+  - [x] Improve structured errors for connection failures and timeouts.
 
 - **Type mapping**
   - [x] Document and finalize behavior for Postgres ranges and remaining unsupported built-ins.
