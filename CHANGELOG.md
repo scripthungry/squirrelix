@@ -7,15 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-07-27
+
 ### Added
 
 - Generated soft companions (`<name>_ok/arity`) via `Postgrex.query/3` that return
   `{:ok, result} | {:error, Exception.t()}` without raising. Soft command companions
   return `{:ok, num_rows}` (affected-row count). The raising `query!` API is unchanged
   (**additive**, not breaking). See Writing Queries and Getting Started guides.
-
-### Added
-
 - Parameter name inference from `INSERT ... (columns) VALUES (...)` placeholders
   (equality / `UPDATE ... SET` naming unchanged; equality wins on conflicts).
 - `--infer` honors `DATABASE_URL` with documented precedence: flags → `--url` →
