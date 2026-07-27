@@ -140,6 +140,28 @@ mix squirrelix.gen --metadata config/squirr_elix.exs
 mix squirrelix.check --metadata config/squirr_elix.exs
 ```
 
+### Exporting inferred metadata
+
+Some CI jobs cannot reach Postgres. Capture types once with `--infer`, then run
+offline check from the written metadata file:
+
+```sh
+# Locally or in a migrate job with Postgres available:
+mix squirrelix.gen --infer --database my_app_dev --write-metadata squirr_elix.exs
+
+# Later, offline (no database):
+mix squirrelix.check
+# or:
+mix squirrelix.check --metadata squirr_elix.exs
+```
+
+`--write-metadata PATH` requires `--infer`. It writes after a successful inference
+pass (all queries typed with no errors) and overwrites `PATH`. Commit the file if
+offline CI should use it.
+
+The export is ordinary evaluated Elixir in the same shape as a hand-written
+metadata file — treat it like `mix.exs` and never load untrusted paths.
+
 ### Format
 
 The file is **evaluated as Elixir** (like `mix.exs`) and must return a map. Only
@@ -183,6 +205,7 @@ Both `mix squirrelix.gen` and `mix squirrelix.check` accept:
 | --- | --- |
 | `--metadata PATH` | Metadata file path (default: `squirr_elix.exs`) |
 | `--infer` | Infer types from Postgres instead of metadata |
+| `--write-metadata PATH` | Write inferred types to a metadata file (requires `--infer`) |
 | `--url URL` | Postgres connection URL |
 | `--database NAME` | Database name |
 | `--hostname HOST` | Database host |
@@ -243,8 +266,24 @@ A typical CI step runs the check task after migrations:
   run: mix squirrelix.check --infer
 ```
 
-Commit generated `sql.ex` files alongside your `.sql` sources so CI verifies they
-stay in sync.
+When some jobs cannot reach Postgres, export metadata where the database is
+available and check offline elsewhere:
+
+```yaml
+- name: Export Squirrelix metadata
+  env:
+    PGDATABASE: my_app_test
+    PGHOST: localhost
+    PGUSER: postgres
+  run: mix squirrelix.gen --infer --write-metadata squirr_elix.exs
+
+# In a later job without Postgres:
+- name: Check Squirrelix output (offline)
+  run: mix squirrelix.check
+```
+
+Commit generated `sql.ex` files (and the exported metadata file, when using offline
+check) alongside your `.sql` sources so CI verifies they stay in sync.
 
 For Phoenix apps — Mix aliases, `DATABASE_URL`, and a fuller GitHub Actions
 example — see the [Phoenix + CI Cookbook](phoenix.md).

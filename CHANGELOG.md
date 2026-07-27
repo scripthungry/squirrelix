@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `--write-metadata PATH` on `mix squirrelix.gen` / `mix squirrelix.check` (requires
+  `--infer`) exports a reloadable metadata file for offline check/codegen without
+  Postgres.
+
 - Broader structural parameter naming beyond `INSERT`: comparison operators
   (`<>`, `!=`, `<`, `>`, `<=`, `>=`), `LIKE`/`ILIKE` (including `NOT`), and
   `SET (columns) = (...)` / `ROW(...)` lists (including `ON CONFLICT ... DO UPDATE SET`).
