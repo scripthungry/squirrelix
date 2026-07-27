@@ -42,6 +42,9 @@ jobs:
       PGUSER: postgres
       PGPASSWORD: postgres
       PGDATABASE: postgres
+      # Soft floor only: warn in the job summary if coverage dips below this.
+      # Not a hard fail until we lock a baseline for a quality gate.
+      COVERAGE_SOFT_FLOOR: "70"
 
     steps:
       - uses: actions/checkout@v4
@@ -68,4 +71,50 @@ jobs:
       - run: mix format --check-formatted
       - run: mix compile --warnings-as-errors
       - run: mix credo --strict --all
-      - run: mix test
+
+      - name: Run tests with coverage
+        run: |
+          set -o pipefail
+          mix coveralls.html 2>&1 | tee coverage-output.txt
+
+      - name: Publish coverage summary
+        if: always()
+        run: |
+          set -euo pipefail
+          TOTAL_LINE=$(grep -E '\[TOTAL\]' coverage-output.txt | tail -n1 || true)
+          PCT=$(printf '%s\n' "$TOTAL_LINE" | grep -oE '[0-9]+(\.[0-9]+)?' | head -n1 || true)
+
+          {
+            echo "## Test coverage"
+            echo
+            if [ -n "$PCT" ]; then
+              echo "**${PCT}%** total line coverage (ExCoveralls)"
+            else
+              echo "Could not parse coverage percentage from test output."
+            fi
+            echo
+            echo "HTML report uploaded as the \`coverage-html\` artifact."
+            if [ -n "${COVERAGE_SOFT_FLOOR:-}" ] && [ -n "$PCT" ]; then
+              echo
+              echo "Soft floor: ${COVERAGE_SOFT_FLOOR}% (warning only; does not fail CI)."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ -n "${COVERAGE_SOFT_FLOOR:-}" ] && [ -n "$PCT" ]; then
+            awk -v pct="$PCT" -v floor="$COVERAGE_SOFT_FLOOR" 'BEGIN {
+              if ((pct + 0) < (floor + 0)) {
+                printf "::warning::Coverage %.1f%% is below soft floor %s%% (not failing CI)\n", pct, floor
+              } else {
+                printf "Coverage %.1f%% meets soft floor %s%%\n", pct, floor
+              }
+            }'
+          fi
+
+      - name: Upload coverage HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html
+          path: cover/
+          if-no-files-found: ignore
+          retention-days: 14

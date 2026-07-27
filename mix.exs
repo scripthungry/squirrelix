@@ -19,14 +19,19 @@ defmodule Squirrelix.MixProject do
       docs: docs(),
       aliases: aliases(),
       deps: deps(),
-      elixirc_paths: elixirc_paths(Mix.env())
+      elixirc_paths: elixirc_paths(Mix.env()),
+      test_coverage: [tool: ExCoveralls]
     ]
   end
 
   def cli do
     [
       preferred_envs: [
-        precommit: :test
+        precommit: :test,
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.html": :test,
+        "coveralls.json": :test
       ]
     ]
   end
@@ -44,6 +49,7 @@ defmodule Squirrelix.MixProject do
     [
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.37", only: :dev, runtime: false},
+      {:excoveralls, "~> 0.18", only: :test},
       {:file_system, "~> 1.0"},
       {:postgrex, "~> 0.22"}
     ]
@@ -116,7 +122,9 @@ defmodule Squirrelix.MixProject do
   defp aliases do
     [
       precommit: ["format", "credo.strict", "test"],
-      "credo.strict": "credo --strict --all"
+      "credo.strict": "credo --strict --all",
+      # Opt-in coverage; plain `mix test` / `mix precommit` stay fast locally.
+      cover: ["coveralls.html"]
     ]
   end
 end

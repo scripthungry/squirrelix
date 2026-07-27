@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Multi-schema / `search_path` inference docs (Configuration + Writing Queries) and
   ExUnit coverage for unqualified tables resolved via session `search_path` and
   schema-qualified tables outside `search_path`.
+- CI test coverage via ExCoveralls: HTML artifact + GitHub Actions job summary,
+  soft floor warning (not a hard fail). Local `mix test` / `mix precommit`
+  unchanged; opt in with `mix cover` / `mix coveralls.html`.
 
 ### Changed
 
