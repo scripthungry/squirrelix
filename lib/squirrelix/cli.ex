@@ -31,6 +31,7 @@ defmodule Squirrelix.CLI do
         |> connection_options_from_variables(project_name)
         |> merge_connection_options(from_url)
         |> merge_flag_overrides(opts)
+        |> apply_connection_defaults()
 
       {:ok, base}
     end
@@ -39,24 +40,8 @@ defmodule Squirrelix.CLI do
   @spec parse_connection_url(String.t()) ::
           {:ok, ConnectionOptions.t()} | {:error, :invalid_url}
   def parse_connection_url(raw) when is_binary(raw) do
-    with %URI{} = uri <- URI.parse(raw),
-         :ok <- check_scheme(uri.scheme),
-         {:ok, timeout, ssl} <- parse_query_options(uri.query) do
-      {user, password} = parse_user_and_password(uri.userinfo)
-      database = parse_database(uri.path)
-
-      {:ok,
-       %ConnectionOptions{
-         host: default_if_nil_or_empty(uri.host, @default_host),
-         port: uri.port || @default_port,
-         user: default_if_nil_or_empty(user, @default_user),
-         password: default_if_nil_or_empty(password, @default_password),
-         database: default_if_nil_or_empty(database, @default_database),
-         timeout_seconds: timeout,
-         ssl: ssl
-       }}
-    else
-      _ -> {:error, :invalid_url}
+    with {:ok, options} <- do_parse_connection_url(raw) do
+      {:ok, apply_connection_defaults(options)}
     end
   end
 
@@ -111,13 +96,37 @@ defmodule Squirrelix.CLI do
   defp url_override(env, opts) do
     case Keyword.fetch(opts, :url) do
       {:ok, url} when is_binary(url) and url != "" ->
-        parse_connection_url(url)
+        do_parse_connection_url(url)
 
       _ ->
         case Map.get(env, "DATABASE_URL") do
-          url when is_binary(url) and url != "" -> parse_connection_url(url)
+          url when is_binary(url) and url != "" -> do_parse_connection_url(url)
           _ -> {:ok, nil}
         end
+    end
+  end
+
+  # Parse without filling library defaults so merge can keep present PG* values
+  # for fields the URL omits.
+  defp do_parse_connection_url(raw) when is_binary(raw) do
+    with %URI{} = uri <- URI.parse(raw),
+         :ok <- check_scheme(uri.scheme),
+         {:ok, timeout, ssl} <- parse_query_options(uri.query) do
+      {user, password} = parse_user_and_password(uri.userinfo)
+      database = parse_database(uri.path)
+
+      {:ok,
+       %ConnectionOptions{
+         host: blank_to_nil(uri.host),
+         port: uri.port,
+         user: blank_to_nil(user),
+         password: password_from_url(password),
+         database: blank_to_nil(database),
+         timeout_seconds: timeout,
+         ssl: ssl
+       }}
+    else
+      _ -> {:error, :invalid_url}
     end
   end
 
@@ -150,7 +159,21 @@ defmodule Squirrelix.CLI do
     struct!(base, overrides)
   end
 
+  defp apply_connection_defaults(%ConnectionOptions{} = options) do
+    %ConnectionOptions{
+      host: default_if_nil_or_empty(options.host, @default_host),
+      port: options.port || @default_port,
+      user: default_if_nil_or_empty(options.user, @default_user),
+      password: default_if_nil_or_empty(options.password, @default_password),
+      database: default_if_nil_or_empty(options.database, @default_database),
+      timeout_seconds: options.timeout_seconds || @default_timeout,
+      ssl: options.ssl
+    }
+  end
+
   # Empty password from a URL like postgres://user@host/db should not wipe PGPASSWORD.
+  # `nil` means the URL omitted a password; `""` means it was present but empty.
+  defp prefer_password(nil, base), do: base
   defp prefer_password("", base), do: base
   defp prefer_password(password, _base), do: password
 
@@ -195,7 +218,7 @@ defmodule Squirrelix.CLI do
     end
   end
 
-  defp check_scheme(nil), do: :ok
+  defp check_scheme(nil), do: :error
   defp check_scheme("postgres"), do: :ok
   defp check_scheme("postgresql"), do: :ok
   defp check_scheme(_), do: :error
@@ -204,22 +227,32 @@ defmodule Squirrelix.CLI do
 
   defp parse_user_and_password(userinfo) do
     case String.split(userinfo, ":", parts: 2) do
-      [user] -> {user, nil}
-      [user, password] -> {user, password}
+      [user] -> {percent_decode(user), nil}
+      [user, password] -> {percent_decode(user), percent_decode(password)}
       _ -> {nil, nil}
     end
   end
+
+  defp percent_decode(value) when is_binary(value) do
+    URI.decode(value)
+  rescue
+    _ -> value
+  end
+
+  defp password_from_url(nil), do: nil
+  defp password_from_url(password), do: password
 
   defp parse_database(nil), do: nil
 
   defp parse_database(path) when is_binary(path) do
     case String.split(path, "/", trim: true) do
-      [database | _rest] -> database
+      [database | _rest] -> percent_decode(database)
       [] -> nil
     end
   end
 
-  defp parse_query_options(nil), do: {:ok, @default_timeout, nil}
+  # Missing query string → leave timeout unset so PGCONNECT_TIMEOUT can win on merge.
+  defp parse_query_options(nil), do: {:ok, nil, nil}
 
   defp parse_query_options(query) do
     params = URI.decode_query(query)
@@ -235,7 +268,7 @@ defmodule Squirrelix.CLI do
   defp parse_timeout_param(params) do
     case Map.fetch(params, "connect_timeout") do
       :error ->
-        {:ok, @default_timeout}
+        {:ok, nil}
 
       {:ok, timeout} ->
         case Integer.parse(timeout) do
@@ -301,6 +334,10 @@ defmodule Squirrelix.CLI do
   end
 
   defp parse_int_or_default(_value, default), do: default
+
+  defp blank_to_nil(nil), do: nil
+  defp blank_to_nil(""), do: nil
+  defp blank_to_nil(value), do: value
 
   defp default_if_nil_or_empty(nil, default), do: default
   defp default_if_nil_or_empty("", default), do: default

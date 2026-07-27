@@ -37,6 +37,16 @@ defmodule SquirrelixCliCompatibilityTest do
              CLI.parse_connection_url("mysql://user:pass@db:3306/my_db")
   end
 
+  test "parse_connection_url rejects schemeless URLs" do
+    assert {:error, :invalid_url} = CLI.parse_connection_url("localhost:5432/db")
+    assert {:error, :invalid_url} = CLI.parse_connection_url("user:pass@host/db")
+  end
+
+  test "parse_connection_url percent-decodes userinfo" do
+    assert {:ok, %ConnectionOptions{user: "u@mail", password: "p@ss"}} =
+             CLI.parse_connection_url("postgres://u%40mail:p%40ss@db/my_db")
+  end
+
   test "parse_connection_url applies upstream defaults" do
     assert {:ok,
             %ConnectionOptions{

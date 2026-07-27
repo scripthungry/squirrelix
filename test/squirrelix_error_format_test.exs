@@ -95,6 +95,23 @@ defmodule SquirrelixErrorFormatTest do
     assert formatted =~ "Hint: Try using a supported built-in instead."
   end
 
+  test "postgres inference error with nil code omits bracketed NIL" do
+    formatted =
+      Error.format(%Squirrelix.Error.PostgresInferenceError{
+        file: "q.sql",
+        starting_line: 1,
+        content: "select 1",
+        message: "something went wrong",
+        code: nil,
+        position: nil
+      })
+
+    assert formatted =~ "Error: Invalid query"
+    refute formatted =~ "[NIL]"
+    refute formatted =~ "[nil]"
+    assert formatted =~ "something went wrong"
+  end
+
   test "format_unsupported_type_error surfaces composite policy hints from TypeMapper" do
     assert {:error, error} =
              Squirrelix.TypeMapper.from_postgres("inventory_item", kind: "c")

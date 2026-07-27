@@ -36,7 +36,9 @@ defmodule Squirrelix.Project do
       when is_binary(root) and is_binary(sql_directory) do
     with {:ok, app} <- app(root),
          {:ok, relative_segments} <- relative_sql_segments(root, sql_directory) do
-      module_parts = [app_module_part(app) | Enum.map(relative_segments, &Macro.camelize/1)]
+      app_part = app_module_part(app)
+      relative_segments = drop_leading_app_segment(relative_segments, app_part)
+      module_parts = [app_part | Enum.map(relative_segments, &Macro.camelize/1)]
       {:ok, Module.concat(module_parts ++ ["SQL"])}
     else
       _ -> {:error, :invalid_sql_directory}
@@ -95,6 +97,17 @@ defmodule Squirrelix.Project do
       end
     end)
   end
+
+  # Phoenix layout is `lib/my_app/...`; without this we'd emit `MyApp.MyApp....SQL`.
+  defp drop_leading_app_segment([first | rest], app_part) do
+    if Macro.camelize(first) == app_part do
+      rest
+    else
+      [first | rest]
+    end
+  end
+
+  defp drop_leading_app_segment([], _app_part), do: []
 
   defp app_module_part(app) do
     app

@@ -54,6 +54,27 @@ defmodule SquirrelixProjectTest do
              {:ok, AcornCounter.Accounts.SQL}
   end
 
+  test "module_for_sql_directory dedups Phoenix-style leading app segment" do
+    root = tmp_dir()
+    File.write!(Path.join(root, "mix.exs"), mixfile(:my_app))
+
+    assert Project.module_for_sql_directory(root, Path.join(root, "lib/my_app/accounts/sql")) ==
+             {:ok, MyApp.Accounts.SQL}
+
+    assert Project.module_for_sql_directory(root, Path.join(root, "lib/my_app/sql")) ==
+             {:ok, MyApp.SQL}
+  end
+
+  test "module_for_sql_directory keeps nested segments that match app name only at the front" do
+    root = tmp_dir()
+    File.write!(Path.join(root, "mix.exs"), mixfile(:my_app))
+
+    assert Project.module_for_sql_directory(
+             root,
+             Path.join(root, "lib/my_app/my_app/sql")
+           ) == {:ok, MyApp.MyApp.SQL}
+  end
+
   test "module_for_sql_directory derives an app-namespaced module from test path" do
     root = tmp_dir()
     File.write!(Path.join(root, "mix.exs"), mixfile(:acorn_counter))

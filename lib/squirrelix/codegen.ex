@@ -42,6 +42,8 @@ defmodule Squirrelix.Codegen do
   alias Squirrelix.TypedQueryDirectory
   alias Squirrelix.TypeMapper
 
+  require Logger
+
   @spec generate_module(module(), [TypedQuery.t()], keyword()) :: String.t()
   def generate_module(module, queries, opts \\ []) when is_atom(module) and is_list(queries) do
     version = Keyword.fetch!(opts, :version)
@@ -183,21 +185,27 @@ defmodule Squirrelix.Codegen do
 
   defp function_sources(queries, postgrex_module) do
     taken_names = MapSet.new(queries, & &1.name)
+    _ = validate_row_type_names!(queries)
 
-    Enum.map(queries, fn query ->
-      function_source(query, postgrex_module, taken_names)
+    queries
+    |> Enum.reduce({[], taken_names}, fn query, {sources, claimed} ->
+      {source, claimed} = function_source(query, postgrex_module, claimed)
+      {[source | sources], claimed}
     end)
+    |> elem(0)
+    |> Enum.reverse()
   end
 
-  defp function_source(%TypedQuery{} = query, postgrex_module, taken_names) do
+  defp function_source(%TypedQuery{} = query, postgrex_module, claimed_names) do
     raising = raising_function_source(query, postgrex_module)
 
-    case soft_companion_name(query.name, taken_names) do
-      nil ->
-        raising
+    case soft_companion_name(query.name, claimed_names) do
+      {:ok, soft_name} ->
+        source = raising <> "\n\n" <> soft_function_source(query, postgrex_module, soft_name)
+        {source, MapSet.put(claimed_names, soft_name)}
 
-      soft_name ->
-        raising <> "\n\n" <> soft_function_source(query, postgrex_module, soft_name)
+      :skipped ->
+        {raising, claimed_names}
     end
   end
 
@@ -235,25 +243,50 @@ defmodule Squirrelix.Codegen do
     """
   end
 
-  defp soft_companion_name(name, taken_names) when is_binary(name) do
+  defp soft_companion_name(name, claimed_names) when is_binary(name) do
     soft_name = soft_companion_base_name(name)
 
-    if MapSet.member?(taken_names, soft_name) do
-      nil
+    if MapSet.member?(claimed_names, soft_name) do
+      Logger.warning(
+        "Squirrelix: omitting soft companion `#{soft_name}` for query `#{name}` because that name is already taken"
+      )
+
+      :skipped
     else
-      soft_name
+      {:ok, soft_name}
     end
   end
 
   defp soft_companion_base_name(name) when is_binary(name) do
-    base =
-      cond do
-        String.ends_with?(name, "!") -> String.trim_trailing(name, "!")
-        String.ends_with?(name, "?") -> String.trim_trailing(name, "?")
-        true -> name
-      end
+    identifier_base_name(name) <> "_ok"
+  end
 
-    base <> "_ok"
+  # Strip trailing `!` / `?` so generated `@type` names stay valid Elixir identifiers.
+  defp identifier_base_name(name) when is_binary(name) do
+    cond do
+      String.ends_with?(name, "!") -> String.trim_trailing(name, "!")
+      String.ends_with?(name, "?") -> String.trim_trailing(name, "?")
+      true -> name
+    end
+  end
+
+  defp row_type_name(%TypedQuery{name: name}), do: identifier_base_name(name) <> "_row"
+
+  defp validate_row_type_names!(queries) do
+    queries
+    |> Enum.filter(&(&1.returns != []))
+    |> Enum.reduce(%{}, fn query, seen ->
+      type_name = row_type_name(query)
+
+      case Map.fetch(seen, type_name) do
+        {:ok, other} ->
+          raise ArgumentError,
+                "row type name collision on `#{type_name}` between queries `#{other}` and `#{query.name}`"
+
+        :error ->
+          Map.put(seen, type_name, query.name)
+      end
+    end)
   end
 
   defp soft_doc_source(%TypedQuery{name: name, returns: []}, arity) do
@@ -640,8 +673,8 @@ defmodule Squirrelix.Codegen do
     "{:ok, non_neg_integer()} | {:error, Exception.t()}"
   end
 
-  defp soft_function_return_typespec(%TypedQuery{name: name}) do
-    "{:ok, [#{name}_row()]} | {:error, Exception.t()}"
+  defp soft_function_return_typespec(%TypedQuery{} = query) do
+    "{:ok, [#{row_type_name(query)}()]} | {:error, Exception.t()}"
   end
 
   defp column_specs_literal(columns) do
@@ -682,7 +715,7 @@ defmodule Squirrelix.Codegen do
 
   defp row_type_source(%TypedQuery{returns: []}), do: ""
 
-  defp row_type_source(%TypedQuery{name: name, returns: returns}) do
+  defp row_type_source(%TypedQuery{returns: returns} = query) do
     fields =
       Enum.map_join(returns, ", ", fn column ->
         spec =
@@ -696,14 +729,14 @@ defmodule Squirrelix.Codegen do
       end)
 
     """
-      @type #{name}_row :: %{#{fields}}
+      @type #{row_type_name(query)} :: %{#{fields}}
     """
   end
 
   defp function_return_typespec(%TypedQuery{returns: []}), do: ":ok"
 
-  defp function_return_typespec(%TypedQuery{name: name, returns: _returns}) do
-    "[#{name}_row()]"
+  defp function_return_typespec(%TypedQuery{} = query) do
+    "[#{row_type_name(query)}()]"
   end
 
   defp generated_function_doc(%TypedQuery{name: name, file: file}) do

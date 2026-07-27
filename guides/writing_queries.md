@@ -319,8 +319,11 @@ end
 
 Soft command companions return the affected-row count as `{:ok, num_rows}`. Soft
 companions for query names ending in `!` or `?` strip that suffix before adding
-`_ok` (for example `save!` → `save_ok`). If `<name>_ok` already exists as another
-query in the same module, the soft companion is omitted to avoid a name collision.
+`_ok` (for example `save!` → `save_ok`). The same stripping is used for generated
+`@type` names (`q!` → `@type q_row`). If `<name>_ok` already exists as another
+query in the same module, or was already claimed by another soft companion (for
+example both `q.sql` and `q!.sql`), the soft companion is omitted and a warning is
+logged. Row queries whose sanitized type names collide raise at generate time.
 
 Queries with a `returning` clause produce row maps like any other select.
 

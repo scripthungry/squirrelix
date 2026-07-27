@@ -28,8 +28,34 @@ jobs:
     runs-on: ubuntu-latest
     if: github.repository == 'scripthungry/squirrelix'
 
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      MIX_ENV: test
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: postgres
+
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install inotify-tools
+        run: sudo apt-get update && sudo apt-get install -y inotify-tools
 
       - uses: erlef/setup-beam@v1
         with:
@@ -61,11 +87,14 @@ jobs:
 
       - run: mix deps.get
       - run: mix compile --warnings-as-errors
+      - run: mix credo --strict --all
+      - run: mix test
 
       - name: Publish package and docs
         if: github.event_name == 'push' || inputs.mode == 'all' || inputs.mode == 'package'
         env:
           HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
+          MIX_ENV: dev
         run: |
           if [ -z "$HEX_API_KEY" ]; then
             echo "HEX_API_KEY secret is not set"
@@ -81,6 +110,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.mode == 'docs'
         env:
           HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
+          MIX_ENV: dev
         run: |
           if [ -z "$HEX_API_KEY" ]; then
             echo "HEX_API_KEY secret is not set"
