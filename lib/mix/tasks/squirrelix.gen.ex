@@ -36,6 +36,9 @@ defmodule Mix.Tasks.Squirrelix.Gen do
   map to Postgrex `:ssl` options. Unix sockets are not supported.
 
   Generated query functions call `Postgrex.query!/3` and raise on database errors.
+  Soft companions named `<name>_ok/arity` call `Postgrex.query/3` and return
+  `{:ok, result} | {:error, Exception.t()}` (commands: `{:ok, num_rows}`). This soft
+  API is additive — the raising functions are unchanged.
 
   Metadata files are evaluated Elixir that must return a map. Each entry maps a
   query file path to a keyword list with `:params` and `:returns` keys.

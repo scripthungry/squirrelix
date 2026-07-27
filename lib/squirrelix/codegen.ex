@@ -33,7 +33,9 @@ defmodule Squirrelix.Codegen do
   Generates Elixir modules for typed SQL queries.
 
   Produces per-query row `@type` definitions, `@spec`-annotated functions, and runtime
-  encode/decode helpers. See [Writing Queries](writing_queries.html) and
+  encode/decode helpers. Each query gets a raising function and an additive soft
+  companion (`<name>_ok/arity`) that returns `{:ok, result} | {:error, Exception.t()}`.
+  Soft command companions return `{:ok, num_rows}`. See [Writing Queries](writing_queries.html) and
   [Types](types.html) for conventions and type mapping.
   """
 
@@ -49,6 +51,8 @@ defmodule Squirrelix.Codegen do
     version = Keyword.fetch!(opts, :version)
     postgrex_module = Keyword.get(opts, :postgrex, Postgrex)
 
+    sorted_queries = Enum.sort_by(queries, & &1.file)
+
     source = """
     defmodule #{inspect(module)} do
       @moduledoc \"\"\"
@@ -59,11 +63,16 @@ defmodule Squirrelix.Codegen do
       Runtime row decoding uses `column_spec/0` tuples `{name, type, nullable?}`
       where `type` is an atom such as `:string` or a list wrapper such as
       `{:list, :integer}`.
+
+      Each query has a raising function (via `Postgrex.query!/3`) and an additive
+      soft companion named `<name>_ok/arity` (via `Postgrex.query/3`) that returns
+      `{:ok, result} | {:error, Exception.t()}`. Soft command companions return
+      `{:ok, num_rows}` where `num_rows` is the affected-row count.
       \"\"\"
 
       @type column_spec :: {atom(), atom() | {:list, atom()}, boolean()}
 
-    #{queries |> Enum.sort_by(& &1.file) |> Enum.map(&function_source(&1, postgrex_module)) |> join_function_sources()}#{runtime_helpers_section(queries)}
+    #{sorted_queries |> function_sources(postgrex_module) |> join_function_sources()}#{runtime_helpers_section(queries)}
     end
     """
 
@@ -171,7 +180,27 @@ defmodule Squirrelix.Codegen do
     }
   end
 
-  defp function_source(%TypedQuery{} = query, postgrex_module) do
+  defp function_sources(queries, postgrex_module) do
+    taken_names = MapSet.new(queries, & &1.name)
+
+    Enum.map(queries, fn query ->
+      function_source(query, postgrex_module, taken_names)
+    end)
+  end
+
+  defp function_source(%TypedQuery{} = query, postgrex_module, taken_names) do
+    raising = raising_function_source(query, postgrex_module)
+
+    case soft_companion_name(query.name, taken_names) do
+      nil ->
+        raising
+
+      soft_name ->
+        raising <> "\n\n" <> soft_function_source(query, postgrex_module, soft_name)
+    end
+  end
+
+  defp raising_function_source(%TypedQuery{} = query, postgrex_module) do
     args = TypedQuery.resolve_parameter_names(query.params)
     all_args = ["conn" | args]
     encoded_params = encode_params_call(args, query.params)
@@ -185,6 +214,59 @@ defmodule Squirrelix.Codegen do
         |> #{decode_call(query.returns)}
       end
     """
+  end
+
+  defp soft_function_source(%TypedQuery{} = query, postgrex_module, soft_name) do
+    args = TypedQuery.resolve_parameter_names(query.params)
+    all_args = ["conn" | args]
+    encoded_params = encode_params_call(args, query.params)
+    arity = length(all_args)
+
+    """
+      #{soft_doc_source(query, arity)}
+      @spec #{soft_name}(Postgrex.conn()#{spec_args(query.params)}) :: #{soft_function_return_typespec(query)}
+      def #{soft_name}(#{Enum.join(all_args, ", ")}) do
+        case #{inspect(postgrex_module)}.query(conn, #{sql_string_literal(query.content)}, #{encoded_params}) do
+          {:ok, result} -> {:ok, result |> #{soft_decode_call(query.returns)}}
+          {:error, reason} -> {:error, reason}
+        end
+      end
+    """
+  end
+
+  defp soft_companion_name(name, taken_names) when is_binary(name) do
+    soft_name = soft_companion_base_name(name)
+
+    if MapSet.member?(taken_names, soft_name) do
+      nil
+    else
+      soft_name
+    end
+  end
+
+  defp soft_companion_base_name(name) when is_binary(name) do
+    base =
+      cond do
+        String.ends_with?(name, "!") -> String.trim_trailing(name, "!")
+        String.ends_with?(name, "?") -> String.trim_trailing(name, "?")
+        true -> name
+      end
+
+    base <> "_ok"
+  end
+
+  defp soft_doc_source(%TypedQuery{name: name, returns: []}, arity) do
+    doc =
+      "Soft companion to `#{name}/#{arity}`. Returns `{:ok, num_rows}` or `{:error, exception}` instead of raising."
+
+    "  @doc #{inspect(doc, limit: :infinity)}\n"
+  end
+
+  defp soft_doc_source(%TypedQuery{name: name}, arity) do
+    doc =
+      "Soft companion to `#{name}/#{arity}`. Returns `{:ok, rows}` or `{:error, exception}` instead of raising."
+
+    "  @doc #{inspect(doc, limit: :infinity)}\n"
   end
 
   defp encode_params_call([], []), do: "[]"
@@ -244,6 +326,10 @@ defmodule Squirrelix.Codegen do
         """
           defp decode_command(%Postgrex.Result{}) do
             :ok
+          end
+
+          defp decode_command_num_rows(%Postgrex.Result{num_rows: num_rows}) do
+            num_rows
           end
         """
         | sources
@@ -506,6 +592,18 @@ defmodule Squirrelix.Codegen do
 
   defp decode_call(columns) do
     "decode_rows(#{column_specs_literal(columns)})"
+  end
+
+  defp soft_decode_call([]), do: "decode_command_num_rows()"
+
+  defp soft_decode_call(columns), do: decode_call(columns)
+
+  defp soft_function_return_typespec(%TypedQuery{returns: []}) do
+    "{:ok, non_neg_integer()} | {:error, Exception.t()}"
+  end
+
+  defp soft_function_return_typespec(%TypedQuery{name: name}) do
+    "{:ok, [#{name}_row()]} | {:error, Exception.t()}"
   end
 
   defp column_specs_literal(columns) do

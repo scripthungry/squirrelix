@@ -43,6 +43,8 @@ Gleam records, custom enum ADTs, or opaque tagged error values.
 - **Code generation**
   - [x] Per-query row `@type` definitions and `@spec`-annotated functions.
   - [x] Row queries return decoded maps; command queries return `:ok`.
+  - [x] Soft companions (`<name>_ok`) via `Postgrex.query/3`; soft commands return
+    `{:ok, num_rows}` (additive; raising API unchanged).
   - [x] Safe overwrite and `mix squirrelix.check` drift detection.
   - [x] Runtime decode coverage for nullable values, arrays, JSON, UUIDs, dates/times, and
     command results.
@@ -76,7 +78,7 @@ parameter-name/Gleam parity ports, and Hex `0.1.0` / `0.2.0` releases.
 - [x] `DATABASE_URL` + SSL for `--infer` (#9)
 - [x] Project-wide atomic generate/check (#10)
 - [x] INSERT/VALUES parameter names (#11)
-- [ ] Generated runtime ergonomics: soft errors and/or command row counts (#12)
+- [x] Generated runtime ergonomics: soft errors and/or command row counts (#12)
 - [ ] Docs/ROADMAP hygiene for 0.3.0 (#13)
 
 ### [v0.4.0](https://github.com/scripthungry/squirrelix/milestone/3) — Day-to-day workflow & adoption docs

@@ -158,6 +158,15 @@ Command queries (no returned rows) return `:ok`:
 :ok = SQL.delete_user(conn, 1)
 ```
 
+Soft companions return ok/error tuples instead of raising. Soft commands include the
+affected-row count:
+
+```elixir
+{:ok, [%{id: 1, name: "Ada"}]} = SQL.find_user_ok(conn, 1)
+{:ok, 1} = SQL.delete_user_ok(conn, 1)
+{:error, %Postgrex.Error{}} = SQL.find_user_ok(conn, -1)
+```
+
 ## Keep generated code in sync
 
 Run the check task in CI to catch stale generated files:
