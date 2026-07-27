@@ -13,6 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ExUnit coverage for unqualified tables resolved via session `search_path` and
   schema-qualified tables outside `search_path`.
 
+### Changed
+
+- User-facing errors for file I/O, missing/incomplete/invalid metadata, invalid
+  connection URLs, and invalid CLI options use the same structured titles/hints as
+  connection and query diagnostics (no raw `inspect/1` primary messages). Existing
+  structured connection error types from 0.2/0.3 are unchanged.
+
 ## [0.4.0] — 2026-07-27
 
 ### Added

@@ -77,7 +77,11 @@ defmodule Squirrelix.Watch do
         """)
 
       {:error, reason} ->
-        Mix.raise("Could not start the file watcher: #{inspect(reason)}")
+        Mix.raise("""
+        Could not start the file watcher.
+
+        Reason: #{format_watch_reason(reason)}
+        """)
     end
   end
 
@@ -117,6 +121,11 @@ defmodule Squirrelix.Watch do
 
   defp cancel_timer(nil), do: :ok
   defp cancel_timer(timer), do: Process.cancel_timer(timer)
+
+  defp format_watch_reason(reason) when is_binary(reason), do: reason
+  defp format_watch_reason(reason) when is_atom(reason), do: Atom.to_string(reason)
+  defp format_watch_reason(%{__exception__: true} = reason), do: Exception.message(reason)
+  defp format_watch_reason(reason), do: inspect(reason)
 
   defp under_source_root?(path, root) do
     Enum.any?(Project.source_roots(root), fn source_root ->
