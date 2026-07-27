@@ -270,6 +270,9 @@ export DATABASE_URL=postgres://localhost/my_app_dev?sslmode=require
 mix squirrelix.gen --infer
 ```
 
+Use `--write-metadata PATH` with `--infer` to export a reloadable metadata file for
+offline `mix squirrelix.check` / `gen` (see the Configuration guide).
+
 The programmatic API mirrors this split — see `Squirrelix.generate/3` and
 `Squirrelix.check/3`.
 

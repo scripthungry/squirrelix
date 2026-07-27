@@ -192,12 +192,92 @@ defmodule MixTasksSquirrelixTest do
     refute message =~ "Could not connect to Postgres:"
   end
 
+  test "mix squirrelix.gen --infer --write-metadata exports metadata for offline check" do
+    root = tmp_project(:acorn_counter)
+    write_query(root, "select $1::text as name")
+    metadata_file = Path.join(root, "squirr_elix.exs")
+
+    File.cd!(root, fn ->
+      output =
+        capture_io(fn ->
+          Mix.Task.run("squirrelix.gen", [
+            "--infer",
+            "--database",
+            "postgres",
+            "--write-metadata",
+            metadata_file
+          ])
+        end)
+
+      assert output =~ "Generated 1 query."
+      assert output =~ "Wrote metadata"
+      assert File.exists?(metadata_file)
+
+      Mix.Task.reenable("squirrelix.check")
+
+      check_output =
+        capture_io(fn ->
+          Mix.Task.run("squirrelix.check", ["--metadata", metadata_file])
+        end)
+
+      assert check_output =~ "All 1 query current."
+    end)
+  end
+
+  test "mix squirrelix.check detects drift after metadata export when generated output changes" do
+    root = tmp_project(:acorn_counter)
+    write_query(root, "select $1::text as name")
+    metadata_file = Path.join(root, "config/squirr_elix.exs")
+
+    File.cd!(root, fn ->
+      capture_io(fn ->
+        Mix.Task.run("squirrelix.gen", [
+          "--infer",
+          "--database",
+          "postgres",
+          "--write-metadata",
+          metadata_file
+        ])
+      end)
+
+      generated = Path.join(root, "lib/accounts/sql.ex")
+
+      File.write!(
+        generated,
+        String.replace(File.read!(generated), "name", "renamed", global: false)
+      )
+
+      Mix.Task.reenable("squirrelix.check")
+
+      error =
+        assert_raise Mix.Error, fn ->
+          Mix.Task.run("squirrelix.check", ["--metadata", metadata_file])
+        end
+
+      assert Exception.message(error) =~ "Squirrelix check failed"
+      assert Exception.message(error) =~ "Outdated"
+    end)
+  end
+
+  test "mix squirrelix.gen rejects --write-metadata without --infer" do
+    root = tmp_project(:acorn_counter)
+    query_file = write_query(root)
+    write_metadata(root, query_file)
+
+    assert_raise Mix.Error, ~r/--write-metadata requires --infer/, fn ->
+      File.cd!(root, fn ->
+        Mix.Task.run("squirrelix.gen", ["--write-metadata", "squirr_elix.exs"])
+      end)
+    end
+  end
+
   test "mix squirrelix.gen moduledoc documents metadata and infer options" do
     {:docs_v1, _, _, _, module_doc, _, _} = Code.fetch_docs(Mix.Tasks.Squirrelix.Gen)
     moduledoc = module_doc["en"]
 
     assert moduledoc =~ "--metadata"
     assert moduledoc =~ "--infer"
+    assert moduledoc =~ "--write-metadata"
     assert moduledoc =~ "squirr_elix.exs"
     assert moduledoc =~ "DATABASE_URL"
     assert moduledoc =~ "sslmode"
@@ -210,6 +290,7 @@ defmodule MixTasksSquirrelixTest do
 
     assert moduledoc =~ "mix squirrelix.check"
     assert moduledoc =~ "--infer"
+    assert moduledoc =~ "--write-metadata"
     assert moduledoc =~ "DATABASE_URL"
   end
 

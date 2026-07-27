@@ -82,7 +82,7 @@ row counts, and Hex `0.1.0` / `0.2.0` / `0.3.0` releases.
 
 - [ ] Watch mode for `mix squirrelix.gen` (#14)
 - [x] Phoenix + CI cookbook guide (#15)
-- [ ] Export inferred metadata for offline check (#16)
+- [x] Export inferred metadata for offline check (#16)
 - [x] Broader structural parameter naming beyond INSERT (#17)
 
 ### [v0.5.0](https://github.com/scripthungry/squirrelix/milestone/4) — Production hardening

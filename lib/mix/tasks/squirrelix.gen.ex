@@ -13,6 +13,7 @@ defmodule Mix.Tasks.Squirrelix.Gen do
       mix squirrelix.gen
       mix squirrelix.gen --metadata config/squirr_elix.exs
       mix squirrelix.gen --infer --database my_app_dev
+      mix squirrelix.gen --infer --write-metadata squirr_elix.exs
 
   ## Options
 
@@ -20,6 +21,8 @@ defmodule Mix.Tasks.Squirrelix.Gen do
       types (default: `squirr_elix.exs` in the project root). The file is evaluated
       as Elixir — treat it like `mix.exs` and never load untrusted paths.
     * `--infer` — infer types from a live Postgres database instead of a metadata file
+    * `--write-metadata PATH` — after a successful `--infer` pass, write inferred
+      types to a metadata file for offline `gen` / `check` (requires `--infer`)
     * `--url URL` — Postgres connection URL (also reads `DATABASE_URL` and `PG*`
       environment variables)
     * `--database NAME` — database name when inferring

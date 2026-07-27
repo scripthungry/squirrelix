@@ -12,12 +12,15 @@ defmodule Mix.Tasks.Squirrelix.Check do
       mix squirrelix.check
       mix squirrelix.check --metadata config/squirr_elix.exs
       mix squirrelix.check --infer --database my_app_dev
+      mix squirrelix.check --infer --write-metadata squirr_elix.exs
 
   ## Options
 
     * `--metadata PATH` — metadata file (default: `squirr_elix.exs`). Evaluated as
       Elixir — only load trusted files.
     * `--infer` — infer types from Postgres instead of reading a metadata file
+    * `--write-metadata PATH` — after a successful `--infer` pass, write inferred
+      types to a metadata file for offline check (requires `--infer`)
     * `--url URL` — Postgres connection URL (also reads `DATABASE_URL` and `PG*`)
     * `--database NAME` — database name when inferring
     * `--hostname HOST` — database host when inferring

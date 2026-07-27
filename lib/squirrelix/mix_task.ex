@@ -5,11 +5,13 @@ defmodule Squirrelix.MixTask do
   alias Squirrelix.CodegenCheckSummary
   alias Squirrelix.CodegenSummary
   alias Squirrelix.Error
+  alias Squirrelix.Inference
   alias Squirrelix.Metadata
   alias Squirrelix.Postgres
 
   @switches [
     metadata: :string,
+    write_metadata: :string,
     infer: :boolean,
     url: :string,
     database: :string,
@@ -44,10 +46,63 @@ defmodule Squirrelix.MixTask do
   end
 
   defp with_query_source!(opts, root, callback) do
-    if opts[:infer] do
-      with_postgres_inferrer!(opts, callback)
+    write_metadata? = is_binary(opts[:write_metadata])
+    infer? = opts[:infer] == true
+
+    cond do
+      write_metadata? and not infer? ->
+        Mix.raise("--write-metadata requires --infer")
+
+      infer? and write_metadata? ->
+        with_infer_and_optional_export!(opts, root, callback)
+
+      infer? ->
+        with_postgres_inferrer!(opts, callback)
+
+      true ->
+        callback.(load_metadata!(opts, root))
+    end
+  end
+
+  defp with_infer_and_optional_export!(opts, root, callback) do
+    with_postgres_inferrer!(opts, &maybe_export_then_callback(opts, root, &1, callback))
+  end
+
+  defp maybe_export_then_callback(opts, root, inferrer, callback) do
+    case exportable_metadata(root, inferrer) do
+      {:ok, metadata} ->
+        write_metadata!(opts[:write_metadata], metadata, root)
+        callback.(metadata)
+
+      :has_errors ->
+        callback.(inferrer)
+    end
+  end
+
+  defp exportable_metadata(root, inferrer) do
+    directories =
+      root
+      |> CLI.query_directories()
+      |> Inference.from_query_directories(inferrer)
+
+    if Enum.any?(directories, &(&1.errors != [])) do
+      :has_errors
     else
-      callback.(load_metadata!(opts, root))
+      {:ok, Metadata.from_typed_directories(directories)}
+    end
+  end
+
+  defp write_metadata!(path, metadata, root) do
+    file = Path.expand(path, root)
+
+    case Metadata.to_file(file, metadata, root: root) do
+      :ok ->
+        display = Path.relative_to(file, root)
+        Mix.shell().info("Wrote metadata to #{display}.")
+        :ok
+
+      {:error, error} ->
+        Mix.raise("Could not write Squirrelix metadata:\n\n#{Error.format(error)}")
     end
   end
 
