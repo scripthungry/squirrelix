@@ -4,7 +4,8 @@ defmodule Mix.Tasks.Squirrelix.Check do
 
   Uses the same discovery rules and options as `mix squirrelix.gen`. Exits
   with a non-zero status when generated output would change or when metadata,
-  inference, or SQL parsing fails.
+  inference, or SQL parsing fails. Failure is project-wide: errors from every
+  directory are collected, and a single failing directory fails the whole check.
 
   ## Usage
 

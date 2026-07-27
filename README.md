@@ -435,6 +435,11 @@ structured formatting as query diagnostics (actionable titles and hints), not ra
 Postgrex/`DBConnection` dumps. Verify `PG*` variables or `--url`, ensure Postgres
 is running, and confirm the database exists and has the expected schema.
 
+Generation is project-wide atomic: if any `sql/` directory has query errors,
+`mix squirrelix.gen` writes nothing (no partial codegen). `mix squirrelix.check`
+fails globally when any directory has errors or drift. See
+[Configuration](guides/configuration.md#atomic-generate-and-check).
+
 ## Relationship to Gleam Squirrel
 
 Squirrelix is an Elixir port of [Gleam Squirrel](https://github.com/giacomocavalieri/squirrel)

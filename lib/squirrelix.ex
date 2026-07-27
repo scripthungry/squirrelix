@@ -83,6 +83,10 @@ defmodule Squirrelix do
   @doc """
   Generates query modules for SQL files discovered under a Mix project root.
 
+  Generation is **project-wide atomic**: if any `sql/` directory has query errors
+  (invalid names, missing metadata, inference failures, …), nothing is written —
+  including directories that would otherwise succeed. Fix every error, then re-run.
+
   ## Options
 
     * `:version` (required) — generator version string written into file headers
@@ -92,16 +96,27 @@ defmodule Squirrelix do
   """
   @spec generate(Path.t(), query_source(), keyword()) :: Squirrelix.CodegenSummary.t()
   def generate(root, query_source, opts \\ []) when is_binary(root) and is_list(opts) do
-    root
-    |> typed_query_directories(query_source)
-    |> Enum.map(&write_typed_directory(root, &1, opts))
-    |> Squirrelix.Codegen.summarize_write_outcomes()
+    directories = typed_query_directories(root, query_source)
+
+    case directory_query_errors(directories) do
+      [] ->
+        directories
+        |> Enum.map(&write_typed_directory(root, &1, opts))
+        |> Squirrelix.Codegen.summarize_write_outcomes()
+
+      errors ->
+        # Gleam squirrel 4.5+ parity: refuse all writes when any query errors exist.
+        Squirrelix.Codegen.summarize_write_outcomes(errors)
+    end
   end
 
   @doc """
   Checks that generated query modules are current without writing files.
 
   Accepts the same `query_source` and options as `generate/3`.
+  Fails globally when any directory has query errors or drift — the summary
+  status is `:error` and every failing directory is included in `:errors`.
+
   Returns a `Squirrelix.CodegenCheckSummary` struct.
   """
   @spec check(Path.t(), query_source(), keyword()) :: Squirrelix.CodegenCheckSummary.t()
@@ -204,19 +219,19 @@ defmodule Squirrelix do
     |> Squirrelix.Inference.from_query_directories(inferrer)
   end
 
-  defp write_typed_directory(
-         root,
-         %Squirrelix.TypedQueryDirectory{errors: []} = directory,
-         opts
-       ) do
+  defp directory_query_errors(directories) do
+    directories
+    |> Enum.filter(fn %Squirrelix.TypedQueryDirectory{errors: errors} -> errors != [] end)
+    |> Enum.map(fn %Squirrelix.TypedQueryDirectory{} = directory ->
+      {directory.directory, {:error, directory.errors}, length(directory.queries)}
+    end)
+  end
+
+  defp write_typed_directory(root, %Squirrelix.TypedQueryDirectory{} = directory, opts) do
     outcome =
       Squirrelix.Codegen.write_directory(root, directory.directory, directory.queries, opts)
 
     {directory.directory, outcome, length(directory.queries)}
-  end
-
-  defp write_typed_directory(_root, %Squirrelix.TypedQueryDirectory{} = directory, _opts) do
-    {directory.directory, {:error, directory.errors}, length(directory.queries)}
   end
 
   defp check_typed_directory(

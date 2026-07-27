@@ -254,6 +254,18 @@ marker, generation fails with `CannotOverwriteFile`.
 
 During check, an outdated generated file produces `OutdatedFile`.
 
+## Atomic generate and check
+
+Code generation is **project-wide atomic** (Gleam squirrel 4.5+ parity). If any
+`sql/` directory has query errors — invalid file names, missing metadata,
+inference failures, unsupported types, and so on — `mix squirrelix.gen` writes
+**nothing**. Directories that would otherwise succeed are left untouched until
+every error is fixed.
+
+`mix squirrelix.check` fails globally when any directory has query errors or
+generated-file drift. Errors from every failing directory are reported together;
+a single bad directory is enough for a non-zero exit.
+
 ## Next steps
 
 - [Getting Started](getting_started.md) — first query walkthrough
