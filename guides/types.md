@@ -222,3 +222,4 @@ See [NOTICE](../NOTICE) for upstream attribution.
 
 - [Writing Queries](writing_queries.md) — nullable parameters and naming
 - [Configuration](configuration.md) — inference vs metadata mode
+- [Phoenix + CI Cookbook](phoenix.md) — Phoenix Mix and CI workflow

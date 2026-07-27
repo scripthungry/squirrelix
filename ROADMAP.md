@@ -81,7 +81,7 @@ row counts, and Hex `0.1.0` / `0.2.0` / `0.3.0` releases.
 ### [v0.4.0](https://github.com/scripthungry/squirrelix/milestone/3) — Day-to-day workflow & adoption docs
 
 - [ ] Watch mode for `mix squirrelix.gen` (#14)
-- [ ] Phoenix + CI cookbook guide (#15)
+- [x] Phoenix + CI cookbook guide (#15)
 - [ ] Export inferred metadata for offline check (#16)
 - [ ] Broader structural parameter naming beyond INSERT (#17)
 
