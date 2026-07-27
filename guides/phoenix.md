@@ -15,7 +15,7 @@ Keep Squirrelix as a **dev/test** Mix tool and Postgrex as a **runtime** depende
 ```elixir
 def deps do
   [
-    {:squirr_elix, "~> 0.4.0", only: [:dev, :test], runtime: false},
+    {:squirr_elix, "~> 0.5.0", only: [:dev, :test], runtime: false},
     {:postgrex, "~> 0.22"}
   ]
 end

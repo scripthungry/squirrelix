@@ -308,14 +308,14 @@ metadata = %{
   ]
 }
 
-Squirrelix.generate("/path/to/project", metadata, version: "v0.4.0")
+Squirrelix.generate("/path/to/project", metadata, version: "v0.5.0")
 
 # Postgres inferrer (function or module implementing Squirrelix.Inference.Inferrer)
 {:ok, conn} = Postgrex.start_link(database: "my_app_dev")
 
 try do
   Squirrelix.generate("/path/to/project", Squirrelix.Postgres.inferrer(conn),
-    version: "v0.4.0"
+    version: "v0.5.0"
   )
 after
   GenServer.stop(conn)

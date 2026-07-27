@@ -25,8 +25,11 @@ Gleam records, custom enum ADTs, or opaque tagged error values.
   - [x] Postgrex prepare metadata for parameters and result types.
   - [x] Nullability for table columns, outer joins, `using(...)`, CTEs, and foreign-key-derived
     cases.
+  - [x] Multi-schema / `search_path` inference docs and focused tests.
   - [x] Structured errors for syntax errors, missing tables, missing columns, invalid enums,
     and unsupported types.
+  - [x] Consistent structured formatting for user-facing codegen/check/metadata/connection
+    errors.
 
 - **Type mapping (Elixir-native)**
   - [x] Scalar Postgres types mapped to Elixir stdlib typespecs.
@@ -45,6 +48,8 @@ Gleam records, custom enum ADTs, or opaque tagged error values.
   - [x] Row queries return decoded maps; command queries return `:ok`.
   - [x] Soft companions (`<name>_ok`) via `Postgrex.query/3`; soft commands return
     `{:ok, num_rows}` (additive; raising API unchanged).
+  - [x] Dialyzer-oriented public `@spec`s / helpers for generated modules (documented
+    expectations and known `:overspecs` limits).
   - [x] Safe overwrite and `mix squirrelix.check` drift detection.
   - [x] Runtime decode coverage for nullable values, arrays, JSON, UUIDs, dates/times, and
     command results.
@@ -65,6 +70,9 @@ Gleam records, custom enum ADTs, or opaque tagged error values.
   - [x] Hex package metadata, Apache-2.0 license, and ExDoc module grouping.
   - [x] README mirroring Gleam Squirrel structure (motivation, installation, types, FAQ).
   - [x] Guides: getting started, writing queries, types, configuration, and Phoenix + CI.
+  - [x] Supported pre-1.0 public API inventory; internals `@moduledoc false`.
+  - [x] Adopter CI workflow examples (`examples/github-actions/`).
+  - [x] CI test coverage metrics (ExCoveralls; soft floor).
   - [x] ExDoc extras and module docs linking to guides.
 
 ## Remaining (path to 1.0)
@@ -75,21 +83,14 @@ Gleam-aligned where intentional, with a SemVer stability promise — not infinit
 
 ### Shipped slices (folded into Completed above)
 
-Post-0.1 roadmap items through **v0.4.0** are done: nullability expansion, structured
+Post-0.1 roadmap items through **v0.5.0** are done: nullability expansion, structured
 connection/timeout errors, ranges/unsupported built-ins, composite reject-with-hints,
 parameter-name/Gleam parity ports, Phoenix-ready `DATABASE_URL`/SSL `--infer`, atomic
 codegen, INSERT/VALUES and broader structural parameter naming, additive soft query
 companions with command row counts, watch mode, `--write-metadata`, Phoenix + CI
-cookbook, and Hex `0.1.0` / `0.2.0` / `0.3.0` / `0.4.0` releases.
-
-### [v0.5.0](https://github.com/scripthungry/squirrelix/milestone/4) — Production hardening
-
-- [x] Multi-schema / `search_path` docs and tests (#18)
-- [x] Dialyzer-friendly generated modules (#19)
-- [x] Public API surface audit (#20)
-- [x] Adopter CI workflow example (#21)
-- [x] User-facing error consistency pass (#22)
-- [x] Test coverage metrics in CI (#33)
+cookbook, production hardening (multi-schema docs/tests, Dialyzer-friendly codegen,
+public API audit, adopter CI examples, error-message consistency, CI coverage), and Hex
+`0.1.0` / `0.2.0` / `0.3.0` / `0.4.0` / `0.5.0` releases.
 
 ### [v1.0.0](https://github.com/scripthungry/squirrelix/milestone/5) — Stability promise
 
