@@ -84,7 +84,7 @@ cookbook, and Hex `0.1.0` / `0.2.0` / `0.3.0` / `0.4.0` releases.
 
 ### [v0.5.0](https://github.com/scripthungry/squirrelix/milestone/4) — Production hardening
 
-- [ ] Multi-schema / `search_path` docs and tests (#18)
+- [x] Multi-schema / `search_path` docs and tests (#18)
 - [ ] Dialyzer-friendly generated modules (#19)
 - [ ] Public API surface audit (#20)
 - [ ] Adopter CI workflow example (#21)

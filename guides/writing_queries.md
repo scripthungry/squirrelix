@@ -198,6 +198,9 @@ Inference also covers:
 
 - **Schema-qualified tables** — `schema.table` columns use catalog nullability for that
   schema (including tables outside `search_path`).
+- **Unqualified tables via `search_path`** — bare `from widgets` resolves through the
+  infer connection's session `search_path` (same as interactive Postgres). Squirrelix
+  does not set `search_path`; see [Configuration](configuration.md#multi-schema-and-search_path).
 - **Scalar subqueries in the select list** — treated as nullable (they can return no
   row). This is intentionally stricter than Gleam Squirrel, which treats
   non-table columns as non-nullable.

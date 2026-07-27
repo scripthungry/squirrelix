@@ -708,6 +708,81 @@ defmodule SquirrelixPostgresTest do
             ]} = Postgres.infer(conn, query)
   end
 
+  # Multi-schema / search_path (#18): unqualified names resolve via the session
+  # search_path; schema-qualified names work regardless of search_path.
+  test "infer resolves unqualified tables via session search_path", %{conn: conn} do
+    Postgrex.query!(conn, "drop schema if exists squirr_elix_app cascade", [])
+    Postgrex.query!(conn, "create schema squirr_elix_app", [])
+
+    Postgrex.query!(
+      conn,
+      "create table squirr_elix_app.widgets (id integer not null, label text)",
+      []
+    )
+
+    {:ok, %Postgrex.Result{rows: [[original_search_path]]}} =
+      Postgrex.query(conn, "show search_path", [])
+
+    try do
+      Postgrex.query!(conn, "set search_path to squirr_elix_app, public", [])
+
+      query = query("select id, label from widgets")
+
+      assert {:ok,
+              [
+                params: [],
+                returns: [
+                  %Column{name: "id", type: :integer, nullable?: false},
+                  %Column{name: "label", type: :string, nullable?: true}
+                ]
+              ]} = Postgres.infer(conn, query)
+    after
+      Postgrex.query!(
+        conn,
+        "select set_config('search_path', $1, false)",
+        [original_search_path]
+      )
+    end
+  end
+
+  test "infer keeps schema-qualified nullability when table is outside search_path", %{
+    conn: conn
+  } do
+    Postgrex.query!(conn, "drop schema if exists squirr_elix_vault cascade", [])
+    Postgrex.query!(conn, "create schema squirr_elix_vault", [])
+
+    Postgrex.query!(
+      conn,
+      "create table squirr_elix_vault.secrets (id integer not null, note text)",
+      []
+    )
+
+    {:ok, %Postgrex.Result{rows: [[original_search_path]]}} =
+      Postgrex.query(conn, "show search_path", [])
+
+    try do
+      # Only public — vault is intentionally not on the path.
+      Postgrex.query!(conn, "set search_path to public", [])
+
+      query = query("select id, note from squirr_elix_vault.secrets")
+
+      assert {:ok,
+              [
+                params: [],
+                returns: [
+                  %Column{name: "id", type: :integer, nullable?: false},
+                  %Column{name: "note", type: :string, nullable?: true}
+                ]
+              ]} = Postgres.infer(conn, query)
+    after
+      Postgrex.query!(
+        conn,
+        "select set_config('search_path', $1, false)",
+        [original_search_path]
+      )
+    end
+  end
+
   # Scalar subqueries in the select list can return NULL even when the inner
   # column is NOT NULL. Gleam Squirrel treats table_oid=0 as not nullable; we
   # intentionally mark SubPlan outputs nullable instead.
