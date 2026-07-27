@@ -653,6 +653,126 @@ defmodule SquirrelixPostgresTest do
             ]} = Postgres.infer(conn, query)
   end
 
+  test "infer marks schema-qualified not-null columns as non-nullable", %{conn: conn} do
+    Postgrex.query!(conn, "drop schema if exists squirr_elix_other cascade", [])
+    Postgrex.query!(conn, "create schema squirr_elix_other", [])
+
+    Postgrex.query!(
+      conn,
+      "create table squirr_elix_other.people (id integer not null, nickname text)",
+      []
+    )
+
+    query = query("select id, nickname from squirr_elix_other.people")
+
+    assert {:ok,
+            [
+              params: [],
+              returns: [
+                %Column{name: "id", type: :integer, nullable?: false},
+                %Column{name: "nickname", type: :string, nullable?: true}
+              ]
+            ]} = Postgres.infer(conn, query)
+  end
+
+  test "infer keeps schema-qualified left joined columns nullable", %{conn: conn} do
+    Postgrex.query!(conn, "drop schema if exists squirr_elix_other cascade", [])
+    Postgrex.query!(conn, "create schema squirr_elix_other", [])
+
+    Postgrex.query!(
+      conn,
+      "create table squirr_elix_other.teams (id integer not null, name text not null)",
+      []
+    )
+
+    Postgrex.query!(
+      conn,
+      "create table squirr_elix_other.members (team_id integer not null, name text not null)",
+      []
+    )
+
+    query =
+      query("""
+      select t.name as team_name, m.name as member_name
+      from squirr_elix_other.teams t
+      left join squirr_elix_other.members m on m.team_id = t.id
+      """)
+
+    assert {:ok,
+            [
+              params: [],
+              returns: [
+                %Column{name: "team_name", type: :string, nullable?: false},
+                %Column{name: "member_name", type: :string, nullable?: true}
+              ]
+            ]} = Postgres.infer(conn, query)
+  end
+
+  # Scalar subqueries in the select list can return NULL even when the inner
+  # column is NOT NULL. Gleam Squirrel treats table_oid=0 as not nullable; we
+  # intentionally mark SubPlan outputs nullable instead.
+  test "infer marks scalar subqueries in the select list as nullable", %{conn: conn} do
+    Postgrex.query!(conn, "drop table if exists squirr_elix_subq_people", [])
+
+    Postgrex.query!(
+      conn,
+      "create temporary table squirr_elix_subq_people (id integer not null, name text not null)",
+      []
+    )
+
+    query =
+      query("""
+      select
+        id,
+        name,
+        (select name from squirr_elix_subq_people s2 where s2.id = s1.id) as other_name
+      from squirr_elix_subq_people s1
+      """)
+
+    assert {:ok,
+            [
+              params: [],
+              returns: [
+                %Column{name: "id", type: :integer, nullable?: false},
+                %Column{name: "name", type: :string, nullable?: false},
+                %Column{name: "other_name", type: :string, nullable?: true}
+              ]
+            ]} = Postgres.infer(conn, query)
+  end
+
+  # Expression-derived columns have no table oid in Postgres RowDescription.
+  # Matching Gleam Squirrel, treat them as non-nullable unless forced with `?`.
+  test "infer treats expression-derived columns as non-nullable", %{conn: conn} do
+    Postgrex.query!(conn, "drop table if exists squirr_elix_expr_people", [])
+
+    Postgrex.query!(
+      conn,
+      "create temporary table squirr_elix_expr_people (id integer not null, nickname text, score integer)",
+      []
+    )
+
+    query =
+      query("""
+      select
+        id + 1 as next_id,
+        upper(nickname) as nick,
+        coalesce(nickname, 'x') as nick_or_x,
+        score * 2 as doubled
+      from squirr_elix_expr_people
+      """)
+
+    assert {:ok,
+            [
+              params: [],
+              returns: [
+                %Column{name: "next_id", type: :integer, nullable?: false},
+                %Column{name: "nick", type: :string, nullable?: false},
+                %Column{name: "nick_or_x", type: :string, nullable?: false},
+                %Column{name: "doubled", type: :integer, nullable?: false}
+              ]
+            ]} = Postgres.infer(conn, query)
+  end
+
   test "infer accepts do blocks", %{conn: conn} do
     query =
       query("""
