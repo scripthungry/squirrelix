@@ -1,6 +1,19 @@
 defmodule Squirrelix.Query do
   @moduledoc """
-  Parses Squirrel SQL query files into Elixir structs.
+  A parsed SQL query file.
+
+  Part of the supported public API **only** as the argument to
+  `Squirrelix.Inference.Inferrer` callbacks (and to functions returned by
+  `Squirrelix.Postgres.inferrer/1`). Fields are plain struct keys:
+
+    * `:file` — absolute path to the `.sql` file
+    * `:starting_line` — 1-based start of the query body
+    * `:name` — Elixir function name derived from the file basename
+    * `:comment` — leading `--` comment lines (become `@doc`)
+    * `:content` — full file contents
+
+  Parsing helpers on this module are internal and may change without notice.
+  Prefer `Squirrelix.generate/3` / Mix tasks for normal use.
   """
 
   @enforce_keys [:file, :starting_line, :name, :comment, :content]
@@ -18,6 +31,7 @@ defmodule Squirrelix.Query do
           content: String.t()
         }
 
+  @doc false
   @spec from_file(String.t()) ::
           {:ok, t()} | {:error, CannotReadFile.t() | QueryFileHasInvalidName.t()}
   def from_file(file) when is_binary(file) do

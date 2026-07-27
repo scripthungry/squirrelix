@@ -87,29 +87,20 @@ defmodule Squirrelix.MixProject do
       ],
       source_url: @source_url,
       source_ref: "v#{@version}",
+      nest_modules_by_prefix: [Squirrelix.Error],
       groups_for_modules: [
         "Core API": [
           Squirrelix,
-          Squirrelix.CLI,
-          Squirrelix.Project
-        ],
-        "Query discovery": [
-          Squirrelix.Query,
-          Squirrelix.QueryDirectory,
-          Squirrelix.TypedQuery,
-          Squirrelix.TypedQueryDirectory,
-          Squirrelix.SQL
+          Squirrelix.CodegenSummary,
+          Squirrelix.CodegenCheckSummary
         ],
         Inference: [
-          Squirrelix.Inference,
+          Squirrelix.Inference.Inferrer,
           Squirrelix.Postgres,
-          Squirrelix.TypeMapper,
-          Squirrelix.Metadata,
-          Squirrelix.ConnectionOptions
+          Squirrelix.Query
         ],
-        Codegen: [
-          Squirrelix.Codegen,
-          Squirrelix.Output
+        Errors: [
+          Squirrelix.Error
         ],
         "Mix tasks": [
           Mix.Tasks.Squirrelix.Gen,

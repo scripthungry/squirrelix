@@ -1,7 +1,5 @@
 defmodule Squirrelix.SQL do
-  @moduledoc """
-  SQL helpers used by query analysis and code generation.
-  """
+  @moduledoc false
 
   @identifier ~S/(?:"(?:[^"]|"")*"|[A-Za-z_][A-Za-z0-9_]*)(?:\.(?:"(?:[^"]|"")*"|[A-Za-z_][A-Za-z0-9_]*))?/
   @horizontal_space ~S/[ \t\r]*/

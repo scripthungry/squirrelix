@@ -1,11 +1,5 @@
 defmodule Squirrelix.Project do
-  @moduledoc """
-  Locates an Elixir Mix project and derives module names for generated SQL code.
-
-  Functions return standard `{:ok, value}` / `{:error, reason}` tuples. Reasons are
-  plain atoms (`:not_found`, `:invalid_mixfile`, `:invalid_sql_directory`) rather than
-  Gleam-style tagged error values.
-  """
+  @moduledoc false
 
   @type error_reason :: :not_found | :invalid_mixfile | :invalid_sql_directory
 

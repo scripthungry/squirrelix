@@ -1,6 +1,8 @@
 defmodule Squirrelix.CodegenSummary do
   @moduledoc """
   Summary of a generated query-module write pass.
+
+  Returned by `Squirrelix.generate/3`. Part of the supported public API.
   """
 
   @enforce_keys [:generated_count, :errors, :status]
@@ -16,6 +18,8 @@ end
 defmodule Squirrelix.CodegenCheckSummary do
   @moduledoc """
   Summary of a generated query-module check pass.
+
+  Returned by `Squirrelix.check/3`. Part of the supported public API.
   """
 
   @enforce_keys [:checked_count, :errors, :status]
@@ -29,15 +33,7 @@ defmodule Squirrelix.CodegenCheckSummary do
 end
 
 defmodule Squirrelix.Codegen do
-  @moduledoc """
-  Generates Elixir modules for typed SQL queries.
-
-  Produces per-query row `@type` definitions, `@spec`-annotated functions, and runtime
-  encode/decode helpers. Each query gets a raising function and an additive soft
-  companion (`<name>_ok/arity`) that returns `{:ok, result} | {:error, Exception.t()}`.
-  Soft command companions return `{:ok, num_rows}`. See [Writing Queries](writing_queries.html) and
-  [Types](types.html) for conventions, type mapping, and Dialyzer expectations.
-  """
+  @moduledoc false
 
   alias Squirrelix.Output
   alias Squirrelix.Parameter

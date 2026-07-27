@@ -2,6 +2,18 @@ defmodule Squirrelix.Inference.Inferrer do
   @moduledoc """
   Behaviour for modules that infer SQL query parameters and returned columns.
 
+  Part of the supported public API for custom query sources. Prefer
+  `Squirrelix.Postgres.inferrer/1` when connecting to a live database.
+
+  Callbacks receive a `Squirrelix.Query` and must return either:
+
+      {:ok, [params: types, returns: columns]}
+      {:error, structured_error}
+
+  where `types` is a list of type atoms (see the Types guide) and `columns` is a
+  list of maps with `:name`, `:type`, and `:nullable?` keys — the same shape as
+  metadata-file entries.
+
   The Mix task uses `Squirrelix.Postgres.inferrer/1` when `--infer` is passed.
   See the [Configuration guide](configuration.html) for connection options.
   """
@@ -10,13 +22,7 @@ defmodule Squirrelix.Inference.Inferrer do
 end
 
 defmodule Squirrelix.Inference do
-  @moduledoc """
-  Converts parsed query directories into typed query directories using an inferrer callback.
-
-  Used by `Squirrelix.generate/3` and `Squirrelix.check/3` when the query source
-  is a function or `Squirrelix.Inference.Inferrer` module rather than a metadata map.
-  See [Configuration](configuration.html) for metadata vs inference modes.
-  """
+  @moduledoc false
 
   alias Squirrelix.Error
   alias Squirrelix.Query
