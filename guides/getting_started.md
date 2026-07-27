@@ -184,3 +184,4 @@ the updated `sql.ex`.
 - [Writing Queries](writing_queries.md) — naming, comments, nullable parameters
 - [Types](types.md) — Postgres to Elixir type mapping
 - [Configuration](configuration.md) — metadata, env vars, programmatic API
+- [Phoenix + CI Cookbook](phoenix.md) — migrate-then-gen, Mix aliases, Ecto coexistence

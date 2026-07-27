@@ -420,6 +420,13 @@ Select individual fields (for example `(location).x`), or cast to
 `json`/`jsonb`/`text` in the query. See the
 [Types guide](guides/types.md#composite-types-policy) for the full policy.
 
+### Does Squirrelix integrate with Ecto `Repo`?
+
+No — and that is intentional. Use Ecto for schemas and migrations; put typed SQL
+in `sql/` directories and call generated modules with a `Postgrex.conn()`.
+Squirrelix is not a `Repo` wrapper and does not provide query macros. See the
+[Phoenix + CI Cookbook](guides/phoenix.md#coexistence-with-ecto-intentional).
+
 ## Errors and troubleshooting
 
 Squirrelix reports structured errors during generation and checking. Common cases:
@@ -483,6 +490,7 @@ See [ROADMAP.md](ROADMAP.md) for completed work and remaining compatibility slic
 - [Writing Queries](guides/writing_queries.md)
 - [Types](guides/types.md)
 - [Configuration](guides/configuration.md)
+- [Phoenix + CI Cookbook](guides/phoenix.md)
 
 ## License
 

@@ -246,6 +246,9 @@ A typical CI step runs the check task after migrations:
 Commit generated `sql.ex` files alongside your `.sql` sources so CI verifies they
 stay in sync.
 
+For Phoenix apps — Mix aliases, `DATABASE_URL`, and a fuller GitHub Actions
+example — see the [Phoenix + CI Cookbook](phoenix.md).
+
 ## Safe overwrite rules
 
 Squirrelix only overwrites files whose header contains the Squirrelix generation
@@ -269,4 +272,5 @@ a single bad directory is enough for a non-zero exit.
 ## Next steps
 
 - [Getting Started](getting_started.md) — first query walkthrough
+- [Phoenix + CI Cookbook](phoenix.md) — Phoenix Mix aliases and CI
 - [Types](types.md) — type mapping reference

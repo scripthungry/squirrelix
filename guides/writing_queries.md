@@ -296,3 +296,4 @@ This is one of the main benefits over embedding SQL as strings in Elixir source.
 
 - [Types](types.md) — supported Postgres types and Elixir mappings
 - [Configuration](configuration.md) — inference and metadata options
+- [Phoenix + CI Cookbook](phoenix.md) — Mix aliases, CI, Ecto coexistence

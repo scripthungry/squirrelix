@@ -72,7 +72,8 @@ defmodule Squirrelix.MixProject do
         "guides/getting_started.md",
         "guides/writing_queries.md",
         "guides/types.md",
-        "guides/configuration.md"
+        "guides/configuration.md",
+        "guides/phoenix.md"
       ],
       groups_for_extras: [
         Guides: Path.wildcard("guides/*.md")
