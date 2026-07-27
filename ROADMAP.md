@@ -59,38 +59,54 @@ Gleam records, custom enum ADTs, or opaque tagged error values.
   - [x] Guides: getting started, writing queries, types, and configuration.
   - [x] ExDoc extras and module docs linking to guides.
 
-## Remaining
+## Remaining (path to 1.0)
 
-- **Parameter inference**
-  - [x] Port remaining upstream cases for repeated parameter names, invalid inferred identifiers,
-    keyword-like names, and ambiguous comparisons.
-  - [x] Rename inferred `connection` arguments to avoid shadowing the Postgrex connection param.
+GitHub is the source of truth for open work: [project board](https://github.com/orgs/scripthungry/projects/1)
+and milestones below. **1.0** means production-ready typed SQL codegen for Elixir/Phoenix,
+Gleam-aligned where intentional, with a SemVer stability promise — not infinite feature creep.
 
-- **Postgres inference**
-  - [x] Expand nullability for schema-qualified tables, subqueries in select lists, and
-    expression-derived columns where practical.
-  - [x] Improve structured errors for connection failures and timeouts.
+### Shipped slices (folded into Completed above)
 
-- **Type mapping**
-  - [x] Document and finalize behavior for Postgres ranges and remaining unsupported built-ins.
-  - [x] Revisit composite-type support policy (reject-with-hints; see Completed).
+Post-0.1 roadmap items through **v0.2.0** are done: nullability expansion, structured
+connection/timeout errors, ranges/unsupported built-ins, composite reject-with-hints,
+parameter-name/Gleam parity ports, and Hex `0.1.0` / `0.2.0` releases.
 
-- **Upstream fixture porting**
-  - [x] Port remaining Birdie snapshots into focused ExUnit cases by behavior rather than
-    copying generated Gleam APIs (join nullability, select-list aliases, multi-helper codegen,
-    long enum names, enum arrays, connection shadowing).
-  - [x] Document intentional Gleam-only snapshot gaps in `squirr_elix_gleam_parity_test.exs`.
+### [v0.3.0](https://github.com/scripthungry/squirrelix/milestone/2) — Phoenix/Mix adoption DX
 
-- **Gleam implementation alignment**
-  - [x] Sort generated query functions by source file path (matches Gleam reproducibility).
-  - [x] Align validation error titles and hints with upstream Squirrel wording (duplicate
-    columns, invalid file/column names, outdated/cannot-overwrite files).
-  - [x] Keep intentional divergences: Elixir row maps and `@spec`s, `String.t()` enums,
-    `timestamptz` mapped to `DateTime.t()`, function-name sorting only when file/name differ.
+- [ ] `DATABASE_URL` + SSL for `--infer` (#9)
+- [ ] Project-wide atomic generate/check (#10)
+- [ ] INSERT/VALUES parameter names (#11)
+- [ ] Generated runtime ergonomics: soft errors and/or command row counts (#12)
+- [ ] Docs/ROADMAP hygiene for 0.3.0 (#13)
 
-- **Release**
-  - [x] Harden codegen escaping, EXPLAIN path, overwrite markers, and release docs.
-  - [x] Publish `0.1.0` to Hex and enable HexDocs at <https://hexdocs.pm/squirr_elix>.
+### [v0.4.0](https://github.com/scripthungry/squirrelix/milestone/3) — Day-to-day workflow & adoption docs
+
+- [ ] Watch mode for `mix squirrelix.gen` (#14)
+- [ ] Phoenix + CI cookbook guide (#15)
+- [ ] Export inferred metadata for offline check (#16)
+- [ ] Broader structural parameter naming beyond INSERT (#17)
+
+### [v0.5.0](https://github.com/scripthungry/squirrelix/milestone/4) — Production hardening
+
+- [ ] Multi-schema / `search_path` docs and tests (#18)
+- [ ] Dialyzer-friendly generated modules (#19)
+- [ ] Public API surface audit (#20)
+- [ ] Adopter CI workflow example (#21)
+- [ ] User-facing error consistency pass (#22)
+
+### [v1.0.0](https://github.com/scripthungry/squirrelix/milestone/5) — Stability promise
+
+- [ ] SemVer / stability / deprecation policy (#23)
+- [ ] Documented non-goals freeze (#24)
+- [ ] Docs freeze and HexDocs polish (#25)
+- [ ] Ship via `docs/RELEASE.md` (#26)
+
+### Explicit non-goals (not on the 1.0 path)
+
+Composites as nested modules, first-class ranges/geometric/network/`interval`, Gleam-style
+enum ADTs, catalog-inferred nullable parameters, Unix sockets, PostGIS, ULID, first-class
+Ecto `Repo` integration, and a built-in SQL formatter. See FAQ / Types guide; freeze tracked
+in #24.
 
 ## Validation discipline
 
