@@ -29,6 +29,35 @@ mix squirrelix.gen --infer --database my_app_dev
 The database must exist, be reachable, and have the schema your queries reference
 (migrations applied).
 
+### Multi-schema and `search_path`
+
+`--infer` uses the **session** Postgres connection: it does not set `search_path`
+itself, and there is no CLI flag for it. Unqualified table names resolve the same
+way they would in `psql` for that role — via
+[`search_path`](https://www.postgresql.org/docs/current/ddl-schemas.html#DDL-SCHEMAS-PATH)
+/`current_schemas(true)`. Schema-qualified names (`app.users`) resolve that
+schema regardless of `search_path`.
+
+Practical guidance:
+
+- Prefer **schema-qualified** table names in `.sql` files when objects live outside
+  `public`, so codegen and runtime see the same relation even if role defaults differ.
+- If you rely on unqualified names, ensure the role used for
+  `mix squirrelix.gen --infer` / `mix squirrelix.check --infer` has the same
+  `search_path` as production (database/role `ALTER ... SET search_path`, or a
+  connection that already applies it).
+- Temporary tables (`pg_temp`) are resolved like ordinary Postgres sessions.
+
+Intentional gaps (out of scope):
+
+- Squirrelix does not migrate objects across schemas or rewrite SQL to add qualifiers.
+- Cross-database federation is unsupported.
+- Connection options do not expose a `search_path` override; configure it in Postgres
+  (or qualify names in SQL) instead.
+
+Nullability for schema-qualified and `search_path`-resolved columns is covered in
+[Writing Queries](writing_queries.md#nullable-result-columns).
+
 If connection fails, Squirrelix reports a structured error (refused host/port,
 timeout, invalid credentials, or missing database) with hints for `PG*` variables
 and Mix flags. Timeouts are reported separately from other connection failures.
