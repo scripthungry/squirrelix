@@ -83,14 +83,14 @@ Gleam-aligned where intentional, with a SemVer stability promise — not infinit
 
 ### Shipped slices (folded into Completed above)
 
-Post-0.1 roadmap items through **v0.5.0** are done: nullability expansion, structured
+Post-0.1 roadmap items through **v0.5.1** are done: nullability expansion, structured
 connection/timeout errors, ranges/unsupported built-ins, composite reject-with-hints,
 parameter-name/Gleam parity ports, Phoenix-ready `DATABASE_URL`/SSL `--infer`, atomic
 codegen, INSERT/VALUES and broader structural parameter naming, additive soft query
 companions with command row counts, watch mode, `--write-metadata`, Phoenix + CI
 cookbook, production hardening (multi-schema docs/tests, Dialyzer-friendly codegen,
 public API audit, adopter CI examples, error-message consistency, CI coverage), and Hex
-`0.1.0` / `0.2.0` / `0.3.0` / `0.4.0` / `0.5.0` releases.
+`0.1.0` / `0.2.0` / `0.3.0` / `0.4.0` / `0.5.0` / `0.5.1` releases.
 
 ### [v1.0.0](https://github.com/scripthungry/squirrelix/milestone/5) — Stability promise
 
