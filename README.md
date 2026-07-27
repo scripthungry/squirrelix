@@ -330,8 +330,13 @@ The types that are currently supported are:
 | user-defined enum | `String.t()` | `String.t()` |
 | user-defined domain | base type | base type |
 
-See the [Types guide](guides/types.md) for nullable columns, JSON columns, and
-intentional differences from Gleam Squirrel.
+See the [Types guide](guides/types.md) for nullable columns, JSON columns,
+unsupported ranges/built-ins, and intentional differences from Gleam Squirrel.
+
+**Unsupported (rejected with hints):** Postgres ranges/multiranges, geometric
+types (`point`, …), network types (`inet`, …), `interval`, `bit`/`varbit`,
+`tsvector`/`tsquery`, `money`, `xml`, OID-family types, `hstore`, and `timetz`.
+Prefer casting to a supported type in SQL or selecting scalar bounds/fields.
 
 ### Enums
 
@@ -409,7 +414,7 @@ Squirrelix reports structured errors during generation and checking. Common case
 | `MissingPostgresTable` / `MissingPostgresColumn` | Schema mismatch | Apply migrations before `--infer` |
 | `DuplicateReturnColumns` | Two columns share the same name in the result | Add aliases in the `select` list |
 | `QueryFileHasInvalidName` | Filename is not a valid Elixir function name | Rename the `.sql` file (a suggested name may be shown) |
-| `UnsupportedPostgresType` | Postgres type not yet mapped | Check the supported types table; some types include hints |
+| `UnsupportedPostgresType` | Postgres type not mapped (ranges, geometric, …) | Check the Types guide; errors include actionable hints |
 | `MissingQueryMetadata` | No metadata entry for a query file | Add an entry to `squirr_elix.exs` or use `--infer` |
 
 Connection failures during `--infer` produce a Mix error with the underlying

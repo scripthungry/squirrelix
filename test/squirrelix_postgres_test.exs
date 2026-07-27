@@ -797,13 +797,12 @@ defmodule SquirrelixPostgresTest do
         []
       )
 
-      assert {:error, %UnsupportedPostgresType{name: "point", hint: point_hint}} =
+      assert {:error, %UnsupportedPostgresType{name: "point", hint: hint}} =
                Postgres.infer(conn, query("select point(1, 2) as location"))
 
-      assert point_hint =~ "point"
-      assert point_hint =~ ~r/text|json|numeric/i
+      assert hint =~ "Geometric"
 
-      assert {:error, %UnsupportedPostgresType{name: "point", hint: ^point_hint}} =
+      assert {:error, %UnsupportedPostgresType{name: "point", hint: ^hint}} =
                Postgres.infer(conn, query("select $1::point as location"))
 
       assert {:error, %UnsupportedPostgresType{name: "squirr_elix_point", hint: composite_hint}} =
@@ -820,6 +819,45 @@ defmodule SquirrelixPostgresTest do
                  conn,
                  query("select $1::squirr_elix_point as location")
                )
+    end
+  end
+
+  describe "postgres ranges and remaining unsupported built-ins" do
+    test "infer rejects built-in range types with actionable hints", %{conn: conn} do
+      assert {:error, %UnsupportedPostgresType{name: "int4range", hint: hint}} =
+               Postgres.infer(conn, query("select int4range(1, 5) as ages"))
+
+      assert hint =~ "range"
+
+      assert {:error, %UnsupportedPostgresType{name: "daterange", hint: hint}} =
+               Postgres.infer(conn, query("select $1::daterange as window"))
+
+      assert hint =~ "range"
+    end
+
+    test "infer rejects custom range types with range hints", %{conn: conn} do
+      Postgrex.query!(conn, "drop type if exists squirr_elix_floatrange cascade", [])
+      Postgrex.query!(conn, "create type squirr_elix_floatrange as range (subtype = float8)", [])
+
+      assert {:error, %UnsupportedPostgresType{name: "squirr_elix_floatrange", hint: hint}} =
+               Postgres.infer(
+                 conn,
+                 query("select '[1.0,2.0)'::squirr_elix_floatrange as window")
+               )
+
+      assert hint =~ "range"
+    end
+
+    test "infer rejects interval and network built-ins with hints", %{conn: conn} do
+      assert {:error, %UnsupportedPostgresType{name: "interval", hint: hint}} =
+               Postgres.infer(conn, query("select interval '1 day' as duration"))
+
+      assert is_binary(hint)
+
+      assert {:error, %UnsupportedPostgresType{name: "inet", hint: hint}} =
+               Postgres.infer(conn, query("select '127.0.0.1'::inet as address"))
+
+      assert hint =~ "text"
     end
   end
 end

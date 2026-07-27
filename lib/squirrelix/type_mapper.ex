@@ -24,6 +24,13 @@ defmodule Squirrelix.TypeMapper do
   fields, or cast to `json`/`jsonb`/`text`). This matches Gleam Squirrel and
   keeps generated Elixir APIs limited to stdlib typespecs and flat row maps —
   no nested composite modules or opaque encodings.
+
+  ## Unsupported types
+
+  Postgres range/multirange types and several other built-ins are intentionally
+  unsupported. Inference returns `UnsupportedPostgresType` with an actionable
+  hint (for example: select bounds as separate columns, or cast to `text` /
+  `jsonb` in SQL). See the Types guide for the full inventory.
   """
 
   alias Squirrelix.Error.UnsupportedPostgresType
@@ -55,14 +62,77 @@ defmodule Squirrelix.TypeMapper do
   @composite_hint "Postgres composite types are not supported. Select individual fields " <>
                     "(for example `(value).field`), or cast to `json`/`jsonb`/`text` in the query."
 
-  @point_hint "Postgres geometric types such as `point` are not supported. Prefer separate " <>
-                "numeric columns, or cast to `text`/`json` if you only need a string representation."
+  @range_hint "Postgres range types are not mapped. Prefer selecting lower/upper " <>
+                "bounds as separate columns of a supported type, or cast the range to " <>
+                "text/jsonb in SQL."
+
+  @multirange_hint "Postgres multirange types are not mapped. Prefer expanding ranges " <>
+                     "into supported scalar columns, or cast to text/jsonb in SQL."
+
+  @geometric_hint "Geometric types are not mapped. Cast to text in SQL, or select " <>
+                    "coordinates as separate float/numeric columns."
+
+  @network_hint "Network address types are not mapped. Cast to text in SQL."
+
+  @interval_hint "interval is not mapped. Prefer extracting epoch seconds " <>
+                   "(for example `extract(epoch from ...)::float8`) or casting to text in SQL."
+
+  @bit_hint "Bit string types are not mapped. Cast to text in SQL."
+
+  @text_search_hint "Full-text search types are not mapped. Cast to text in SQL, or " <>
+                      "return ranking/boolean results as supported scalars."
+
+  @money_hint "money is not mapped. Prefer numeric/decimal columns instead of money."
+
+  @xml_hint "xml is not mapped. Prefer text or jsonb columns instead."
+
+  @oid_hint "OID-family types are not mapped. Cast to text or use a supported " <>
+              "scalar that identifies the object."
+
+  @hstore_hint "hstore is not mapped. Prefer jsonb instead of hstore."
+
+  @timetz_hint "timetz is not mapped. Prefer time (without time zone) columns."
 
   @type_hints %{
     "timestamptz" =>
       "In Postgres a timestamptz is converted to a regular timestamp using the connection's " <>
         "time zone. This is very error prone and should be avoided in favour of using regular timestamps.",
-    "point" => @point_hint
+    "int4range" => @range_hint,
+    "int8range" => @range_hint,
+    "numrange" => @range_hint,
+    "tsrange" => @range_hint,
+    "tstzrange" => @range_hint,
+    "daterange" => @range_hint,
+    "int4multirange" => @multirange_hint,
+    "int8multirange" => @multirange_hint,
+    "nummultirange" => @multirange_hint,
+    "tsmultirange" => @multirange_hint,
+    "tstzmultirange" => @multirange_hint,
+    "datemultirange" => @multirange_hint,
+    "point" => @geometric_hint,
+    "box" => @geometric_hint,
+    "circle" => @geometric_hint,
+    "line" => @geometric_hint,
+    "lseg" => @geometric_hint,
+    "path" => @geometric_hint,
+    "polygon" => @geometric_hint,
+    "inet" => @network_hint,
+    "cidr" => @network_hint,
+    "macaddr" => @network_hint,
+    "macaddr8" => @network_hint,
+    "interval" => @interval_hint,
+    "bit" => @bit_hint,
+    "varbit" => @bit_hint,
+    "tsvector" => @text_search_hint,
+    "tsquery" => @text_search_hint,
+    "money" => @money_hint,
+    "xml" => @xml_hint,
+    "oid" => @oid_hint,
+    "xid" => @oid_hint,
+    "tid" => @oid_hint,
+    "pg_lsn" => @oid_hint,
+    "hstore" => @hstore_hint,
+    "timetz" => @timetz_hint
   }
 
   @elixir_types MapSet.new([
@@ -84,6 +154,14 @@ defmodule Squirrelix.TypeMapper do
 
   @spec hint_for(String.t()) :: String.t() | nil
   def hint_for(name) when is_binary(name), do: Map.get(@type_hints, name)
+
+  @spec hint_for(String.t(), String.t() | nil) :: String.t() | nil
+  def hint_for(name, kind) when is_binary(name) do
+    case hint_for(name) do
+      nil -> kind_hint(kind)
+      hint -> hint
+    end
+  end
 
   @spec validate_enum(String.t(), [String.t()]) :: :ok | {:error, :no_variants}
   def validate_enum(_name, []), do: {:error, :no_variants}
@@ -147,10 +225,14 @@ defmodule Squirrelix.TypeMapper do
     {:error, unsupported_composite(name)}
   end
 
-  defp base_type(name, _kind, _base) do
+  defp base_type(name, kind, _base) when kind in ["r", "m"] do
+    {:error, unsupported_type(name, kind)}
+  end
+
+  defp base_type(name, kind, _base) do
     case Map.fetch(@base_types, name) do
       {:ok, type} -> {:ok, type}
-      :error -> {:error, unsupported_type(name)}
+      :error -> {:error, unsupported_type(name, kind)}
     end
   end
 
@@ -158,9 +240,14 @@ defmodule Squirrelix.TypeMapper do
     %UnsupportedPostgresType{name: name, hint: @composite_hint}
   end
 
-  defp unsupported_type(name) do
-    %UnsupportedPostgresType{name: name, hint: hint_for(name)}
+  defp unsupported_type(name, kind) do
+    %UnsupportedPostgresType{name: name, hint: hint_for(name, kind)}
   end
+
+  defp kind_hint("r"), do: @range_hint
+  defp kind_hint("m"), do: @multirange_hint
+  defp kind_hint("c"), do: @composite_hint
+  defp kind_hint(_kind), do: nil
 
   @spec normalize_type(term()) :: {:ok, elixir_type()} | {:error, UnsupportedPostgresType.t()}
   def normalize_type({:list, type}) do

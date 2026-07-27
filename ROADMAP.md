@@ -37,6 +37,8 @@ Gleam records, custom enum ADTs, or opaque tagged error values.
   - [x] Composite-type policy: **reject-with-hints** (no nested row modules / opaque
     encodings); geometric `point` also rejected with workarounds. Documented in
     `guides/types.md` and the README FAQ.
+  - [x] Ranges/multiranges and remaining unsupported built-ins rejected with actionable
+    hints; inventory documented in `guides/types.md`.
 
 - **Code generation**
   - [x] Per-query row `@type` definitions and `@spec`-annotated functions.
@@ -70,7 +72,7 @@ Gleam records, custom enum ADTs, or opaque tagged error values.
   - [ ] Improve structured errors for connection failures and timeouts.
 
 - **Type mapping**
-  - [ ] Document and finalize behavior for Postgres ranges and remaining unsupported built-ins.
+  - [x] Document and finalize behavior for Postgres ranges and remaining unsupported built-ins.
   - [x] Revisit composite-type support policy (reject-with-hints; see Completed).
 
 - **Upstream fixture porting**

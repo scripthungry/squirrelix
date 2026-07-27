@@ -49,13 +49,12 @@ defmodule SquirrelixTypeMapperTest do
     assert {:error, %UnsupportedPostgresType{name: "point", hint: hint}} =
              TypeMapper.from_postgres("point")
 
-    assert hint =~ "point"
-    assert hint =~ ~r/text|json|numeric/i
+    assert hint =~ "Geometric"
   end
 
   test "hint_for returns guidance for timestamptz and point" do
     assert TypeMapper.hint_for("timestamptz") =~ "time zone"
-    assert TypeMapper.hint_for("point") =~ "point"
+    assert TypeMapper.hint_for("point") =~ "Geometric"
   end
 
   test "validate_enum accepts any enum name and variant strings" do
@@ -125,12 +124,11 @@ defmodule SquirrelixTypeMapperTest do
       assert hint =~ "regular timestamps"
     end
 
-    test "from_postgres rejects point with an actionable geometric-type hint" do
+    test "from_postgres rejects point with a geometric hint" do
       assert {:error, %UnsupportedPostgresType{name: "point", hint: hint}} =
                TypeMapper.from_postgres("point")
 
-      assert hint =~ "point"
-      assert hint =~ ~r/text|json|numeric/i
+      assert hint =~ "Geometric"
     end
 
     test "from_postgres rejects composite kinds with an actionable composite-type hint" do
@@ -150,6 +148,11 @@ defmodule SquirrelixTypeMapperTest do
 
       assert hint =~ "composite"
     end
+
+    test "from_postgres rejects unknown names without a kind-specific hint" do
+      assert TypeMapper.from_postgres("squirr_elix_point") ==
+               {:error, %UnsupportedPostgresType{name: "squirr_elix_point", hint: nil}}
+    end
   end
 
   describe "composite type policy" do
@@ -164,6 +167,82 @@ defmodule SquirrelixTypeMapperTest do
       assert hint =~ "composite"
       refute match?({:ok, :map}, TypeMapper.from_postgres("inventory_item", kind: "c"))
       refute match?({:ok, :string}, TypeMapper.from_postgres("inventory_item", kind: "c"))
+    end
+  end
+
+  describe "postgres ranges and remaining unsupported built-ins" do
+    @range_types ~w(int4range int8range numrange tsrange tstzrange daterange)
+    @multirange_types ~w(
+      int4multirange int8multirange nummultirange tsmultirange tstzmultirange datemultirange
+    )
+    @geometric_types ~w(point box circle line lseg path polygon)
+    @network_types ~w(inet cidr macaddr macaddr8)
+    @other_unsupported ~w(interval bit varbit tsvector tsquery money xml oid xid tid pg_lsn hstore timetz)
+
+    test "from_postgres rejects built-in range types with range hints" do
+      for type <- @range_types do
+        assert {:error, %UnsupportedPostgresType{name: ^type, hint: hint}} =
+                 TypeMapper.from_postgres(type)
+
+        assert hint =~ "range"
+        assert hint =~ "bounds" or hint =~ "lower" or hint =~ "upper" or hint =~ "text"
+      end
+    end
+
+    test "from_postgres rejects built-in multirange types with range hints" do
+      for type <- @multirange_types do
+        assert {:error, %UnsupportedPostgresType{name: ^type, hint: hint}} =
+                 TypeMapper.from_postgres(type)
+
+        assert hint =~ "range"
+      end
+    end
+
+    test "from_postgres rejects range and multirange kinds for custom names" do
+      assert {:error, %UnsupportedPostgresType{name: "floatrange", hint: hint}} =
+               TypeMapper.from_postgres("floatrange", kind: "r")
+
+      assert hint =~ "range"
+
+      assert {:error, %UnsupportedPostgresType{name: "floatmultirange", hint: hint}} =
+               TypeMapper.from_postgres("floatmultirange", kind: "m")
+
+      assert hint =~ "range"
+    end
+
+    test "from_postgres rejects geometric built-ins with geometric hints" do
+      for type <- @geometric_types do
+        assert {:error, %UnsupportedPostgresType{name: ^type, hint: hint}} =
+                 TypeMapper.from_postgres(type)
+
+        assert hint =~ "Geometric"
+      end
+    end
+
+    test "from_postgres rejects network built-ins with network hints" do
+      for type <- @network_types do
+        assert {:error, %UnsupportedPostgresType{name: ^type, hint: hint}} =
+                 TypeMapper.from_postgres(type)
+
+        assert hint =~ "Network" or hint =~ "text"
+      end
+    end
+
+    test "from_postgres rejects remaining unsupported built-ins with actionable hints" do
+      for type <- @other_unsupported do
+        assert {:error, %UnsupportedPostgresType{name: ^type, hint: hint}} =
+                 TypeMapper.from_postgres(type)
+
+        assert is_binary(hint)
+        assert hint != ""
+      end
+    end
+
+    test "hint_for documents range and unsupported built-in guidance" do
+      assert TypeMapper.hint_for("int4range") =~ "range"
+      assert TypeMapper.hint_for("inet") =~ "text"
+      assert TypeMapper.hint_for("interval") =~ "interval"
+      assert TypeMapper.hint_for("money") =~ "numeric"
     end
   end
 end
