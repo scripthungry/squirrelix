@@ -89,7 +89,7 @@ cookbook, and Hex `0.1.0` / `0.2.0` / `0.3.0` / `0.4.0` releases.
 - [ ] Public API surface audit (#20)
 - [x] Adopter CI workflow example (#21)
 - [x] User-facing error consistency pass (#22)
-- [ ] Test coverage metrics in CI (#33)
+- [x] Test coverage metrics in CI (#33)
 
 ### [v1.0.0](https://github.com/scripthungry/squirrelix/milestone/5) — Stability promise
 
