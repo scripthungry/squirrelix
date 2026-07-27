@@ -71,12 +71,10 @@ UUID strings such as `"550e8400-e29b-41d4-a716-446655440000"`.
 
 ### Timestamptz
 
-Squirrelix maps `timestamptz` to `DateTime.t()`. When inference encounters
-`timestamptz`, Squirrelix may emit a hint recommending plain `timestamp` columns
-to avoid time-zone conversion surprises.
-
-Gleam Squirrel maps `timestamptz` differently; this is an intentional Elixir-native
-choice.
+Squirrelix maps `timestamptz` to `DateTime.t()`. Gleam Squirrel rejects
+`timestamptz` with a hint to prefer plain `timestamp`; mapping to `DateTime.t()`
+is an intentional Elixir-native choice. Prefer `timestamp` columns when you want
+to avoid time-zone conversion surprises at the Postgres connection layer.
 
 ### Arrays
 
@@ -117,9 +115,11 @@ type for both inference and code generation.
 
 ## Unsupported types
 
-Some Postgres types are intentionally unsupported. When inference encounters
-them, Squirrelix returns `UnsupportedPostgresType` with the type name and, when
-available, an actionable hint.
+## Unsupported types
+
+Some Postgres types are intentionally unsupported. When inference encounters them,
+Squirrelix returns `UnsupportedPostgresType` with the type name and an actionable
+hint where one is defined.
 
 ### Composite types (policy)
 
@@ -137,11 +137,41 @@ Workarounds when a query would otherwise return a composite:
 - Cast in SQL: `location::json`, `location::jsonb`, or `location::text`
 - Reshape the schema into ordinary columns
 
-### Other rejected built-ins
+### Ranges and multiranges
 
-Geometric types such as `point` are also rejected with hints (prefer separate
-numeric columns, or cast to `text`/`json`). Ranges and remaining unsupported
-built-ins are tracked separately on the roadmap.
+All built-in and user-defined range / multirange types are **rejected**:
+
+| Postgres types | Policy |
+| --- | --- |
+| `int4range`, `int8range`, `numrange`, `tsrange`, `tstzrange`, `daterange` | Rejected |
+| `int4multirange`, `int8multirange`, `nummultirange`, `tsmultirange`, `tstzmultirange`, `datemultirange` | Rejected |
+| User-defined `create type ... as range` / multirange | Rejected |
+
+Workarounds:
+
+- Select lower/upper bounds as separate supported columns (for example
+  `lower(ages)`, `upper(ages)`).
+- Cast the range to `text` or `jsonb` in SQL if you need the literal form.
+
+Postgrex can decode ranges as `Postgrex.Range` at runtime, but Squirrelix does not
+generate typed helpers for them — keeping the supported surface aligned with
+Gleam Squirrel and Elixir stdlib typespecs.
+
+### Other unsupported built-ins
+
+| Category | Examples | Suggested workaround |
+| --- | --- | --- |
+| Geometric | `point`, `box`, `circle`, `line`, `lseg`, `path`, `polygon` | Cast to `text`, or select coordinates as floats |
+| Network | `inet`, `cidr`, `macaddr`, `macaddr8` | Cast to `text` |
+| Interval | `interval` | `extract(epoch from ...)::float8` or cast to `text` |
+| Bit strings | `bit`, `varbit` | Cast to `text` |
+| Full-text search | `tsvector`, `tsquery` | Cast to `text`, or return ranking/boolean scalars |
+| Money | `money` | Prefer `numeric` |
+| XML | `xml` | Prefer `text` or `jsonb` |
+| OID family | `oid`, `xid`, `tid`, `pg_lsn` | Cast to `text` |
+| hstore | `hstore` | Prefer `jsonb` |
+| Time with time zone | `timetz` | Prefer `time` |
+
 
 ## Metadata type atoms
 

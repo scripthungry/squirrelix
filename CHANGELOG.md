@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Documented composite-type policy as **reject-with-hints** (aligned with Gleam
   Squirrel and flat Elixir row maps). Inference now attaches actionable hints for
   composites (`kind: "c"`) and geometric `point` values.
+- Finalized unsupported-type policy for Postgres ranges/multiranges and remaining
+  built-ins (`interval`, geometric, network, `money`, and related types): inference
+  rejects them with actionable hints, and the Types guide documents workarounds.
 
 ## [0.1.0] — 2026-07-24
 

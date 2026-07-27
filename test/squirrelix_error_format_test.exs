@@ -45,4 +45,14 @@ defmodule SquirrelixErrorFormatTest do
     assert formatted =~ "Hint:"
     assert formatted =~ "composite"
   end
+
+  test "format_unsupported_type_error surfaces range rejection hints" do
+    assert {:error, error} = Squirrelix.TypeMapper.from_postgres("int4range")
+    formatted = Error.format(error)
+
+    assert formatted =~ "Error: Unsupported type"
+    assert formatted =~ "`int4range`"
+    assert formatted =~ "Hint:"
+    assert formatted =~ "range"
+  end
 end
