@@ -28,6 +28,14 @@ defmodule SquirrelixGleamParityTest do
     non-identifier enum names/variants at codegen; Elixir maps custom enums to `String.t()`.
   * `integration_test_` — Gleam compiles a throwaway Gleam project; Elixir uses
     `SquirrelixIntegrationTest` with Mix projects and Postgrex mocks instead.
+
+  ## Intentional nullability divergence
+
+  Gleam Squirrel treats columns with `table_oid = 0` (expressions and select-list
+  subqueries) as non-nullable. Squirrelix matches that for expression-derived
+  columns, but marks scalar `SubPlan` outputs in the select list as nullable
+  because they can return no row. See `SquirrelixPostgresTest` coverage and the
+  Writing Queries guide.
   """
 
   use ExUnit.Case, async: true
