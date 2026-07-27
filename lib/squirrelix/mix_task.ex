@@ -8,11 +8,13 @@ defmodule Squirrelix.MixTask do
   alias Squirrelix.Inference
   alias Squirrelix.Metadata
   alias Squirrelix.Postgres
+  alias Squirrelix.Watch
 
   @switches [
     metadata: :string,
     write_metadata: :string,
     infer: :boolean,
+    watch: :boolean,
     url: :string,
     database: :string,
     hostname: :string,
@@ -26,11 +28,11 @@ defmodule Squirrelix.MixTask do
     root = File.cwd!()
     opts = parse_args!(args)
 
-    with_query_source!(opts, root, fn query_source ->
-      root
-      |> Squirrelix.generate(query_source, version: version())
-      |> report_generate_summary()
-    end)
+    if opts[:watch] do
+      watch_generate!(root, opts)
+    else
+      generate_once!(root, opts)
+    end
   end
 
   @spec check([String.t()]) :: :ok
@@ -38,11 +40,57 @@ defmodule Squirrelix.MixTask do
     root = File.cwd!()
     opts = parse_args!(args)
 
+    if opts[:watch] do
+      Mix.raise("--watch is only supported by mix squirrelix.gen")
+    end
+
     with_query_source!(opts, root, fn query_source ->
       root
       |> Squirrelix.check(query_source, version: version())
       |> report_check_summary()
     end)
+  end
+
+  defp watch_generate!(root, opts) do
+    generate_once!(root, opts)
+
+    dirs = Watch.watchable_dirs(root)
+
+    Mix.shell().info(
+      "Watching for .sql changes under {lib,test,dev}/**/sql/. Press Ctrl-C to stop."
+    )
+
+    debounce_ms = Application.get_env(:squirr_elix, :watch_debounce_ms, 200)
+
+    after_start =
+      case Application.get_env(:squirr_elix, :watch_test_hook) do
+        fun when is_function(fun, 1) -> fun
+        _ -> nil
+      end
+
+    Watch.watch!(
+      root: root,
+      dirs: dirs,
+      debounce_ms: debounce_ms,
+      after_start: after_start,
+      on_change: fn -> soft_generate_once(root, opts) end
+    )
+  end
+
+  defp generate_once!(root, opts) do
+    with_query_source!(opts, root, fn query_source ->
+      root
+      |> Squirrelix.generate(query_source, version: version())
+      |> report_generate_summary()
+    end)
+  end
+
+  defp soft_generate_once(root, opts) do
+    generate_once!(root, opts)
+  rescue
+    error in Mix.Error ->
+      Mix.shell().error(Exception.message(error))
+      :error
   end
 
   defp with_query_source!(opts, root, callback) do

@@ -219,16 +219,19 @@ re-run `mix squirrelix.gen` instead of editing the Elixir module directly.
 Squirrelix offers the following Mix tasks to streamline your workflow:
 
 - `mix squirrelix.gen` — Generates typed Elixir code for all SQL queries found
-  under `{lib,test,dev}/**/sql/*.sql`.
+  under `{lib,test,dev}/**/sql/*.sql`. Pass `--watch` to regenerate when those
+  `.sql` files change (Ctrl-C to stop).
 - `mix squirrelix.check` — Validates that the generated Elixir code is up-to-date
   with the SQL queries. This is particularly useful to run in a CI pipeline to make
   sure you don't forget to run `mix squirrelix.gen`.
 
-Both tasks accept the same options. See [Configuration](guides/configuration.md) for
-metadata files, connection settings, and programmatic use.
+Both tasks accept the same query-source / connection options (`--infer`, `--metadata`,
+`DATABASE_URL`, …). `--watch` is gen-only. See [Configuration](guides/configuration.md)
+for metadata files, watch mode, connection settings, and programmatic use.
 
 ```sh
 mix squirrelix.gen --infer --database my_app_dev
+mix squirrelix.gen --infer --watch
 mix squirrelix.check --infer --database my_app_dev
 ```
 
