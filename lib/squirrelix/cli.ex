@@ -267,7 +267,7 @@ defmodule Squirrelix.CLI do
   defp percent_decode(value) when is_binary(value) do
     URI.decode(value)
   rescue
-    _ -> value
+    ArgumentError -> value
   end
 
   defp password_from_url(nil), do: nil
@@ -293,7 +293,7 @@ defmodule Squirrelix.CLI do
       {:ok, timeout, ssl}
     end
   rescue
-    _ -> :error
+    ArgumentError -> :error
   end
 
   defp parse_timeout_param(params) do

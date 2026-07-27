@@ -91,15 +91,15 @@ codegen (query-error refuse-all; write-pass temp/rename in **0.5.2**), INSERT/VA
 broader structural parameter naming, additive soft query companions with command row
 counts, watch mode, `--write-metadata`, Phoenix + CI cookbook, production hardening
 (multi-schema docs/tests, Dialyzer-friendly codegen, public API audit, adopter CI
-examples, error-message consistency, CI coverage), and Hex `0.1.0`–`0.5.1` releases
-(**0.5.2** ships write-pass atomicity).
+examples, error-message consistency, CI coverage), and Hex `0.1.0`–`0.5.2` releases
+(**0.5.3** adds Dialyzer/ExDNA/Reach/ExSlop CI gates).
 
 ### [Post-0.5 backlog](https://github.com/scripthungry/squirrelix/milestone/6)
 
 Point-release follow-ups from the multi-model review (not the 1.0 SemVer cut):
 
 - [ ] Optional `file_system` (watch-only) (#50)
-- [ ] Library Dialyzer CI job for the package itself (#51)
+- Library Dialyzer CI job for the package itself (#51) — **0.5.3**
 - Write-pass atomicity (#49) — **0.5.2**
 
 ### [v1.0.0](https://github.com/scripthungry/squirrelix/milestone/5) — Stability promise
@@ -132,5 +132,11 @@ mix precommit
 ```
 
 (`mix precommit` runs `mix format`, `mix credo.strict`, and `mix test`.)
+
+For the full CI quality gate (Dialyzer, ExDNA, Reach, ExSlop):
+
+```sh
+mix ci
+```
 
 Commit only after validation passes.

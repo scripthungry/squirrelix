@@ -494,13 +494,22 @@ and [sqlx](https://github.com/launchbadge/sqlx).
 
 ## Development
 
-Clone the repository and run the full validation suite before committing:
+Clone the repository and run the local validation suite before committing:
 
 ```sh
 mix precommit
 ```
 
-(`mix precommit` runs `mix format`, `mix credo --strict --all`, and `mix test`.)
+(`mix precommit` compiles with `--warnings-as-errors`, then runs `mix format`,
+`mix credo --strict --all`, and `mix test`.)
+
+For the full quality gate used in CI (also Dialyzer, [ExDNA](https://github.com/elixir-vibe/ex_dna),
+and [Reach](https://github.com/elixir-vibe/reach), with [ExSlop](https://github.com/elixir-vibe/ex_slop)
+Credo checks):
+
+```sh
+mix ci
+```
 
 See [ROADMAP.md](ROADMAP.md) for completed work and remaining compatibility slices.
 

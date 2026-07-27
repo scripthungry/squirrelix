@@ -1,7 +1,7 @@
 defmodule Squirrelix.MixProject do
   use Mix.Project
 
-  @version "0.5.2"
+  @version "0.5.3"
   @source_url "https://github.com/scripthungry/squirrelix"
 
   def project do
@@ -20,7 +20,8 @@ defmodule Squirrelix.MixProject do
       aliases: aliases(),
       deps: deps(),
       elixirc_paths: elixirc_paths(Mix.env()),
-      test_coverage: [tool: ExCoveralls]
+      test_coverage: [tool: ExCoveralls],
+      dialyzer: [plt_add_apps: [:ex_unit, :mix]]
     ]
   end
 
@@ -31,7 +32,8 @@ defmodule Squirrelix.MixProject do
         coveralls: :test,
         "coveralls.detail": :test,
         "coveralls.html": :test,
-        "coveralls.json": :test
+        "coveralls.json": :test,
+        ci: :test
       ]
     ]
   end
@@ -48,10 +50,14 @@ defmodule Squirrelix.MixProject do
   defp deps do
     [
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+      {:ex_dna, "~> 1.5", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.37", only: :dev, runtime: false},
+      {:ex_slop, "~> 0.4", only: [:dev, :test], runtime: false},
       {:excoveralls, "~> 0.18", only: :test},
       {:file_system, "~> 1.0"},
-      {:postgrex, "~> 0.22"}
+      {:postgrex, "~> 0.22"},
+      {:reach, "~> 2.8", only: [:dev, :test], runtime: false}
     ]
   end
 
@@ -112,10 +118,21 @@ defmodule Squirrelix.MixProject do
 
   defp aliases do
     [
+      # Fast local gate before committing.
       precommit: ["compile --warnings-as-errors", "format", "credo.strict", "test"],
       "credo.strict": "credo --strict --all",
       # Opt-in coverage; plain `mix test` / `mix precommit` stay fast locally.
-      cover: ["coveralls.html"]
+      cover: ["coveralls.html"],
+      # Full quality gate (VibeKit): Dialyzer, ExDNA, Reach, plus compile/format/credo/test.
+      ci: [
+        "compile --warnings-as-errors",
+        "format --check-formatted",
+        "test",
+        "credo.strict",
+        "dialyzer",
+        "ex_dna --max-clones 0",
+        "reach.check --arch --smells"
+      ]
     ]
   end
 end

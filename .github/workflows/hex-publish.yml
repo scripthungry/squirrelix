@@ -87,7 +87,11 @@ jobs:
 
       - run: mix deps.get
       - run: mix compile --warnings-as-errors
+      - run: mix format --check-formatted
       - run: mix credo --strict --all
+      - run: mix dialyzer
+      - run: mix ex_dna --max-clones 0
+      - run: mix reach.check --arch --smells
       - run: mix test
 
       - name: Publish package and docs

@@ -676,7 +676,7 @@ defmodule SquirrelixCodegenTest do
         # Soft for find_user would be find_user_ok — skipped due to collision.
         # Soft for find_user_ok is find_user_ok_ok.
         assert code =~ "def find_user_ok_ok(conn)"
-        assert length(Regex.scan(~r/def find_user_ok\(/, code)) == 1
+        assert [_] = Regex.scan(~r/def find_user_ok\(/, code)
       end)
 
     assert log =~ "find_user_ok"
@@ -712,7 +712,7 @@ defmodule SquirrelixCodegenTest do
         assert code =~ "def q(conn, name)"
         assert code =~ "def q!(conn, name)"
         # Only one soft companion may claim q_ok.
-        assert length(Regex.scan(~r/def q_ok\(/, code)) == 1
+        assert [_] = Regex.scan(~r/def q_ok\(/, code)
       end)
 
     assert log =~ "q_ok"

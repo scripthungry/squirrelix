@@ -152,7 +152,12 @@ defmodule Squirrelix.Postgres do
   defp probe_connection(opts) do
     case Postgrex.Protocol.connect(opts) do
       {:ok, state} ->
-        _ = Postgrex.Protocol.disconnect(:normal, state)
+        _ =
+          Postgrex.Protocol.disconnect(
+            %DBConnection.ConnectionError{message: "squirrelix connection probe"},
+            state
+          )
+
         :ok
 
       {:error, reason} ->
@@ -281,7 +286,7 @@ defmodule Squirrelix.Postgres do
 
       try do
         with {:ok, %Postgrex.Result{rows: [[plan_json]]}} <-
-               Postgrex.query(conn, explain_query, [], query_type: :text),
+               explain_json_query(conn, explain_query),
              {:ok, root_plan} <- decode_plan_json(plan_json) do
           {:ok, parse_plan(root_plan)}
         else
@@ -290,7 +295,7 @@ defmodule Squirrelix.Postgres do
             :error
         end
       rescue
-        _ ->
+        _e in [DBConnection.ConnectionError, Postgrex.Error, ArgumentError] ->
           warn_explain_unavailable(query.file)
           :error
       end
@@ -301,6 +306,13 @@ defmodule Squirrelix.Postgres do
 
       :error
     end
+  end
+
+  # `query_type: :text` is documented by Postgrex but missing from `execute_option()`,
+  # so a direct call makes Dialyzer treat the success path as impossible.
+  defp explain_json_query(conn, explain_query) do
+    # credo:disable-for-next-line Credo.Check.Refactor.Apply
+    apply(Postgrex, :query, [conn, explain_query, [], [query_type: :text]])
   end
 
   defp warn_explain_unavailable(file) do

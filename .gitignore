@@ -25,3 +25,8 @@ erl_crash.dump
 # Ignore package tarball (built via "mix hex.build").
 squirr_elix-*.tar
 
+# Dialyzer PLT files (built via mix dialyzer).
+/*.plt
+/*.plt.hash
+/priv/plts/
+

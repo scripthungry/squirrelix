@@ -137,11 +137,7 @@ defmodule Squirrelix.Output do
   defp maybe_backup(file, bak) do
     if File.exists?(file) do
       _ = File.rm(bak)
-
-      case File.rename(file, bak) do
-        :ok -> :ok
-        {:error, reason} -> {:error, reason}
-      end
+      File.rename(file, bak)
     else
       :ok
     end
@@ -216,6 +212,7 @@ defmodule Squirrelix.Output do
       content
     end
   rescue
-    _ -> content
+    _e in [TokenMissingError, SyntaxError, MismatchedDelimiterError] ->
+      content
   end
 end
