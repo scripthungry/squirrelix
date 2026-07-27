@@ -1,6 +1,15 @@
 defmodule Squirrelix.Postgres do
   @moduledoc """
-  Postgrex-backed query inferrer for Squirrelix inference.
+  Postgrex-backed query inferrer.
+
+  ## Supported public API
+
+  * `inferrer/1` — build a query-source inferrer for `Squirrelix.generate/3` /
+    `check/3` from an open `Postgrex.conn()`
+
+  Other functions in this module are internal and may change without notice.
+  Connection resolution for Mix tasks is documented in the Configuration guide;
+  do not call Mix-oriented helpers from application code.
   """
 
   alias Squirrelix.Column
@@ -82,10 +91,7 @@ defmodule Squirrelix.Postgres do
   order by enumsortorder asc
   """
 
-  @doc """
-  Opens a Postgrex connection after a synchronous probe so connection failures
-  and timeouts become structured Squirrelix errors.
-  """
+  @doc false
   @spec connect(ConnectionOptions.t()) :: {:ok, pid()} | {:error, struct()}
   def connect(%ConnectionOptions{} = connection_options) do
     postgrex_opts = postgrex_opts(connection_options)
@@ -105,11 +111,18 @@ defmodule Squirrelix.Postgres do
     end
   end
 
+  @doc """
+  Returns an inferrer function for `Squirrelix.generate/3` / `check/3`.
+
+  The returned function takes a `Squirrelix.Query` and returns
+  `{:ok, [params: ..., returns: ...]}` or `{:error, structured_error}`.
+  """
   @spec inferrer(Postgrex.conn()) :: Squirrelix.Inference.inferrer()
   def inferrer(conn) do
     &infer(conn, &1)
   end
 
+  @doc false
   @spec infer(Postgrex.conn(), Query.t()) :: {:ok, keyword()} | {:error, struct()}
   def infer(conn, %Query{} = query) do
     with {:ok, prepared_query} <- prepare(conn, query),
@@ -119,9 +132,7 @@ defmodule Squirrelix.Postgres do
     end
   end
 
-  @doc """
-  Converts Squirrelix connection options into a Postgrex `start_link/1` keyword list.
-  """
+  @doc false
   @spec postgrex_opts(ConnectionOptions.t()) :: keyword()
   def postgrex_opts(%ConnectionOptions{} = connection_options) do
     [

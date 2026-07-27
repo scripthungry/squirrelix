@@ -1,7 +1,5 @@
 defmodule Squirrelix.QueryDirectory do
-  @moduledoc """
-  Parsed queries and query-file errors for one SQL directory.
-  """
+  @moduledoc false
 
   alias Squirrelix.Query
 

@@ -274,6 +274,29 @@ On Linux, watch mode needs [inotify-tools](https://github.com/rvoicilas/inotify-
 
 ## Programmatic API
 
+### Supported public API
+
+Pre-1.0, only the following are part of the **supported** programmatic surface.
+Anything else under `Squirrelix.*` is internal (`@moduledoc false`) and may
+change without a SemVer bump before 1.0.
+
+| Surface | Role |
+| --- | --- |
+| `Squirrelix.generate/3` | Generate `sql.ex` modules for a project root |
+| `Squirrelix.check/3` | Drift-check without writing files |
+| `Squirrelix.CodegenSummary` / `CodegenCheckSummary` | Return values from generate / check |
+| `mix squirrelix.gen` / `mix squirrelix.check` | Supported Mix task entry points |
+| `Squirrelix.Error.*` structs | Pattern-matchable diagnostics in summaries |
+| `Squirrelix.Error.format/1` / `format_all/1` | Render the same text Mix prints |
+| `Squirrelix.Postgres.inferrer/1` | Live-Postgres query source for generate / check |
+| `Squirrelix.Inference.Inferrer` | Behaviour for custom query sources |
+| `Squirrelix.Query` | Struct passed to Inferrer callbacks (fields only) |
+
+Do **not** expand the public surface silently: new modules or functions intended
+for adopters need docs (module/`@doc`, README / this guide) in the same change.
+
+### Usage
+
 Use `Squirrelix.generate/3` and `Squirrelix.check/3` from Elixir code:
 
 ```elixir

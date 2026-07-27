@@ -1,7 +1,5 @@
 defmodule Squirrelix.Parameter do
-  @moduledoc """
-  A typed SQL parameter in query order.
-  """
+  @moduledoc false
 
   @enforce_keys [:index, :type]
   defstruct [:index, :name, :type]
@@ -15,9 +13,7 @@ defmodule Squirrelix.Parameter do
 end
 
 defmodule Squirrelix.Column do
-  @moduledoc """
-  A returned SQL column.
-  """
+  @moduledoc false
 
   @enforce_keys [:name, :type, :nullable?]
   defstruct [:name, :type, :nullable?]
@@ -31,9 +27,7 @@ defmodule Squirrelix.Column do
 end
 
 defmodule Squirrelix.TypedQuery do
-  @moduledoc """
-  A query annotated with parameter and return column metadata.
-  """
+  @moduledoc false
 
   @enforce_keys [:file, :starting_line, :name, :comment, :content, :params, :returns]
   defstruct [:file, :starting_line, :name, :comment, :content, :params, :returns]

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Multi-schema / `search_path` inference docs (Configuration + Writing Queries) and
+  ExUnit coverage for unqualified tables resolved via session `search_path` and
+  schema-qualified tables outside `search_path`.
+- CI test coverage via ExCoveralls: HTML artifact + GitHub Actions job summary,
+  soft floor warning (not a hard fail). Local `mix test` / `mix precommit`
+  unchanged; opt in with `mix cover` / `mix coveralls.html`.
+
 ### Changed
 
 - Generated query modules are Dialyzer-friendlier under typical adopter flags:
@@ -19,15 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   connection URLs, and invalid CLI options use the same structured titles/hints as
   connection and query diagnostics (no raw `inspect/1` primary messages). Existing
   structured connection error types from 0.2/0.3 are unchanged.
-
-### Added
-
-- Multi-schema / `search_path` inference docs (Configuration + Writing Queries) and
-  ExUnit coverage for unqualified tables resolved via session `search_path` and
-  schema-qualified tables outside `search_path`.
-- CI test coverage via ExCoveralls: HTML artifact + GitHub Actions job summary,
-  soft floor warning (not a hard fail). Local `mix test` / `mix precommit`
-  unchanged; opt in with `mix cover` / `mix coveralls.html`.
+- Documented and narrowed the supported pre-1.0 public API: `Squirrelix.generate/3` /
+  `check/3`, Mix tasks, codegen summaries, documented `Squirrelix.Error.*` structs /
+  `Error.format`, `Postgres.inferrer/1`, `Inference.Inferrer`, and `Query` (Inferrer
+  argument). Other library modules are marked `@moduledoc false` / internal.
 
 ## [0.4.0] — 2026-07-27
 

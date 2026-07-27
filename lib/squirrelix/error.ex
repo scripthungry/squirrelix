@@ -128,7 +128,7 @@ defmodule Squirrelix.Error.UnsupportedPostgresType do
 
   Composite types (`create type ... as (...)`) and some built-ins such as
   `point` are intentionally unsupported; `hint` carries actionable guidance when
-  available (see `Squirrelix.TypeMapper`).
+  available (see the Types guide).
   """
 
   @enforce_keys [:name]
@@ -295,7 +295,12 @@ end
 
 defmodule Squirrelix.Error do
   @moduledoc """
-  Formatting and normalization helpers for Squirrelix errors.
+  Formatting helpers for structured Squirrelix errors.
+
+  Error **structs** under `Squirrelix.Error.*` are part of the supported public
+  API — pattern-match them in tooling that inspects `CodegenSummary` /
+  `CodegenCheckSummary` errors. Use `format/1` and `format_all/1` to render the
+  same actionable text Mix tasks print.
 
   User-facing failures (codegen, check, metadata, connection) format through
   `format/1` with titles and actionable hints where possible. Connection failures
@@ -325,6 +330,7 @@ defmodule Squirrelix.Error do
   alias Squirrelix.Error.UnsupportedPostgresType
   alias Squirrelix.Query
 
+  @doc false
   @spec normalize(struct()) :: struct()
   def normalize(%PostgresInferenceError{code: :undefined_object, message: message} = error)
       when is_binary(message) do
@@ -345,9 +351,7 @@ defmodule Squirrelix.Error do
 
   def normalize(error), do: error
 
-  @doc """
-  Classifies a Postgrex / DBConnection connection failure into a structured error.
-  """
+  @doc false
   @spec connection_error(term(), ConnectionOptions.t()) ::
           CannotConnectToPostgres.t() | PostgresConnectionTimeout.t()
   def connection_error(reason, %ConnectionOptions{} = opts) do
@@ -393,6 +397,7 @@ defmodule Squirrelix.Error do
     end
   end
 
+  @doc false
   @spec attach_query(struct(), Query.t()) :: struct()
   def attach_query(%{__struct__: module} = error, %Query{} = query) do
     if query_context_fields?(module) do
@@ -402,14 +407,21 @@ defmodule Squirrelix.Error do
     end
   end
 
+  @doc """
+  Formats a structured error for display (same text Mix tasks print).
+  """
   @spec format(struct()) :: String.t()
   def format(error), do: error |> normalize() |> do_format()
 
+  @doc """
+  Formats a list of structured errors, separated by blank lines.
+  """
   @spec format_all([struct()]) :: String.t()
   def format_all(errors) when is_list(errors) do
     Enum.map_join(errors, "\n\n", &format/1)
   end
 
+  @doc false
   @spec postgresql_code(struct()) :: String.t() | nil
   def postgresql_code(%PostgresSyntaxError{}), do: "42601"
   def postgresql_code(%MissingPostgresTable{}), do: "42P01"

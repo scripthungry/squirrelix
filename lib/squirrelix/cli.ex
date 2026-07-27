@@ -1,19 +1,5 @@
 defmodule Squirrelix.CLI do
-  @moduledoc """
-  Project discovery and PostgreSQL connection helpers.
-
-  This module mirrors upstream Squirrel CLI behaviour using Elixir data structures:
-  maps for discovered files, structs for connection options, and `{:ok, _}` /
-  `{:error, reason}` tuples for fallible operations.
-
-  Connection resolution precedence (highest first):
-
-  1. Explicit CLI flag overrides (`--hostname`, `--database`, …)
-  2. `--url`
-  3. `DATABASE_URL`
-  4. `PG*` / `PGSSLMODE` environment variables
-  5. Built-in defaults
-  """
+  @moduledoc false
 
   alias Squirrelix.ConnectionOptions
   alias Squirrelix.Project

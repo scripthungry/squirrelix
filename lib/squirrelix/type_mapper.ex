@@ -1,37 +1,5 @@
 defmodule Squirrelix.TypeMapper do
-  @moduledoc """
-  Maps Postgres type names into Squirrelix's Elixir type metadata and typespecs.
-
-  ## Postgres enums
-
-  Custom Postgres enums (`kind: "e"`) map to the internal atom `:string` and emit
-  `String.t()` in generated `@spec`s. Runtime encode/decode passes enum labels
-  through as plain strings — Squirrelix does not generate Gleam-style enum ADTs.
-
-  ## JSON and JSONB
-
-  JSON columns map to the internal atom `:map` (shared by `json` and `jsonb`) but
-  emit `term()` in generated `@spec`s. JSON values are not always objects, and
-  Postgrex may return maps, lists, or primitives depending on the stored payload.
-  `term()` matches Elixir 1.20 practice for dynamically typed JSON columns; row
-  result maps still use `map()` with `required/1` keys via `row_typespec/1`.
-
-  ## Composite types
-
-  Postgres composite types (`kind: "c"`, including `create type ... as (...)`)
-  are **intentionally unsupported**. Squirrelix rejects them with an
-  `UnsupportedPostgresType` error and an actionable hint (select individual
-  fields, or cast to `json`/`jsonb`/`text`). This matches Gleam Squirrel and
-  keeps generated Elixir APIs limited to stdlib typespecs and flat row maps —
-  no nested composite modules or opaque encodings.
-
-  ## Unsupported types
-
-  Postgres range/multirange types and several other built-ins are intentionally
-  unsupported. Inference returns `UnsupportedPostgresType` with an actionable
-  hint (for example: select bounds as separate columns, or cast to `text` /
-  `jsonb` in SQL). See the Types guide for the full inventory.
-  """
+  @moduledoc false
 
   alias Squirrelix.Error.UnsupportedPostgresType
 

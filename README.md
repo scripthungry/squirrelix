@@ -283,7 +283,10 @@ Use `--write-metadata PATH` with `--infer` to export a reloadable metadata file 
 offline `mix squirrelix.check` / `gen` (see the Configuration guide).
 
 The programmatic API mirrors this split — see `Squirrelix.generate/3` and
-`Squirrelix.check/3`.
+`Squirrelix.check/3`. The supported public surface (Mix tasks, summaries, error
+structs, `Postgres.inferrer/1`, Inferrer behaviour) is inventoried under
+[Configuration → Supported public API](guides/configuration.md#supported-public-api).
+Other `Squirrelix.*` modules are internal and may change before 1.0.
 
 ## Configuration and connection
 

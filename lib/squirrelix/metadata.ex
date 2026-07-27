@@ -1,15 +1,5 @@
 defmodule Squirrelix.Metadata do
-  @moduledoc """
-  Loads and writes Elixir query metadata files for the current code generation pipeline.
-
-  Metadata files are evaluated with `Code.eval_string/3` and must return a map.
-  Treat them like `mix.exs` / `config/*.exs`: only load trusted, project-local
-  files. Prefer `--infer` in CI when you do not want to maintain evaluated Elixir
-  metadata.
-
-  Use `to_file/3` (or Mix `--infer --write-metadata PATH`) to capture inferred
-  types for offline `mix squirrelix.check` / `gen` without Postgres.
-  """
+  @moduledoc false
 
   alias Squirrelix.Column
   alias Squirrelix.Error.CannotReadFile

@@ -1,7 +1,5 @@
 defmodule Squirrelix.TypedQueryDirectory do
-  @moduledoc """
-  Typed queries grouped by the SQL directory they came from.
-  """
+  @moduledoc false
 
   alias Squirrelix.Error
   alias Squirrelix.Error.MissingQueryMetadata

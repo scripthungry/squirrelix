@@ -1,7 +1,5 @@
 defmodule Squirrelix.Output do
-  @moduledoc """
-  Safe output-file writing for generated code.
-  """
+  @moduledoc false
 
   alias Squirrelix.Error.CannotOverwriteFile
   alias Squirrelix.Error.CannotReadFile
