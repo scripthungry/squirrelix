@@ -4,6 +4,8 @@ defmodule Squirrelix.Postgres do
   """
 
   alias Squirrelix.Column
+  alias Squirrelix.ConnectionOptions
+  alias Squirrelix.Error
   alias Squirrelix.Error.MissingPostgresColumn
   alias Squirrelix.Error.MissingPostgresTable
   alias Squirrelix.Error.PostgresInferenceError
@@ -80,6 +82,29 @@ defmodule Squirrelix.Postgres do
   order by enumsortorder asc
   """
 
+  @doc """
+  Opens a Postgrex connection after a synchronous probe so connection failures
+  and timeouts become structured Squirrelix errors.
+  """
+  @spec connect(ConnectionOptions.t()) :: {:ok, pid()} | {:error, struct()}
+  def connect(%ConnectionOptions{} = connection_options) do
+    postgrex_opts = postgrex_opts(connection_options)
+
+    case probe_connection(postgrex_opts) do
+      :ok ->
+        case Postgrex.start_link(postgrex_opts) do
+          {:ok, conn} ->
+            {:ok, conn}
+
+          {:error, reason} ->
+            {:error, Error.connection_error(reason, connection_options)}
+        end
+
+      {:error, reason} ->
+        {:error, Error.connection_error(reason, connection_options)}
+    end
+  end
+
   @spec inferrer(Postgrex.conn()) :: Squirrelix.Inference.inferrer()
   def inferrer(conn) do
     &infer(conn, &1)
@@ -91,6 +116,31 @@ defmodule Squirrelix.Postgres do
          {:ok, params} <- describe_oids(conn, prepared_query.param_oids || [], query),
          {:ok, returns} <- describe_returns(conn, prepared_query, query) do
       {:ok, [params: params, returns: returns]}
+    end
+  end
+
+  defp postgrex_opts(%ConnectionOptions{} = connection_options) do
+    [
+      hostname: connection_options.host,
+      port: connection_options.port,
+      username: connection_options.user,
+      password: connection_options.password,
+      database: connection_options.database,
+      timeout: connection_options.timeout_seconds * 1000,
+      connect_timeout: connection_options.timeout_seconds * 1000,
+      types: Postgrex.DefaultTypes
+    ]
+    |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+  end
+
+  defp probe_connection(opts) do
+    case Postgrex.Protocol.connect(opts) do
+      {:ok, state} ->
+        _ = Postgrex.Protocol.disconnect(:normal, state)
+        :ok
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 

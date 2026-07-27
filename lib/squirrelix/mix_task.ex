@@ -54,8 +54,9 @@ defmodule Squirrelix.MixTask do
 
   defp with_postgres_inferrer!(opts, callback) do
     {:ok, _} = Application.ensure_all_started(:postgrex)
+    connection_options = build_connection_options(opts)
 
-    case Postgrex.start_link(connection_opts(opts)) do
+    case Postgres.connect(connection_options) do
       {:ok, conn} ->
         try do
           callback.(Postgres.inferrer(conn))
@@ -64,17 +65,16 @@ defmodule Squirrelix.MixTask do
         end
 
       {:error, error} ->
-        Mix.raise("Could not connect to Postgres: #{inspect(error)}")
+        Mix.raise("Squirrelix connection failed:\n\n#{Error.format(error)}")
     end
   end
 
   # Precedence (highest first): CLI flags → URL → environment → defaults.
-  defp connection_opts(opts) do
+  defp build_connection_options(opts) do
     System.get_env()
     |> CLI.connection_options_from_variables("postgres")
     |> maybe_merge_url(opts)
     |> merge_flag_overrides(opts)
-    |> postgrex_connection_opts()
   end
 
   defp maybe_merge_url(%ConnectionOptions{} = base, opts) do
@@ -119,17 +119,6 @@ defmodule Squirrelix.MixTask do
   # Empty password from a URL like postgres://user@host/db should not wipe PGPASSWORD.
   defp prefer_password("", base), do: base
   defp prefer_password(password, _base), do: password
-
-  defp postgrex_connection_opts(%ConnectionOptions{} = connection_options) do
-    [
-      hostname: connection_options.host,
-      port: connection_options.port,
-      username: connection_options.user,
-      password: connection_options.password,
-      database: connection_options.database,
-      timeout: connection_options.timeout_seconds * 1000
-    ]
-  end
 
   defp load_metadata!(opts, root) do
     metadata_file = opts |> Keyword.get(:metadata, "squirr_elix.exs") |> Path.expand(root)

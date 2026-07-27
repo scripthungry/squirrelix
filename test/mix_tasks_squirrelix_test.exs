@@ -100,6 +100,58 @@ defmodule MixTasksSquirrelixTest do
     end
   end
 
+  test "mix squirrelix.gen --infer reports structured connection refused errors" do
+    root = tmp_project(:acorn_counter)
+    write_query(root, "select $1::text as name")
+
+    error =
+      assert_raise Mix.Error, fn ->
+        File.cd!(root, fn ->
+          Mix.Task.run("squirrelix.gen", [
+            "--infer",
+            "--hostname",
+            "127.0.0.1",
+            "--port",
+            "1",
+            "--username",
+            "postgres",
+            "--database",
+            "postgres"
+          ])
+        end)
+      end
+
+    message = Exception.message(error)
+    assert message =~ "Cannot connect to Postgres"
+    assert message =~ "`127.0.0.1`"
+    assert message =~ "refused"
+    assert message =~ "PGHOST"
+    refute message =~ "%DBConnection.ConnectionError"
+    refute message =~ "Could not connect to Postgres:"
+  end
+
+  test "mix squirrelix.gen --infer reports structured connection timeouts" do
+    root = tmp_project(:acorn_counter)
+    write_query(root, "select $1::text as name")
+
+    error =
+      assert_raise Mix.Error, fn ->
+        File.cd!(root, fn ->
+          Mix.Task.run("squirrelix.gen", [
+            "--infer",
+            "--url",
+            "postgres://postgres@172.31.255.1:5432/postgres?connect_timeout=1"
+          ])
+        end)
+      end
+
+    message = Exception.message(error)
+    assert message =~ "Connection timed out"
+    assert message =~ "`172.31.255.1`"
+    assert message =~ "PGCONNECT_TIMEOUT"
+    refute message =~ "Could not connect to Postgres:"
+  end
+
   test "mix squirrelix.gen moduledoc documents metadata and infer options" do
     {:docs_v1, _, _, _, module_doc, _, _} = Code.fetch_docs(Mix.Tasks.Squirrelix.Gen)
     moduledoc = module_doc["en"]

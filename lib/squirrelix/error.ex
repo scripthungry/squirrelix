@@ -246,17 +246,71 @@ defmodule Squirrelix.Error.PostgresInferenceError do
         }
 end
 
+defmodule Squirrelix.Error.PostgresConnectionTimeout do
+  @moduledoc """
+  Error returned when establishing a Postgres connection times out during `--infer`.
+  """
+
+  @enforce_keys [:host, :port, :timeout_seconds]
+  defstruct [:host, :port, :timeout_seconds]
+
+  @type t :: %__MODULE__{
+          host: String.t(),
+          port: non_neg_integer(),
+          timeout_seconds: non_neg_integer()
+        }
+end
+
+defmodule Squirrelix.Error.CannotConnectToPostgres do
+  @moduledoc """
+  Error returned when Squirrelix cannot connect to Postgres for inference.
+
+  Covers TCP failures (refused, unreachable, closed) and authorization / catalog
+  problems. Connection timeouts use `Squirrelix.Error.PostgresConnectionTimeout`.
+  """
+
+  @enforce_keys [:host, :port, :reason]
+  defstruct [:host, :port, :reason, :user, :database, :message, :detail]
+
+  @type reason ::
+          :refused
+          | :unreachable
+          | :closed
+          | :nxdomain
+          | :invalid_authorization
+          | :invalid_password
+          | :invalid_catalog
+          | :unknown
+
+  @type t :: %__MODULE__{
+          host: String.t(),
+          port: non_neg_integer(),
+          reason: reason(),
+          user: String.t() | nil,
+          database: String.t() | nil,
+          message: String.t() | nil,
+          detail: term() | nil
+        }
+end
+
 defmodule Squirrelix.Error do
   @moduledoc """
   Formatting and normalization helpers for Squirrelix errors.
+
+  Connection failures and timeouts during `--infer` are classified with
+  `connection_error/2` into `CannotConnectToPostgres` or
+  `PostgresConnectionTimeout`, then formatted like other structured diagnostics.
   """
 
+  alias Squirrelix.ConnectionOptions
+  alias Squirrelix.Error.CannotConnectToPostgres
   alias Squirrelix.Error.CannotOverwriteFile
   alias Squirrelix.Error.DuplicateReturnColumns
   alias Squirrelix.Error.MissingPostgresColumn
   alias Squirrelix.Error.MissingPostgresConstraint
   alias Squirrelix.Error.MissingPostgresTable
   alias Squirrelix.Error.OutdatedFile
+  alias Squirrelix.Error.PostgresConnectionTimeout
   alias Squirrelix.Error.PostgresInferenceError
   alias Squirrelix.Error.PostgresSyntaxError
   alias Squirrelix.Error.QueryFileHasInvalidName
@@ -284,6 +338,54 @@ defmodule Squirrelix.Error do
   end
 
   def normalize(error), do: error
+
+  @doc """
+  Classifies a Postgrex / DBConnection connection failure into a structured error.
+  """
+  @spec connection_error(term(), ConnectionOptions.t()) ::
+          CannotConnectToPostgres.t() | PostgresConnectionTimeout.t()
+  def connection_error(reason, %ConnectionOptions{} = opts) do
+    case classify_connection_reason(reason) do
+      :timeout ->
+        %PostgresConnectionTimeout{
+          host: opts.host,
+          port: opts.port,
+          timeout_seconds: opts.timeout_seconds
+        }
+
+      {kind, message}
+      when kind in [:invalid_authorization, :invalid_password, :invalid_catalog] ->
+        %CannotConnectToPostgres{
+          host: opts.host,
+          port: opts.port,
+          user: opts.user,
+          database: opts.database,
+          reason: kind,
+          message: message
+        }
+
+      {kind, detail} when kind in [:refused, :unreachable, :closed, :nxdomain] ->
+        %CannotConnectToPostgres{
+          host: opts.host,
+          port: opts.port,
+          user: opts.user,
+          database: opts.database,
+          reason: kind,
+          detail: detail
+        }
+
+      {:unknown, detail} ->
+        %CannotConnectToPostgres{
+          host: opts.host,
+          port: opts.port,
+          user: opts.user,
+          database: opts.database,
+          reason: :unknown,
+          detail: detail,
+          message: connection_detail_message(detail)
+        }
+    end
+  end
 
   @spec attach_query(struct(), Query.t()) :: struct()
   def attach_query(%{__struct__: module} = error, %Query{} = query) do
@@ -352,6 +454,8 @@ defmodule Squirrelix.Error do
   defp do_format(%UnsupportedPostgresType{} = error), do: format_unsupported_type_error(error)
   defp do_format(%OutdatedFile{} = error), do: format_outdated_file_error(error)
   defp do_format(%CannotOverwriteFile{} = error), do: format_cannot_overwrite_file_error(error)
+  defp do_format(%PostgresConnectionTimeout{} = error), do: format_connection_timeout_error(error)
+  defp do_format(%CannotConnectToPostgres{} = error), do: format_cannot_connect_error(error)
 
   defp do_format(error) do
     if postgres_query_error?(error) do
@@ -492,6 +596,146 @@ defmodule Squirrelix.Error do
     ]
     |> Enum.join("\n")
   end
+
+  defp format_connection_timeout_error(%PostgresConnectionTimeout{} = error) do
+    [
+      "Error: Connection timed out",
+      "",
+      "I couldn't connect to `#{error.host}` at port #{error.port} because the connection timed out after #{error.timeout_seconds} seconds.",
+      "Hint: Increase `PGCONNECT_TIMEOUT` or the URL `connect_timeout` parameter, check that `#{error.host}:#{error.port}` is reachable, or use a metadata file (`squirr_elix.exs`) instead of `--infer`."
+    ]
+    |> Enum.join("\n")
+  end
+
+  defp format_cannot_connect_error(%CannotConnectToPostgres{reason: reason} = error)
+       when reason in [:invalid_authorization, :invalid_password] do
+    lines = [
+      "Error: Cannot authenticate with Postgres",
+      "",
+      authentication_message(error)
+    ]
+
+    lines =
+      case error.message do
+        nil -> lines
+        message -> lines ++ [message]
+      end
+
+    (lines ++
+       [
+         "Hint: Check `PGUSER`, `PGPASSWORD`, and `PGDATABASE` (or `--username` / `--password` / `--database`), or use a metadata file (`squirr_elix.exs`) instead of `--infer`."
+       ])
+    |> Enum.join("\n")
+  end
+
+  defp format_cannot_connect_error(%CannotConnectToPostgres{reason: :invalid_catalog} = error) do
+    lines = [
+      "Error: Cannot connect to Postgres",
+      "",
+      "I couldn't connect to database `#{error.database}`."
+    ]
+
+    lines =
+      case error.message do
+        nil -> lines
+        message -> lines ++ [message]
+      end
+
+    (lines ++
+       [
+         "Hint: Set `PGDATABASE` or `--database` to an existing database, or use a metadata file (`squirr_elix.exs`) instead of `--infer`."
+       ])
+    |> Enum.join("\n")
+  end
+
+  defp format_cannot_connect_error(%CannotConnectToPostgres{} = error) do
+    [
+      "Error: Cannot connect to Postgres",
+      "",
+      tcp_connection_message(error),
+      "Hint: Check `PGHOST` and `PGPORT` (or `--hostname` / `--port`), ensure Postgres is running, or use a metadata file (`squirr_elix.exs`) instead of `--infer`."
+    ]
+    |> Enum.join("\n")
+  end
+
+  defp authentication_message(%CannotConnectToPostgres{reason: :invalid_password} = error) do
+    "Invalid password for user `#{error.user}`."
+  end
+
+  defp authentication_message(%CannotConnectToPostgres{} = error) do
+    "I couldn't connect to database `#{error.database}` with user `#{error.user}`."
+  end
+
+  defp tcp_connection_message(%CannotConnectToPostgres{reason: :refused} = error) do
+    "I couldn't connect to the database because `#{error.host}` refused the connection to port #{error.port}."
+  end
+
+  defp tcp_connection_message(%CannotConnectToPostgres{reason: :closed} = error) do
+    "I couldn't connect to the database because `#{error.host}` closed the connection to port #{error.port}."
+  end
+
+  defp tcp_connection_message(%CannotConnectToPostgres{reason: :unreachable} = error) do
+    "I couldn't connect to the database because `#{error.host}` is unreachable."
+  end
+
+  defp tcp_connection_message(%CannotConnectToPostgres{reason: :nxdomain} = error) do
+    "I couldn't connect to the database because host `#{error.host}` could not be resolved."
+  end
+
+  defp tcp_connection_message(%CannotConnectToPostgres{} = error) do
+    detail =
+      case connection_detail_message(error.detail) || error.message do
+        nil -> "an unexpected connection error"
+        message -> message
+      end
+
+    "I couldn't connect to the database at `#{error.host}` port #{error.port}: #{detail}."
+  end
+
+  defp classify_connection_reason(%DBConnection.ConnectionError{message: message})
+       when is_binary(message) do
+    cond do
+      String.contains?(message, "timeout") ->
+        :timeout
+
+      String.contains?(message, "econnrefused") or String.contains?(message, "connection refused") ->
+        {:refused, message}
+
+      String.contains?(message, "ehostunreach") or String.contains?(message, "unreachable") ->
+        {:unreachable, message}
+
+      String.contains?(message, "nxdomain") ->
+        {:nxdomain, message}
+
+      String.contains?(message, "closed") ->
+        {:closed, message}
+
+      true ->
+        {:unknown, message}
+    end
+  end
+
+  defp classify_connection_reason(%Postgrex.Error{postgres: postgres}) when is_map(postgres) do
+    message = Map.get(postgres, :message)
+
+    case Map.get(postgres, :code) do
+      :invalid_password -> {:invalid_password, message}
+      :invalid_authorization_specification -> {:invalid_authorization, message}
+      :invalid_catalog_name -> {:invalid_catalog, message}
+      _other -> {:unknown, postgres}
+    end
+  end
+
+  defp classify_connection_reason(:timeout), do: :timeout
+  defp classify_connection_reason(:econnrefused), do: {:refused, :econnrefused}
+  defp classify_connection_reason(:ehostunreach), do: {:unreachable, :ehostunreach}
+  defp classify_connection_reason(:nxdomain), do: {:nxdomain, :nxdomain}
+  defp classify_connection_reason(:closed), do: {:closed, :closed}
+  defp classify_connection_reason(other), do: {:unknown, other}
+
+  defp connection_detail_message(nil), do: nil
+  defp connection_detail_message(message) when is_binary(message), do: message
+  defp connection_detail_message(other), do: inspect(other)
 
   defp code_block(
          %{file: file, content: content, starting_line: starting_line} = error,
