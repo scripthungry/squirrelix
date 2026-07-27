@@ -27,7 +27,7 @@ jobs:
       - uses: erlef/setup-beam@v1
         with:
           elixir-version: "1.20.0"
-          otp-version: "28.0"
+          otp-version: "28.1"
 
       - name: Confirm manual publish
         if: github.event_name == 'workflow_dispatch'
@@ -41,7 +41,12 @@ jobs:
         if: github.event_name == 'push'
         run: |
           tag="${GITHUB_REF_NAME#v}"
-          version="$(mix run -e 'IO.write(Mix.Project.config()[:version])')"
+          # Parse @version from mix.exs without Mix so we don't need deps yet.
+          version="$(sed -n 's/^[[:space:]]*@version[[:space:]]*"\([^"]*\)".*/\1/p' mix.exs | head -n1)"
+          if [ -z "$version" ]; then
+            echo "Could not parse @version from mix.exs"
+            exit 1
+          fi
           if [ "$tag" != "$version" ]; then
             echo "Tag v$tag does not match mix.exs version $version"
             exit 1
