@@ -125,7 +125,26 @@ defmodule SquirrelixCliCompatibilityTest do
       ]
     }
 
-    assert CLI.discover_sql_directories(Path.join(tmp, "src")) == expected
+    assert CLI.discover_sql_directories(Path.join(tmp, "src")) == {:ok, expected}
+  end
+
+  test "discover_sql_directories returns CannotReadFile when a directory is unreadable" do
+    tmp = tmp_dir("squirr_elix-unreadable")
+    blocked = Path.join(tmp, "blocked")
+    File.mkdir_p!(blocked)
+    File.write!(Path.join(blocked, "note.txt"), "x")
+
+    # Remove execute permission so File.ls/1 fails with eacces on Unix.
+    File.chmod!(blocked, 0o000)
+
+    try do
+      assert {:error, %Squirrelix.Error.CannotReadFile{file: ^blocked, reason: reason}} =
+               CLI.discover_sql_directories(tmp)
+
+      assert reason in [:eacces, :enotdir]
+    after
+      File.chmod!(blocked, 0o755)
+    end
   end
 
   test "query_files discovers sql files under conventional Elixir project roots" do
@@ -141,17 +160,19 @@ defmodule SquirrelixCliCompatibilityTest do
     File.write!(Path.join(tmp, "dev/scratch/sql/dev_query.sql"), "select 3")
     File.write!(Path.join(tmp, "priv/sql/ignored.sql"), "select 4")
 
-    assert CLI.query_files(tmp) == %{
-             Path.join(tmp, "dev/scratch/sql") => [
-               Path.join(tmp, "dev/scratch/sql/dev_query.sql")
-             ],
-             Path.join(tmp, "lib/accounts/sql") => [
-               Path.join(tmp, "lib/accounts/sql/find_user.sql")
-             ],
-             Path.join(tmp, "test/support/sql") => [
-               Path.join(tmp, "test/support/sql/test_query.sql")
-             ]
-           }
+    assert CLI.query_files(tmp) ==
+             {:ok,
+              %{
+                Path.join(tmp, "dev/scratch/sql") => [
+                  Path.join(tmp, "dev/scratch/sql/dev_query.sql")
+                ],
+                Path.join(tmp, "lib/accounts/sql") => [
+                  Path.join(tmp, "lib/accounts/sql/find_user.sql")
+                ],
+                Path.join(tmp, "test/support/sql") => [
+                  Path.join(tmp, "test/support/sql/test_query.sql")
+                ]
+              }}
   end
 
   test "query_directories loads discovered SQL files into query directories" do
@@ -163,13 +184,14 @@ defmodule SquirrelixCliCompatibilityTest do
 
     accounts_dir = Path.join(tmp, "lib/accounts/sql")
 
-    assert [
-             %QueryDirectory{
-               directory: ^accounts_dir,
-               queries: [%Query{name: "find_user", content: "select 1"}],
-               errors: []
-             }
-           ] = CLI.query_directories(tmp)
+    assert {:ok,
+            [
+              %QueryDirectory{
+                directory: ^accounts_dir,
+                queries: [%Query{name: "find_user", content: "select 1"}],
+                errors: []
+              }
+            ]} = CLI.query_directories(tmp)
   end
 
   test "directory_to_output_file maps sql directory to sibling sql.ex" do

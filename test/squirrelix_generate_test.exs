@@ -256,6 +256,45 @@ defmodule SquirrelixGenerateTest do
     refute File.exists?(Path.join(root, "lib/billing/sql.ex"))
   end
 
+  test "generate refuses all writes when any directory cannot be overwritten" do
+    root = tmp_project(:acorn_counter)
+    good_dir = Path.join(root, "lib/accounts/sql")
+    bad_dir = Path.join(root, "lib/billing/sql")
+    File.mkdir_p!(good_dir)
+    File.mkdir_p!(bad_dir)
+
+    good_query = Path.join(good_dir, "find_account.sql")
+    bad_query = Path.join(bad_dir, "find_invoice.sql")
+    good_output = Path.join(root, "lib/accounts/sql.ex")
+    bad_output = Path.join(root, "lib/billing/sql.ex")
+
+    File.write!(good_query, "select name from accounts where id = $1")
+    File.write!(bad_query, "select total from invoices where id = $1")
+    File.write!(bad_output, "defmodule HandWritten do\nend\n")
+
+    metadata = %{
+      good_query => [
+        params: [:integer],
+        returns: [%{name: "name", type: :string, nullable?: false}]
+      ],
+      bad_query => [
+        params: [:integer],
+        returns: [%{name: "total", type: :integer, nullable?: false}]
+      ]
+    }
+
+    assert %CodegenSummary{
+             generated_count: 0,
+             errors: [
+               {^bad_dir, %Squirrelix.Error.CannotOverwriteFile{file: ^bad_output}}
+             ],
+             status: :error
+           } = Squirrelix.generate(root, metadata, version: "v-test")
+
+    refute File.exists?(good_output)
+    assert File.read!(bad_output) == "defmodule HandWritten do\nend\n"
+  end
+
   test "generate refuses all writes when any directory is missing metadata" do
     root = tmp_project(:acorn_counter)
     accounts_dir = Path.join(root, "lib/accounts/sql")

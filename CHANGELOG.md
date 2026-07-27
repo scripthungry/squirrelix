@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.2] — 2026-07-27
+
+### Added
+
+- Write-pass atomicity for codegen: prepare every `sql.ex` write before committing;
+  refuse all writes when any prepare fails; commit via temp + rename with rollback
+  if a later rename fails (#49).
+
+### Changed
+
+- Directory discovery returns structured `CannotReadFile` instead of raising on
+  unreadable paths.
+- Removed unused internal `Codegen.write_directories` / `check_directories` helpers
+  (partial progress on #52).
+
+### Docs
+
+- Clarify query-error vs write-pass atomicity in README, Configuration, Phoenix
+  guide, and Mix task docs. ROADMAP points at Post-0.5 backlog and 1.0 issues.
+
 ## [0.5.1] — 2026-07-27
 
 ### Fixed

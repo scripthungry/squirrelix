@@ -39,7 +39,6 @@ defmodule Squirrelix.Codegen do
   alias Squirrelix.Parameter
   alias Squirrelix.Project
   alias Squirrelix.TypedQuery
-  alias Squirrelix.TypedQueryDirectory
   alias Squirrelix.TypeMapper
 
   require Logger
@@ -89,12 +88,21 @@ defmodule Squirrelix.Codegen do
           :ok | {:error, :invalid_sql_directory | struct()}
   def write_directory(root, sql_directory, queries, opts \\ [])
       when is_binary(root) and is_binary(sql_directory) and is_list(queries) and is_list(opts) do
+    case prepare_directory(root, sql_directory, queries, opts) do
+      {:ok, prepared} -> Output.commit_writes([prepared])
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @spec prepare_directory(Path.t(), Path.t(), [TypedQuery.t()], keyword()) ::
+          {:ok, map()} | {:error, :invalid_sql_directory | struct()}
+  def prepare_directory(root, sql_directory, queries, opts \\ [])
+      when is_binary(root) and is_binary(sql_directory) and is_list(queries) and is_list(opts) do
     case Project.module_for_sql_directory(root, sql_directory) do
       {:ok, module} ->
         content = generate_module(module, queries, opts)
         output_file = sql_directory |> Path.dirname() |> Path.join("sql.ex")
-
-        Output.safe_write(output_file, content)
+        Output.prepare_write(output_file, content)
 
       {:error, :invalid_sql_directory} ->
         {:error, :invalid_sql_directory}
@@ -115,30 +123,6 @@ defmodule Squirrelix.Codegen do
       {:error, :invalid_sql_directory} ->
         {:error, :invalid_sql_directory}
     end
-  end
-
-  @spec write_directories(Path.t(), [TypedQueryDirectory.t()], keyword()) :: [
-          {Path.t(), :ok | {:error, :invalid_sql_directory | struct()}, non_neg_integer()}
-        ]
-  def write_directories(root, directories, opts \\ [])
-      when is_binary(root) and is_list(directories) and is_list(opts) do
-    directories
-    |> Enum.sort_by(& &1.directory)
-    |> Enum.map(fn %TypedQueryDirectory{directory: directory, queries: queries} ->
-      {directory, write_directory(root, directory, queries, opts), length(queries)}
-    end)
-  end
-
-  @spec check_directories(Path.t(), [TypedQueryDirectory.t()], keyword()) :: [
-          {Path.t(), :ok | {:error, :invalid_sql_directory | struct()}, non_neg_integer()}
-        ]
-  def check_directories(root, directories, opts \\ [])
-      when is_binary(root) and is_list(directories) and is_list(opts) do
-    directories
-    |> Enum.sort_by(& &1.directory)
-    |> Enum.map(fn %TypedQueryDirectory{directory: directory, queries: queries} ->
-      {directory, check_directory(root, directory, queries, opts), length(queries)}
-    end)
   end
 
   @spec summarize_write_outcomes([{Path.t(), :ok | {:error, term()}, non_neg_integer()}]) ::

@@ -391,11 +391,16 @@ During check, an outdated generated file produces `OutdatedFile`.
 
 ## Atomic generate and check
 
-Code generation is **project-wide atomic** (Gleam squirrel 4.5+ parity). If any
-`sql/` directory has query errors — invalid file names, missing metadata,
-inference failures, unsupported types, and so on — `mix squirrelix.gen` writes
-**nothing**. Directories that would otherwise succeed are left untouched until
-every error is fixed.
+Code generation is **project-wide atomic** (Gleam squirrel 4.5+ parity):
+
+1. **Query-error atomicity** — If any `sql/` directory has query errors (invalid
+   file names, missing metadata, inference failures, unsupported types, and so
+   on), `mix squirrelix.gen` writes **nothing**. Directories that would otherwise
+   succeed are left untouched until every error is fixed.
+2. **Write-pass atomicity** — When every directory is query-valid, Squirrelix
+   prepares all `sql.ex` writes first. If any prepare fails (for example
+   `CannotOverwriteFile`), nothing is written. Successful commits use temp files
+   + rename, and roll back earlier renames if a later one fails mid-pass.
 
 `mix squirrelix.check` fails globally when any directory has query errors or
 generated-file drift. Errors from every failing directory are reported together;

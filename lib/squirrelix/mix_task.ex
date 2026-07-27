@@ -128,15 +128,18 @@ defmodule Squirrelix.MixTask do
   end
 
   defp exportable_metadata(root, inferrer) do
-    directories =
-      root
-      |> CLI.query_directories()
-      |> Inference.from_query_directories(inferrer)
+    case CLI.query_directories(root) do
+      {:error, error} ->
+        Mix.raise("Could not discover SQL directories:\n\n#{Error.format(error)}")
 
-    if Enum.any?(directories, &(&1.errors != [])) do
-      :has_errors
-    else
-      {:ok, Metadata.from_typed_directories(directories)}
+      {:ok, query_directories} ->
+        directories = Inference.from_query_directories(query_directories, inferrer)
+
+        if Enum.any?(directories, &(&1.errors != [])) do
+          :has_errors
+        else
+          {:ok, Metadata.from_typed_directories(directories)}
+        end
     end
   end
 

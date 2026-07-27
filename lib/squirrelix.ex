@@ -93,9 +93,17 @@ defmodule Squirrelix do
   @doc """
   Generates query modules for SQL files discovered under a Mix project root.
 
-  Generation is **project-wide atomic**: if any `sql/` directory has query errors
-  (invalid names, missing metadata, inference failures, …), nothing is written —
-  including directories that would otherwise succeed. Fix every error, then re-run.
+  Generation is **project-wide atomic**:
+
+    * If any `sql/` directory has query errors (invalid names, missing metadata,
+      inference failures, …), nothing is written — including directories that
+      would otherwise succeed.
+    * If every directory is query-valid but any prepared write would fail
+      (for example `CannotOverwriteFile`), nothing is written.
+    * Successful writes use temp files + rename, with rollback if a later rename
+      fails mid-pass.
+
+  Fix every error, then re-run.
 
   ## Options
 
@@ -106,17 +114,19 @@ defmodule Squirrelix do
   """
   @spec generate(Path.t(), query_source(), keyword()) :: Squirrelix.CodegenSummary.t()
   def generate(root, query_source, opts \\ []) when is_binary(root) and is_list(opts) do
-    directories = typed_query_directories(root, query_source)
+    case typed_query_directories(root, query_source) do
+      {:error, error} ->
+        Squirrelix.Codegen.summarize_write_outcomes([{root, {:error, error}, 0}])
 
-    case directory_query_errors(directories) do
-      [] ->
-        directories
-        |> Enum.map(&write_typed_directory(root, &1, opts))
-        |> Squirrelix.Codegen.summarize_write_outcomes()
+      directories when is_list(directories) ->
+        case directory_query_errors(directories) do
+          [] ->
+            write_all_or_nothing(root, directories, opts)
 
-      errors ->
-        # Gleam squirrel 4.5+ parity: refuse all writes when any query errors exist.
-        Squirrelix.Codegen.summarize_write_outcomes(errors)
+          errors ->
+            # Gleam squirrel 4.5+ parity: refuse all writes when any query errors exist.
+            Squirrelix.Codegen.summarize_write_outcomes(errors)
+        end
     end
   end
 
@@ -131,10 +141,15 @@ defmodule Squirrelix do
   """
   @spec check(Path.t(), query_source(), keyword()) :: Squirrelix.CodegenCheckSummary.t()
   def check(root, query_source, opts \\ []) when is_binary(root) and is_list(opts) do
-    root
-    |> typed_query_directories(query_source)
-    |> Enum.map(&check_typed_directory(root, &1, opts))
-    |> Squirrelix.Codegen.summarize_check_outcomes()
+    case typed_query_directories(root, query_source) do
+      {:error, error} ->
+        Squirrelix.Codegen.summarize_check_outcomes([{root, {:error, error}, 0}])
+
+      directories when is_list(directories) ->
+        directories
+        |> Enum.map(&check_typed_directory(root, &1, opts))
+        |> Squirrelix.Codegen.summarize_check_outcomes()
+    end
   end
 
   @spec tokenize(String.t()) :: [String.t()]
@@ -216,17 +231,26 @@ defmodule Squirrelix do
   end
 
   defp typed_query_directories(root, metadata) when is_map(metadata) do
-    root
-    |> Squirrelix.CLI.query_directories()
-    |> Enum.map(&Squirrelix.TypedQueryDirectory.from_query_directory(&1, metadata))
-    |> Enum.sort_by(& &1.directory)
+    case Squirrelix.CLI.query_directories(root) do
+      {:ok, directories} ->
+        directories
+        |> Enum.map(&Squirrelix.TypedQueryDirectory.from_query_directory(&1, metadata))
+        |> Enum.sort_by(& &1.directory)
+
+      {:error, _} = error ->
+        error
+    end
   end
 
   defp typed_query_directories(root, inferrer)
        when is_function(inferrer, 1) or is_atom(inferrer) do
-    root
-    |> Squirrelix.CLI.query_directories()
-    |> Squirrelix.Inference.from_query_directories(inferrer)
+    case Squirrelix.CLI.query_directories(root) do
+      {:ok, directories} ->
+        Squirrelix.Inference.from_query_directories(directories, inferrer)
+
+      {:error, _} = error ->
+        error
+    end
   end
 
   defp directory_query_errors(directories) do
@@ -237,11 +261,47 @@ defmodule Squirrelix do
     end)
   end
 
-  defp write_typed_directory(root, %Squirrelix.TypedQueryDirectory{} = directory, opts) do
-    outcome =
-      Squirrelix.Codegen.write_directory(root, directory.directory, directory.queries, opts)
+  defp write_all_or_nothing(root, directories, opts) do
+    prepared =
+      directories
+      |> Enum.sort_by(& &1.directory)
+      |> Enum.map(&prepare_typed_directory(root, &1, opts))
 
-    {directory.directory, outcome, length(directory.queries)}
+    case Enum.reject(prepared, fn {_dir, result, _count} -> match?({:ok, _}, result) end) do
+      [] ->
+        commit_prepared_writes(prepared)
+
+      errors ->
+        errors
+        |> Enum.map(fn {dir, {:error, reason}, count} -> {dir, {:error, reason}, count} end)
+        |> Squirrelix.Codegen.summarize_write_outcomes()
+    end
+  end
+
+  defp prepare_typed_directory(root, %Squirrelix.TypedQueryDirectory{} = directory, opts) do
+    result =
+      Squirrelix.Codegen.prepare_directory(
+        root,
+        directory.directory,
+        directory.queries,
+        opts
+      )
+
+    {directory.directory, result, length(directory.queries)}
+  end
+
+  defp commit_prepared_writes(prepared) do
+    writes = Enum.map(prepared, fn {_dir, {:ok, write}, _count} -> write end)
+
+    case Squirrelix.Output.commit_writes(writes) do
+      :ok ->
+        prepared
+        |> Enum.map(fn {dir, {:ok, _}, count} -> {dir, :ok, count} end)
+        |> Squirrelix.Codegen.summarize_write_outcomes()
+
+      {:error, error} ->
+        Squirrelix.Codegen.summarize_write_outcomes([{error.file, {:error, error}, 0}])
+    end
   end
 
   defp check_typed_directory(
