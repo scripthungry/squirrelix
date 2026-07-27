@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Nullability inference for schema-qualified tables, scalar subqueries in select
+  lists, and expression-derived columns (see Writing Queries guide).
+
 ### Changed
 
 - Documented composite-type policy as **reject-with-hints** (aligned with Gleam

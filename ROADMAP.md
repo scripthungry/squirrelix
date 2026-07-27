@@ -67,7 +67,7 @@ Gleam records, custom enum ADTs, or opaque tagged error values.
   - [x] Rename inferred `connection` arguments to avoid shadowing the Postgrex connection param.
 
 - **Postgres inference**
-  - [ ] Expand nullability for schema-qualified tables, subqueries in select lists, and
+  - [x] Expand nullability for schema-qualified tables, subqueries in select lists, and
     expression-derived columns where practical.
   - [ ] Improve structured errors for connection failures and timeouts.
 

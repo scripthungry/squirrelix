@@ -136,6 +136,17 @@ in `@spec`s and row types with `| nil`:
 
 At runtime, `nil` values decode to Elixir `nil`.
 
+Inference also covers:
+
+- **Schema-qualified tables** — `schema.table` columns use catalog nullability for that
+  schema (including tables outside `search_path`).
+- **Scalar subqueries in the select list** — treated as nullable (they can return no
+  row). This is intentionally stricter than Gleam Squirrel, which treats
+  non-table columns as non-nullable.
+- **Expression-derived columns** — `id + 1`, `upper(name)`, `coalesce(...)`, and similar
+  are treated as non-nullable, matching Gleam Squirrel's `table_oid = 0` behaviour.
+  Override with a `"name?"` / `"name!"` column alias when needed.
+
 ## Nullable query parameters
 
 Postgres does not expose nullability information for query **parameters**. Squirrelix

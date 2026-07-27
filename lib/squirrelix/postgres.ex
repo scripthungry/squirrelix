@@ -15,6 +15,7 @@ defmodule Squirrelix.Postgres do
 
   require Logger
 
+  # $1 = relation name, $2 = column name, $3 = schema (NULL = search_path / temp).
   @column_nullability_query """
   select a.attnotnull
   from pg_attribute a
@@ -24,7 +25,14 @@ defmodule Squirrelix.Postgres do
     and a.attname = $2
     and a.attnum > 0
     and not a.attisdropped
-    and n.nspname = any(current_schemas(true))
+    and (
+      case
+        when $3::text is null then n.nspname = any(current_schemas(true))
+        when $3::text = 'pg_temp' or $3::text like 'pg_temp_%' then
+          n.oid = pg_my_temp_schema()
+        else n.nspname = $3
+      end
+    )
   limit 1
   """
 
@@ -256,6 +264,7 @@ defmodule Squirrelix.Postgres do
       join_type: Map.get(plan_map, "Join Type"),
       output: Map.get(plan_map, "Output", []),
       relation: Map.get(plan_map, "Relation Name"),
+      schema: Map.get(plan_map, "Schema"),
       plans: plan_map |> Map.get("Plans", []) |> Enum.map(&parse_plan/1)
     }
   end
@@ -321,15 +330,15 @@ defmodule Squirrelix.Postgres do
     expr_to_source = collect_expr_sources(plan)
 
     Enum.map(plan.output, fn expr ->
-      Map.get(expr_to_source, expr) || parse_qualified_expr(expr)
+      Map.get(expr_to_source, expr) || classify_output_expr(expr, nil, nil)
     end)
   end
 
-  defp collect_expr_sources(%{relation: relation, output: output, plans: plans})
+  defp collect_expr_sources(%{relation: relation, schema: schema, output: output, plans: plans})
        when is_binary(relation) and relation != "" do
     own =
       output
-      |> Enum.map(fn expr -> {expr, {relation, column_from_expr(expr, relation)}} end)
+      |> Enum.map(fn expr -> {expr, classify_output_expr(expr, schema, relation)} end)
       |> Map.new()
 
     Enum.reduce(plans, own, fn child, acc ->
@@ -343,20 +352,52 @@ defmodule Squirrelix.Postgres do
     end)
   end
 
-  defp parse_qualified_expr(expr) do
-    case String.split(expr, ".") do
-      [table, column] -> {table, column}
+  # Classify EXPLAIN "Output" entries into table columns, scalar subplans, or
+  # expression-derived values. Matches Gleam squirrel's table_oid=0 behaviour
+  # for expressions (non-nullable) while treating SubPlan outputs as nullable.
+  defp classify_output_expr(expr, schema, relation) when is_binary(expr) do
+    if Regex.match?(~r/^\(SubPlan \d+\)$/, expr) do
+      :subquery
+    else
+      table_column_source(expr, schema, relation) || :expression
+    end
+  end
+
+  defp classify_output_expr(_expr, _schema, _relation), do: :expression
+
+  defp table_column_source(expr, schema, relation) do
+    with {:ok, column} <- parse_column_ref(expr),
+         table when is_binary(table) <- relation || table_from_qualified_expr(expr) do
+      {:table_column, schema, table, column}
+    else
       _ -> nil
     end
   end
 
-  defp column_from_expr(expr, default_table) do
-    case String.split(expr, ".") do
-      [_table, column] -> column
-      [column] -> column
-      _ -> default_table
+  defp parse_column_ref(expr) do
+    # Optional alias/table qualifier, then a single identifier (quoted or bare).
+    # Anything else (operators, function calls, casts) is an expression.
+    case Regex.run(
+           ~r/^((?:[A-Za-z_][A-Za-z0-9_]*|"[^"]+")\.)?([A-Za-z_][A-Za-z0-9_]*|"[^"]+")$/,
+           expr
+         ) do
+      [_match, _qualifier, column] -> {:ok, unquote_ident(column)}
+      nil -> :error
     end
   end
+
+  defp table_from_qualified_expr(expr) do
+    case String.split(expr, ".", parts: 2) do
+      [table, _column] -> unquote_ident(table)
+      _ -> nil
+    end
+  end
+
+  defp unquote_ident(<<"\"", rest::binary>>) do
+    String.trim_trailing(rest, "\"")
+  end
+
+  defp unquote_ident(ident), do: ident
 
   defp column_nullable?(conn, name, index, plan_nullables, column_sources, plan_available?) do
     cond do
@@ -370,15 +411,22 @@ defmodule Squirrelix.Postgres do
         true
 
       true ->
-        case Enum.at(column_sources, index) do
-          {table, column} -> !column_has_not_null_constraint?(conn, table, column)
-          nil -> !plan_available?
-        end
+        source_nullable?(conn, Enum.at(column_sources, index), plan_available?)
     end
   end
 
-  defp column_has_not_null_constraint?(conn, table, column) do
-    case Postgrex.query(conn, @column_nullability_query, [table, column]) do
+  defp source_nullable?(_conn, :subquery, _plan_available?), do: true
+  defp source_nullable?(_conn, :expression, _plan_available?), do: false
+
+  defp source_nullable?(conn, {:table_column, schema, table, column}, _plan_available?)
+       when is_binary(table) and is_binary(column) do
+    !column_has_not_null_constraint?(conn, schema, table, column)
+  end
+
+  defp source_nullable?(_conn, _other, plan_available?), do: !plan_available?
+
+  defp column_has_not_null_constraint?(conn, schema, table, column) do
+    case Postgrex.query(conn, @column_nullability_query, [table, column, schema]) do
       {:ok, %Postgrex.Result{rows: [[true]]}} -> true
       {:ok, %Postgrex.Result{rows: [[false]]}} -> false
       _ -> false
