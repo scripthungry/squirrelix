@@ -17,7 +17,8 @@ defmodule Mix.Tasks.Squirrelix.Gen do
       types (default: `squirr_elix.exs` in the project root). The file is evaluated
       as Elixir — treat it like `mix.exs` and never load untrusted paths.
     * `--infer` — infer types from a live Postgres database instead of a metadata file
-    * `--url URL` — Postgres connection URL (also reads `PG*` environment variables)
+    * `--url URL` — Postgres connection URL (also reads `DATABASE_URL` and `PG*`
+      environment variables)
     * `--database NAME` — database name when inferring
     * `--hostname HOST` — database host when inferring
     * `--username USER` — database user when inferring
@@ -25,8 +26,11 @@ defmodule Mix.Tasks.Squirrelix.Gen do
       values on the command line appear in process listings and shell history)
     * `--port PORT` — database port when inferring
 
-  Connection precedence (highest first): CLI flags → `--url` → `PG*` environment
-  variables → defaults.
+  Connection precedence (highest first): flags → `--url` → `DATABASE_URL` → `PG*` → defaults.
+
+  URLs may include `sslmode` (`disable`, `allow`, `prefer`, `require`, `verify-ca`,
+  `verify-full`) or `ssl=true`/`ssl=false`. See the Configuration guide for how those
+  map to Postgrex `:ssl` options. Unix sockets are not supported.
 
   Generated query functions call `Postgrex.query!/3` and raise on database errors.
 

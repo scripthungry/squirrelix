@@ -37,39 +37,68 @@ When you cannot reach Postgres at generation time, use a metadata file instead o
 
 ### Connection URL
 
-Prefer putting secrets in the environment (`PGPASSWORD`) rather than in a URL or
-`--password` flag — both appear in process listings and shell history.
+Prefer putting secrets in the environment (`PGPASSWORD` / `DATABASE_URL`) rather
+than in a URL or `--password` flag — both appear in process listings and shell
+history.
+
+Phoenix-style apps can rely on `DATABASE_URL` with no extra flags:
+
+```sh
+export DATABASE_URL=postgres://user:pass@host:5432/database?sslmode=require
+mix squirrelix.gen --infer
+```
+
+Or pass an explicit URL:
 
 ```sh
 mix squirrelix.gen --infer \
-  --url postgres://user@host:5432/database?connect_timeout=5
+  --url postgres://user@host:5432/database?connect_timeout=5&sslmode=require
 ```
 
 Supported URL schemes: `postgres://` and `postgresql://`.
 
 The `connect_timeout` query parameter sets the connection timeout in seconds.
 
+SSL query parameters:
+
+| Parameter | Postgrex `:ssl` |
+| --- | --- |
+| `sslmode=disable` | `false` |
+| `sslmode=allow` / `prefer` | `false` (Postgrex cannot negotiate SSL fallback) |
+| `sslmode=require` / `ssl=true` | `[verify: :verify_none]` (encrypt; no CA check) |
+| `sslmode=verify-ca` / `verify-full` | `true` (Postgrex secure defaults) |
+| `ssl=false` | `false` |
+
+Unix sockets are not supported.
+
 `--infer` runs your `.sql` files against a real database (prepare + EXPLAIN). Only
 point it at trusted SQL and a database you intend to use for codegen.
 
 ### Environment variables
 
-Squirrelix reads standard
+Squirrelix reads `DATABASE_URL` (when set) and standard
 [libpq environment variables](https://www.postgresql.org/docs/current/libpq-envars.html):
 
 | Variable | Default |
 | --- | --- |
+| `DATABASE_URL` | _(unset — fall back to `PG*`)_ |
 | `PGHOST` | `localhost` |
 | `PGPORT` | `5432` |
 | `PGUSER` | `postgres` |
 | `PGDATABASE` | `postgres` |
 | `PGPASSWORD` | `""` |
 | `PGCONNECT_TIMEOUT` | `5` (seconds) |
+| `PGSSLMODE` | _(no SSL)_ |
+
+`PGSSLMODE` uses the same mapping as URL `sslmode` above. A URL `sslmode` /
+`ssl` parameter overrides `PGSSLMODE`.
 
 Example with `direnv`:
 
 ```sh
 # .envrc
+export DATABASE_URL=postgres://postgres@localhost:5432/my_app_dev
+# or:
 export PGDATABASE=my_app_dev
 export PGUSER=postgres
 export PGPASSWORD=secret
@@ -93,8 +122,9 @@ mix squirrelix.gen --infer \
   --database my_app_dev
 ```
 
-Connection precedence (highest first): CLI flags → `--url` → `PG*` environment
-variables → defaults. Prefer `PGPASSWORD` over `--password`.
+Connection precedence (highest first): flags → `--url` → `DATABASE_URL` → `PG*`
+environment variables → defaults. Prefer `PGPASSWORD` / `DATABASE_URL` over
+`--password`.
 
 ## Metadata files
 

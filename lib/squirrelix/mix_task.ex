@@ -4,7 +4,6 @@ defmodule Squirrelix.MixTask do
   alias Squirrelix.CLI
   alias Squirrelix.CodegenCheckSummary
   alias Squirrelix.CodegenSummary
-  alias Squirrelix.ConnectionOptions
   alias Squirrelix.Error
   alias Squirrelix.Metadata
   alias Squirrelix.Postgres
@@ -69,56 +68,13 @@ defmodule Squirrelix.MixTask do
     end
   end
 
-  # Precedence (highest first): CLI flags → URL → environment → defaults.
+  # Precedence (highest first): flags → --url → DATABASE_URL → PG* → defaults.
   defp build_connection_options(opts) do
-    System.get_env()
-    |> CLI.connection_options_from_variables("postgres")
-    |> maybe_merge_url(opts)
-    |> merge_flag_overrides(opts)
-  end
-
-  defp maybe_merge_url(%ConnectionOptions{} = base, opts) do
-    case Keyword.fetch(opts, :url) do
-      {:ok, url} ->
-        case CLI.parse_connection_url(url) do
-          {:ok, from_url} -> merge_connection_options(base, from_url)
-          {:error, :invalid_url} -> Mix.raise("Invalid Postgres connection URL")
-        end
-
-      :error ->
-        base
+    case CLI.resolve_connection_options(System.get_env(), opts) do
+      {:ok, connection_options} -> connection_options
+      {:error, :invalid_url} -> Mix.raise("Invalid Postgres connection URL")
     end
   end
-
-  defp merge_flag_overrides(%ConnectionOptions{} = base, opts) do
-    overrides =
-      [
-        host: Keyword.get(opts, :hostname),
-        port: Keyword.get(opts, :port),
-        user: Keyword.get(opts, :username),
-        password: Keyword.get(opts, :password),
-        database: Keyword.get(opts, :database)
-      ]
-      |> Enum.reject(fn {_key, value} -> value in [nil, ""] end)
-      |> Map.new()
-
-    struct!(base, overrides)
-  end
-
-  defp merge_connection_options(%ConnectionOptions{} = base, %ConnectionOptions{} = override) do
-    %ConnectionOptions{
-      host: override.host || base.host,
-      port: override.port || base.port,
-      user: override.user || base.user,
-      password: prefer_password(override.password, base.password),
-      database: override.database || base.database,
-      timeout_seconds: override.timeout_seconds || base.timeout_seconds
-    }
-  end
-
-  # Empty password from a URL like postgres://user@host/db should not wipe PGPASSWORD.
-  defp prefer_password("", base), do: base
-  defp prefer_password(password, _base), do: password
 
   defp load_metadata!(opts, root) do
     metadata_file = opts |> Keyword.get(:metadata, "squirr_elix.exs") |> Path.expand(root)

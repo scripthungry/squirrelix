@@ -89,6 +89,28 @@ defmodule MixTasksSquirrelixTest do
     assert File.read!(Path.join(root, "lib/accounts/sql.ex")) =~ "required(:name) => String.t()"
   end
 
+  test "mix squirrelix.gen can infer metadata from DATABASE_URL" do
+    root = tmp_project(:acorn_counter)
+    write_query(root, "select $1::text as name")
+    previous = System.get_env("DATABASE_URL")
+
+    try do
+      System.put_env("DATABASE_URL", Squirrelix.TestSupport.postgres_url())
+
+      output =
+        File.cd!(root, fn ->
+          capture_io(fn ->
+            Mix.Task.run("squirrelix.gen", ["--infer"])
+          end)
+        end)
+
+      assert output =~ "Generated 1 query."
+      assert File.read!(Path.join(root, "lib/accounts/sql.ex")) =~ "required(:name) => String.t()"
+    after
+      restore_env("DATABASE_URL", previous)
+    end
+  end
+
   test "mix squirrelix.gen rejects invalid Postgres URLs" do
     root = tmp_project(:acorn_counter)
     write_query(root, "select $1::text as name")
@@ -97,6 +119,24 @@ defmodule MixTasksSquirrelixTest do
       File.cd!(root, fn ->
         Mix.Task.run("squirrelix.gen", ["--infer", "--url", "mysql://localhost/postgres"])
       end)
+    end
+  end
+
+  test "mix squirrelix.gen rejects invalid DATABASE_URL" do
+    root = tmp_project(:acorn_counter)
+    write_query(root, "select $1::text as name")
+    previous = System.get_env("DATABASE_URL")
+
+    try do
+      System.put_env("DATABASE_URL", "mysql://localhost/postgres")
+
+      assert_raise Mix.Error, "Invalid Postgres connection URL", fn ->
+        File.cd!(root, fn ->
+          Mix.Task.run("squirrelix.gen", ["--infer"])
+        end)
+      end
+    after
+      restore_env("DATABASE_URL", previous)
     end
   end
 
@@ -159,6 +199,9 @@ defmodule MixTasksSquirrelixTest do
     assert moduledoc =~ "--metadata"
     assert moduledoc =~ "--infer"
     assert moduledoc =~ "squirr_elix.exs"
+    assert moduledoc =~ "DATABASE_URL"
+    assert moduledoc =~ "sslmode"
+    assert moduledoc =~ "flags → `--url` → `DATABASE_URL` → `PG*` → defaults"
   end
 
   test "mix squirrelix.check moduledoc documents usage" do
@@ -167,7 +210,11 @@ defmodule MixTasksSquirrelixTest do
 
     assert moduledoc =~ "mix squirrelix.check"
     assert moduledoc =~ "--infer"
+    assert moduledoc =~ "DATABASE_URL"
   end
+
+  defp restore_env(key, nil), do: System.delete_env(key)
+  defp restore_env(key, value), do: System.put_env(key, value)
 
   defp tmp_project(app) do
     path = Squirrelix.TestSupport.tmp_dir!("squirr_elix-mix-task")
