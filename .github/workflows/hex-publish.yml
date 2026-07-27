@@ -9,6 +9,15 @@ on:
       confirm:
         description: 'Type "publish" to publish the current mix.exs version to Hex'
         required: true
+      mode:
+        description: "What to publish (docs = docs only for the existing package version)"
+        required: true
+        type: choice
+        options:
+          - package
+          - docs
+          - all
+        default: all
 
 permissions:
   contents: read
@@ -53,7 +62,8 @@ jobs:
       - run: mix deps.get
       - run: mix compile --warnings-as-errors
 
-      - name: Publish package
+      - name: Publish package and docs
+        if: github.event_name == 'push' || inputs.mode == 'all' || inputs.mode == 'package'
         env:
           HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
         run: |
@@ -61,4 +71,19 @@ jobs:
             echo "HEX_API_KEY secret is not set"
             exit 1
           fi
-          mix hex.publish --yes
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.mode }}" = "package" ]; then
+            mix hex.publish package --yes
+          else
+            mix hex.publish --yes
+          fi
+
+      - name: Publish docs only
+        if: github.event_name == 'workflow_dispatch' && inputs.mode == 'docs'
+        env:
+          HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
+        run: |
+          if [ -z "$HEX_API_KEY" ]; then
+            echo "HEX_API_KEY secret is not set"
+            exit 1
+          fi
+          mix hex.publish docs --yes
