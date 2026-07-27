@@ -2,6 +2,7 @@ defmodule Squirrelix.CLI do
   @moduledoc false
 
   alias Squirrelix.ConnectionOptions
+  alias Squirrelix.Error.CannotReadFile
   alias Squirrelix.Project
   alias Squirrelix.QueryDirectory
 
@@ -64,26 +65,34 @@ defmodule Squirrelix.CLI do
   @doc """
   Recursively finds `sql/` directories and their `.sql` files under `path`.
 
-  Returns a map of directory paths to sorted SQL file paths.
+  Returns `{:ok, map}` of directory paths to sorted SQL file paths, or
+  `{:error, %CannotReadFile{}}` when a directory cannot be listed.
   """
-  @spec discover_sql_directories(Path.t()) :: discovered_sql_files()
+  @spec discover_sql_directories(Path.t()) ::
+          {:ok, discovered_sql_files()} | {:error, CannotReadFile.t()}
   def discover_sql_directories(path) when is_binary(path) do
     do_discover_sql_directories(path)
   end
 
-  @spec query_files(Path.t()) :: discovered_sql_files()
+  @spec query_files(Path.t()) :: {:ok, discovered_sql_files()} | {:error, CannotReadFile.t()}
   def query_files(root) when is_binary(root) do
     root
     |> Project.source_roots()
-    |> Enum.map(&discover_sql_directories/1)
-    |> Enum.reduce(%{}, &Map.merge/2)
+    |> Enum.reduce_while({:ok, %{}}, fn source_root, {:ok, acc} ->
+      case discover_sql_directories(source_root) do
+        {:ok, found} -> {:cont, {:ok, Map.merge(acc, found)}}
+        {:error, _} = error -> {:halt, error}
+      end
+    end)
   end
 
-  @spec query_directories(Path.t()) :: [QueryDirectory.t()]
+  @spec query_directories(Path.t()) ::
+          {:ok, [QueryDirectory.t()]} | {:error, CannotReadFile.t()}
   def query_directories(root) when is_binary(root) do
-    root
-    |> query_files()
-    |> QueryDirectory.from_discovered_files()
+    case query_files(root) do
+      {:ok, files} -> {:ok, QueryDirectory.from_discovered_files(files)}
+      {:error, _} = error -> error
+    end
   end
 
   @spec directory_to_output_file(String.t()) :: String.t()
@@ -182,39 +191,61 @@ defmodule Squirrelix.CLI do
 
   defp do_discover_sql_directories(path) do
     if Path.basename(path) == "sql" do
-      files =
-        case File.ls(path) do
-          {:ok, entries} ->
-            entries
-            |> Enum.map(&Path.join(path, &1))
-            |> Enum.filter(&(File.regular?(&1) and Path.extname(&1) == ".sql"))
-            |> Enum.sort()
-
-          {:error, _reason} ->
-            []
-        end
-
-      %{path => files}
+      list_sql_files(path)
     else
-      path
-      |> list_directories()
-      |> Enum.map(&do_discover_sql_directories/1)
-      |> Enum.reduce(%{}, &Map.merge/2)
+      discover_nested_sql_directories(path)
     end
+  end
+
+  defp list_sql_files(path) do
+    case File.ls(path) do
+      {:ok, entries} ->
+        files =
+          entries
+          |> Enum.map(&Path.join(path, &1))
+          |> Enum.filter(&(File.regular?(&1) and Path.extname(&1) == ".sql"))
+          |> Enum.sort()
+
+        {:ok, %{path => files}}
+
+      {:error, :enoent} ->
+        {:ok, %{}}
+
+      {:error, reason} ->
+        {:error, %CannotReadFile{file: path, reason: reason}}
+    end
+  end
+
+  defp discover_nested_sql_directories(path) do
+    with {:ok, directories} <- list_directories(path) do
+      merge_discovered_directories(directories)
+    end
+  end
+
+  defp merge_discovered_directories(directories) do
+    Enum.reduce_while(directories, {:ok, %{}}, fn directory, {:ok, acc} ->
+      case do_discover_sql_directories(directory) do
+        {:ok, found} -> {:cont, {:ok, Map.merge(acc, found)}}
+        {:error, _} = error -> {:halt, error}
+      end
+    end)
   end
 
   defp list_directories(path) do
     case File.ls(path) do
       {:ok, entries} ->
-        entries
-        |> Enum.map(&Path.join(path, &1))
-        |> Enum.filter(&File.dir?/1)
+        directories =
+          entries
+          |> Enum.map(&Path.join(path, &1))
+          |> Enum.filter(&File.dir?/1)
+
+        {:ok, directories}
 
       {:error, :enoent} ->
-        []
+        {:ok, []}
 
-      {:error, _reason} ->
-        raise "couldn't read directory: #{path}"
+      {:error, reason} ->
+        {:error, %CannotReadFile{file: path, reason: reason}}
     end
   end
 

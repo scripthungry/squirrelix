@@ -469,9 +469,9 @@ and watch-backend startup messages stay as plain Mix raises by design. Verify `P
 variables or `--url`, ensure Postgres is running, and confirm the database exists and
 has the expected schema.
 
-Generation is project-wide atomic: if any `sql/` directory has query errors,
-`mix squirrelix.gen` writes nothing (no partial codegen). `mix squirrelix.check`
-fails globally when any directory has errors or drift. See
+Generation is project-wide atomic: query errors refuse all writes, and the write
+pass prepares every `sql.ex` before committing (temp + rename with rollback).
+`mix squirrelix.check` fails globally when any directory has errors or drift. See
 [Configuration](guides/configuration.md#atomic-generate-and-check).
 
 ## Relationship to Gleam Squirrel

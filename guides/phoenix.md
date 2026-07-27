@@ -233,7 +233,8 @@ Notes:
 - `MIX_ENV=test` requires `squirr_elix` in the `:test` dependency list.
 - Prefer `DATABASE_URL` (or the `sql.check` alias) so connection settings stay
   consistent with hosted Phoenix configs.
-- Generation is project-wide atomic: any query error fails the whole check. See
+- Generation is project-wide atomic: any query error or write-prepare failure
+  refuses the whole generate; check fails globally on errors or drift. See
   [Configuration](configuration.md#atomic-generate-and-check).
 - Prefer live `--infer` when CI can run Postgres. Prefer a committed metadata
   file from `--write-metadata` when jobs cannot reach the database — see

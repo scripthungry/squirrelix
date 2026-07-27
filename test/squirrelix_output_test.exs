@@ -88,6 +88,50 @@ defmodule SquirrelixOutputTest do
              Output.safe_write(path, @generated_content)
   end
 
+  test "safe_write leaves no temp artifacts after a successful write" do
+    path = Path.join(tmp_dir(), "sql.ex")
+
+    assert Output.safe_write(path, @generated_content) == :ok
+    assert File.read!(path) == @generated_content
+    refute File.exists?(path <> ".squirrelix.tmp")
+    refute File.exists?(path <> ".squirrelix.bak")
+  end
+
+  test "commit_writes rolls back earlier files when a later rename fails" do
+    dir = tmp_dir()
+    first = Path.join(dir, "accounts/sql.ex")
+    second = Path.join(dir, "billing/sql.ex")
+    File.mkdir_p!(Path.dirname(first))
+    File.mkdir_p!(Path.dirname(second))
+
+    File.write!(first, @generated_content)
+    File.write!(second, @generated_content)
+
+    new_content = """
+    //// > 🐿️ This module was generated automatically using Squirrelix
+    defmodule Updated do
+    end
+    """
+
+    assert {:ok, prepared_first} = Output.prepare_write(first, new_content)
+    assert {:ok, prepared_second} = Output.prepare_write(second, new_content)
+
+    assert :ok = Output.stage_writes([prepared_first, prepared_second])
+
+    # Sabotage the second staged temp so finalize fails after the first rename.
+    File.rm!(second <> ".squirrelix.tmp")
+
+    assert {:error, %CannotWriteFile{file: ^second, reason: :enoent}} =
+             Output.finalize_writes([prepared_first, prepared_second])
+
+    assert File.read!(first) == @generated_content
+    assert File.read!(second) == @generated_content
+    refute File.exists?(first <> ".squirrelix.tmp")
+    refute File.exists?(second <> ".squirrelix.tmp")
+    refute File.exists?(first <> ".squirrelix.bak")
+    refute File.exists?(second <> ".squirrelix.bak")
+  end
+
   test "check_file returns ok when output matches ignoring comments and whitespace" do
     path = write_file("sql.ex", "# Generated\ndefmodule Sql do\n  def all(), do: []\nend\n")
     expected = "defmodule Sql do\ndef all(), do: []\nend\n"

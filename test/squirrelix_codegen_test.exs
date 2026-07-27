@@ -11,7 +11,6 @@ defmodule SquirrelixCodegenTest do
   alias Squirrelix.Error.OutdatedFile
   alias Squirrelix.Parameter
   alias Squirrelix.TypedQuery
-  alias Squirrelix.TypedQueryDirectory
   alias Squirrelix.TypeMapper
 
   test "generate_module emits formatted Elixir functions sorted alphabetically by name" do
@@ -790,7 +789,7 @@ defmodule SquirrelixCodegenTest do
              {:error, %OutdatedFile{file: output_file}}
   end
 
-  test "write_directories writes each typed query directory and returns outcomes" do
+  test "prepare_directory and write_directory write sibling modules" do
     root = tmp_project(:acorn_counter)
     accounts_dir = Path.join(root, "lib/accounts/sql")
     billing_dir = Path.join(root, "lib/billing/sql")
@@ -798,27 +797,25 @@ defmodule SquirrelixCodegenTest do
     File.mkdir_p!(accounts_dir)
     File.mkdir_p!(billing_dir)
 
-    directories = [
-      %TypedQueryDirectory{
-        directory: billing_dir,
-        queries: [typed_query(Path.join(billing_dir, "invoice.sql"), "invoice", "select 2", [])]
-      },
-      %TypedQueryDirectory{
-        directory: accounts_dir,
-        queries: [typed_query(Path.join(accounts_dir, "account.sql"), "account", "select 1", [])]
-      }
+    accounts_queries = [
+      typed_query(Path.join(accounts_dir, "account.sql"), "account", "select 1", [])
     ]
 
-    assert Codegen.write_directories(root, directories, version: "v-test") == [
-             {accounts_dir, :ok, 1},
-             {billing_dir, :ok, 1}
-           ]
+    billing_queries = [
+      typed_query(Path.join(billing_dir, "invoice.sql"), "invoice", "select 2", [])
+    ]
+
+    assert {:ok, _} =
+             Codegen.prepare_directory(root, accounts_dir, accounts_queries, version: "v-test")
+
+    assert Codegen.write_directory(root, accounts_dir, accounts_queries, version: "v-test") == :ok
+    assert Codegen.write_directory(root, billing_dir, billing_queries, version: "v-test") == :ok
 
     assert File.read!(Path.join(root, "lib/accounts/sql.ex")) =~ "def account(conn)"
     assert File.read!(Path.join(root, "lib/billing/sql.ex")) =~ "def invoice(conn)"
   end
 
-  test "check_directories checks each typed query directory and returns outcomes" do
+  test "check_directory reports missing and current modules" do
     root = tmp_project(:acorn_counter)
     accounts_dir = Path.join(root, "lib/accounts/sql")
     missing_dir = Path.join(root, "lib/missing/sql")
@@ -826,58 +823,28 @@ defmodule SquirrelixCodegenTest do
     File.mkdir_p!(accounts_dir)
     File.mkdir_p!(missing_dir)
 
-    directories = [
-      %TypedQueryDirectory{
-        directory: accounts_dir,
-        queries: [typed_query(Path.join(accounts_dir, "account.sql"), "account", "select 1", [])]
-      },
-      %TypedQueryDirectory{
-        directory: missing_dir,
-        queries: [typed_query(Path.join(missing_dir, "missing.sql"), "missing", "select 2", [])]
-      }
+    accounts_queries = [
+      typed_query(Path.join(accounts_dir, "account.sql"), "account", "select 1", [])
     ]
 
-    assert Codegen.write_directory(root, accounts_dir, hd(directories).queries, version: "v-test") ==
-             :ok
+    missing_queries = [
+      typed_query(Path.join(missing_dir, "missing.sql"), "missing", "select 2", [])
+    ]
 
-    assert [
-             {^accounts_dir, :ok, 1},
-             {^missing_dir, {:error, %CannotReadFile{}}, 1}
-           ] = Codegen.check_directories(root, directories, version: "v-test")
+    assert Codegen.write_directory(root, accounts_dir, accounts_queries, version: "v-test") == :ok
+    assert Codegen.check_directory(root, accounts_dir, accounts_queries, version: "v-test") == :ok
+
+    assert {:error, %CannotReadFile{}} =
+             Codegen.check_directory(root, missing_dir, missing_queries, version: "v-test")
   end
 
   test "summarize_write_outcomes counts generated queries and collects errors" do
-    root = tmp_project(:acorn_counter)
-    accounts_dir = Path.join(root, "lib/accounts/sql")
-    invalid_dir = Path.join(root, "priv/sql")
-
-    File.mkdir_p!(accounts_dir)
-    File.mkdir_p!(invalid_dir)
-
-    outcomes =
-      Codegen.write_directories(
-        root,
-        [
-          %TypedQueryDirectory{
-            directory: accounts_dir,
-            queries: [
-              typed_query(Path.join(accounts_dir, "account.sql"), "account", "select 1", []),
-              typed_query(Path.join(accounts_dir, "accounts.sql"), "accounts", "select 2", [])
-            ]
-          },
-          %TypedQueryDirectory{
-            directory: invalid_dir,
-            queries: [
-              typed_query(Path.join(invalid_dir, "invalid.sql"), "invalid", "select 3", [])
-            ]
-          }
-        ],
-        version: "v-test"
-      )
-
-    assert Codegen.summarize_write_outcomes(outcomes) == %CodegenSummary{
+    assert Codegen.summarize_write_outcomes([
+             {"lib/accounts/sql", :ok, 2},
+             {"priv/sql", {:error, :invalid_sql_directory}, 1}
+           ]) == %CodegenSummary{
              generated_count: 2,
-             errors: [{invalid_dir, :invalid_sql_directory}],
+             errors: [{"priv/sql", :invalid_sql_directory}],
              status: :error
            }
   end

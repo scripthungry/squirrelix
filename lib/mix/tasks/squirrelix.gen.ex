@@ -5,8 +5,8 @@ defmodule Mix.Tasks.Squirrelix.Gen do
   Squirrelix scans `lib/`, `test/`, and `dev/` for `sql/` directories, then
   writes a sibling `sql.ex` module for each one.
 
-  Generation is project-wide atomic: if any directory has query errors, nothing
-  is written (including directories that would otherwise succeed).
+  Generation is project-wide atomic: query errors refuse all writes; the write
+  pass prepares every `sql.ex` before committing (temp + rename with rollback).
 
   ## Usage
 

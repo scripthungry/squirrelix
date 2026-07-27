@@ -58,7 +58,8 @@ Gleam records, custom enum ADTs, or opaque tagged error values.
   - [x] Metadata-file mode (`squirr_elix.exs` or `--metadata`).
   - [x] `--infer` mode with Postgrex connection options and `PG*` environment defaults.
   - [x] `--infer` honors `DATABASE_URL` / SSL (`sslmode`) with documented precedence.
-  - [x] Project-wide atomic generate/check (refuse all writes if any query errors).
+  - [x] Project-wide atomic generate/check (query-error refuse-all + write-pass
+    temp/rename with rollback).
   - [x] INSERT/VALUES structural parameter naming.
   - [x] Broader structural parameter naming (comparisons, LIKE/ILIKE, SET/ROW lists).
   - [x] `--write-metadata` export for offline check/codegen.
@@ -86,11 +87,20 @@ Gleam-aligned where intentional, with a SemVer stability promise — not infinit
 Post-0.1 roadmap items through **v0.5.1** are done: nullability expansion, structured
 connection/timeout errors, ranges/unsupported built-ins, composite reject-with-hints,
 parameter-name/Gleam parity ports, Phoenix-ready `DATABASE_URL`/SSL `--infer`, atomic
-codegen, INSERT/VALUES and broader structural parameter naming, additive soft query
-companions with command row counts, watch mode, `--write-metadata`, Phoenix + CI
-cookbook, production hardening (multi-schema docs/tests, Dialyzer-friendly codegen,
-public API audit, adopter CI examples, error-message consistency, CI coverage), and Hex
-`0.1.0` / `0.2.0` / `0.3.0` / `0.4.0` / `0.5.0` / `0.5.1` releases.
+codegen (query-error refuse-all; write-pass temp/rename in **0.5.2**), INSERT/VALUES and
+broader structural parameter naming, additive soft query companions with command row
+counts, watch mode, `--write-metadata`, Phoenix + CI cookbook, production hardening
+(multi-schema docs/tests, Dialyzer-friendly codegen, public API audit, adopter CI
+examples, error-message consistency, CI coverage), and Hex `0.1.0`–`0.5.1` releases
+(**0.5.2** ships write-pass atomicity).
+
+### [Post-0.5 backlog](https://github.com/scripthungry/squirrelix/milestone/6)
+
+Point-release follow-ups from the multi-model review (not the 1.0 SemVer cut):
+
+- [ ] Optional `file_system` (watch-only) (#50)
+- [ ] Library Dialyzer CI job for the package itself (#51)
+- Write-pass atomicity (#49) — **0.5.2**
 
 ### [v1.0.0](https://github.com/scripthungry/squirrelix/milestone/5) — Stability promise
 
@@ -99,9 +109,10 @@ public API audit, adopter CI examples, error-message consistency, CI coverage), 
 feedback validates the API (maintainer judgment). Completing #23–#26 is necessary but
 **not sufficient** without that gate (#28).
 
-- [ ] SemVer / stability / deprecation policy (#23)
+- [ ] SemVer / stability / deprecation policy (#23) — includes formal deprecation mechanism
 - [ ] Documented non-goals freeze (#24)
 - [ ] Docs freeze and HexDocs polish (#25)
+- [ ] Prune internal APIs before 1.0 (#52)
 - [ ] Adoption / feedback gate: sufficient real-world users (#28)
 - [ ] Ship via `docs/RELEASE.md` (#26) — after maintainer confirms #28
 
