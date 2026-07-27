@@ -18,8 +18,6 @@ jobs:
     name: Publish to Hex
     runs-on: ubuntu-latest
     if: github.repository == 'scripthungry/squirrelix'
-    env:
-      MIX_ENV: prod
 
     steps:
       - uses: actions/checkout@v4
