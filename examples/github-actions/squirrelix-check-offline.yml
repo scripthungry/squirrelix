@@ -1,0 +1,57 @@
+# Adopter example: offline mix squirrelix.check from committed metadata.
+#
+# Use this when CI (or some jobs) cannot reach Postgres. Capture types once
+# where the database is available, commit the file, then check without --infer:
+#
+#   mix squirrelix.gen --infer --write-metadata squirr_elix.exs
+#   # commit squirr_elix.exs alongside .sql and sql.ex
+#
+# Prefer the live Postgres workflow (squirrelix-check.yml) when a service
+# container is available — it catches schema drift against the real catalog.
+# Refresh exported metadata whenever queries or the schema change.
+#
+# Docs: https://hexdocs.pm/squirr_elix/configuration.html#exporting-inferred-metadata
+
+name: Squirrelix check (offline)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: squirrelix-check-offline-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  squirrelix:
+    name: mix squirrelix.check (metadata)
+    runs-on: ubuntu-latest
+
+    env:
+      MIX_ENV: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.20.0"
+          otp-version: "28.0"
+
+      - name: Cache deps and build
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-mix-${{ hashFiles('mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-mix-
+
+      - run: mix deps.get
+      - run: mix compile --warnings-as-errors
+
+      - name: Check Squirrelix generated modules
+        # Defaults to ./squirr_elix.exs; pass --metadata PATH if yours differs.
+        run: mix squirrelix.check

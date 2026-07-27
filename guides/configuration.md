@@ -315,8 +315,19 @@ available and check offline elsewhere:
 Commit generated `sql.ex` files (and the exported metadata file, when using offline
 check) alongside your `.sql` sources so CI verifies they stay in sync.
 
-For Phoenix apps — Mix aliases, `DATABASE_URL`, and a fuller GitHub Actions
-example — see the [Phoenix + CI Cookbook](phoenix.md).
+Prefer live `--infer` whenever CI can run Postgres (it catches catalog drift). Use
+exported metadata only when the job has no database — and refresh
+`squirr_elix.exs` when queries or the schema change.
+
+**Copy-pasteable GitHub Actions workflows** for adopters:
+
+- [`examples/github-actions/squirrelix-check.yml`](https://github.com/scripthungry/squirrelix/blob/main/examples/github-actions/squirrelix-check.yml)
+  — Postgres service + `DATABASE_URL` + `mix squirrelix.check --infer`
+- [`examples/github-actions/squirrelix-check-offline.yml`](https://github.com/scripthungry/squirrelix/blob/main/examples/github-actions/squirrelix-check-offline.yml)
+  — offline check from committed metadata
+
+For Phoenix apps — Mix aliases, `DATABASE_URL`, and cookbook context — see the
+[Phoenix + CI Cookbook](phoenix.md#ci-with-mix-squirrelix-check).
 
 ## Safe overwrite rules
 
@@ -342,4 +353,5 @@ a single bad directory is enough for a non-zero exit.
 
 - [Getting Started](getting_started.md) — first query walkthrough
 - [Phoenix + CI Cookbook](phoenix.md) — Phoenix Mix aliases and CI
+- [Adopter CI workflows](https://github.com/scripthungry/squirrelix/tree/main/examples/github-actions) — copy-pasteable GitHub Actions
 - [Types](types.md) — type mapping reference

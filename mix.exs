@@ -59,7 +59,7 @@ defmodule Squirrelix.MixProject do
         "Upstream Squirrel" => "https://github.com/giacomocavalieri/squirrel"
       },
       files:
-        ~w(lib mix.exs README.md LICENSE NOTICE ROADMAP.md CHANGELOG.md guides .formatter.exs)
+        ~w(lib mix.exs README.md LICENSE NOTICE ROADMAP.md CHANGELOG.md guides examples .formatter.exs)
     ]
   end
 
