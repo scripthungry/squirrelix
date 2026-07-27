@@ -1,6 +1,8 @@
 defmodule SquirrelixCodegenTest do
   use ExUnit.Case, async: true
 
+  import ExUnit.CaptureLog
+
   alias Squirrelix.Codegen
   alias Squirrelix.CodegenCheckSummary
   alias Squirrelix.CodegenSummary
@@ -574,6 +576,77 @@ defmodule SquirrelixCodegenTest do
     refute code =~ "def save!_ok("
   end
 
+  test "bang-named row queries sanitize type names to valid identifiers" do
+    query =
+      typed_query(
+        "q!.sql",
+        "q!",
+        "select name from users",
+        [],
+        [%Column{name: "name", type: :string, nullable?: false}]
+      )
+
+    code =
+      Codegen.generate_module(Squirrelix.GeneratedBangRowTypeTest.SQL, [query], version: "v-test")
+
+    assert code =~ "@type q_row ::"
+    refute code =~ "@type q!_row"
+    assert code =~ "@spec q!(Postgrex.conn()) :: [q_row()]"
+    assert code =~ "def q!(conn)"
+    assert code =~ "def q_ok(conn)"
+
+    assert soft_typespec(code, "q_ok") =~
+             ~r/\{:ok, \[q_row\(\)\]\} \| \{:error, Exception\.t\(\)\}/
+
+    [{_module, _bytecode}] = Squirrelix.TestSupport.compile_string(code)
+  end
+
+  test "question-mark row queries sanitize type names to valid identifiers" do
+    query =
+      typed_query(
+        "exists?.sql",
+        "exists?",
+        "select true as ok",
+        [],
+        [%Column{name: "ok", type: :boolean, nullable?: false}]
+      )
+
+    code =
+      Codegen.generate_module(Squirrelix.GeneratedQuestionRowTypeTest.SQL, [query],
+        version: "v-test"
+      )
+
+    assert code =~ "@type exists_row ::"
+    refute code =~ "@type exists?_row"
+    assert code =~ "@spec exists?(Postgrex.conn()) :: [exists_row()]"
+    [{_module, _bytecode}] = Squirrelix.TestSupport.compile_string(code)
+  end
+
+  test "generate_module raises when bang and plain names collide on row type" do
+    queries = [
+      typed_query(
+        "q.sql",
+        "q",
+        "select 1 as n",
+        [],
+        [%Column{name: "n", type: :integer, nullable?: false}]
+      ),
+      typed_query(
+        "q!.sql",
+        "q!",
+        "select 2 as n",
+        [],
+        [%Column{name: "n", type: :integer, nullable?: false}]
+      )
+    ]
+
+    assert_raise ArgumentError, ~r/row type name collision|q_row/, fn ->
+      Codegen.generate_module(Squirrelix.GeneratedRowTypeCollisionTest.SQL, queries,
+        version: "v-test"
+      )
+    end
+  end
+
   test "soft companion is omitted when name collides with another query" do
     queries = [
       typed_query(
@@ -592,17 +665,59 @@ defmodule SquirrelixCodegenTest do
       )
     ]
 
-    code =
-      Codegen.generate_module(Squirrelix.GeneratedSoftCollisionTest.SQL, queries,
-        version: "v-test"
-      )
+    log =
+      capture_log(fn ->
+        code =
+          Codegen.generate_module(Squirrelix.GeneratedSoftCollisionTest.SQL, queries,
+            version: "v-test"
+          )
 
-    assert code =~ "def find_user(conn)"
-    assert code =~ "def find_user_ok(conn)"
-    # Soft for find_user would be find_user_ok — skipped due to collision.
-    # Soft for find_user_ok is find_user_ok_ok.
-    assert code =~ "def find_user_ok_ok(conn)"
-    assert length(Regex.scan(~r/def find_user_ok\(/, code)) == 1
+        assert code =~ "def find_user(conn)"
+        assert code =~ "def find_user_ok(conn)"
+        # Soft for find_user would be find_user_ok — skipped due to collision.
+        # Soft for find_user_ok is find_user_ok_ok.
+        assert code =~ "def find_user_ok_ok(conn)"
+        assert length(Regex.scan(~r/def find_user_ok\(/, code)) == 1
+      end)
+
+    assert log =~ "find_user_ok"
+    assert log =~ "soft companion" or log =~ "omitting"
+  end
+
+  test "soft companions deconflict when bang and plain names share soft base" do
+    queries = [
+      typed_query(
+        "q.sql",
+        "q",
+        "insert into users(name) values ($1)",
+        [%Parameter{index: 1, name: "name", type: :string}],
+        []
+      ),
+      typed_query(
+        "q!.sql",
+        "q!",
+        "insert into users(name) values ($1)",
+        [%Parameter{index: 1, name: "name", type: :string}],
+        []
+      )
+    ]
+
+    log =
+      capture_log(fn ->
+        code =
+          Codegen.generate_module(Squirrelix.GeneratedSoftSoftCollisionTest.SQL, queries,
+            version: "v-test",
+            postgrex: PostgrexCommandMock
+          )
+
+        assert code =~ "def q(conn, name)"
+        assert code =~ "def q!(conn, name)"
+        # Only one soft companion may claim q_ok.
+        assert length(Regex.scan(~r/def q_ok\(/, code)) == 1
+      end)
+
+    assert log =~ "q_ok"
+    assert log =~ "soft companion" or log =~ "omitting"
   end
 
   test "write_directory writes a generated module next to the sql directory" do

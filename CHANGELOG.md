@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Phoenix-style `lib/my_app/.../sql` paths generate `MyApp....SQL` (no duplicated
+  app segment).
+- Bang/`?` query names sanitize `@type`/`@spec` row identifiers; soft companions
+  deconflict against query names and other soft companions with a warning.
+- Connection URLs percent-decode userinfo, reject schemeless input, and no longer
+  let URL defaults clobber present `PG*` values for omitted fields.
+- `mix precommit` compiles with `--warnings-as-errors`; Hex publish runs credo +
+  tests before publishing.
+- EXPLAIN DO-block warning is captured in tests; inference errors with `code: nil`
+  no longer format as `[NIL]`.
+
 ## [0.5.0] — 2026-07-27
 
 ### Added

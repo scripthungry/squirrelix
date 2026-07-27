@@ -428,6 +428,8 @@ defmodule Squirrelix.Error do
   def postgresql_code(%MissingPostgresColumn{}), do: "42703"
   def postgresql_code(%MissingPostgresConstraint{}), do: "42704"
 
+  def postgresql_code(%PostgresInferenceError{code: nil}), do: nil
+
   def postgresql_code(%PostgresInferenceError{code: code}) when is_atom(code) do
     Map.get(
       %{

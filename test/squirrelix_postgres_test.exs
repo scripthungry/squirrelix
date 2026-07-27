@@ -856,7 +856,12 @@ defmodule SquirrelixPostgresTest do
       end $$;
       """)
 
-    assert {:ok, [params: [], returns: []]} = Postgres.infer(conn, query)
+    log =
+      capture_log(fn ->
+        assert {:ok, [params: [], returns: []]} = Postgres.infer(conn, query)
+      end)
+
+    assert log =~ "skipping EXPLAIN nullability" or log =~ "not a single statement"
   end
 
   test "inferrer can generate modules from a live Postgres connection", %{conn: conn} do

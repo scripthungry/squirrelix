@@ -112,7 +112,7 @@ defmodule Squirrelix.MixProject do
 
   defp aliases do
     [
-      precommit: ["format", "credo.strict", "test"],
+      precommit: ["compile --warnings-as-errors", "format", "credo.strict", "test"],
       "credo.strict": "credo --strict --all",
       # Opt-in coverage; plain `mix test` / `mix precommit` stay fast locally.
       cover: ["coveralls.html"]

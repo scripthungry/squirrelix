@@ -163,6 +163,64 @@ defmodule SquirrelixConnectionOptionsTest do
       assert {:ok, %ConnectionOptions{password: "from_env"}} =
                CLI.resolve_connection_options(env, [])
     end
+
+    test "percent-decodes userinfo in DATABASE_URL" do
+      env = %{
+        "DATABASE_URL" => "postgres://u%40mail:p%40ss%3Aword@dbhost:5432/app_db"
+      }
+
+      assert {:ok,
+              %ConnectionOptions{
+                user: "u@mail",
+                password: "p@ss:word",
+                host: "dbhost",
+                database: "app_db"
+              }} = CLI.resolve_connection_options(env, [])
+    end
+
+    test "rejects schemeless garbage URLs" do
+      assert {:error, :invalid_url} =
+               CLI.resolve_connection_options(%{"DATABASE_URL" => "localhost:5432/db"}, [])
+
+      assert {:error, :invalid_url} =
+               CLI.parse_connection_url("user:pass@host/db")
+    end
+
+    test "URL defaults do not clobber present PG* values for partial URLs" do
+      env = %{
+        "DATABASE_URL" => "postgres://url_user@urlhost/",
+        "PGDATABASE" => "from_pg",
+        "PGPASSWORD" => "from_pg_pass",
+        "PGPORT" => "6543",
+        "PGCONNECT_TIMEOUT" => "12"
+      }
+
+      assert {:ok,
+              %ConnectionOptions{
+                user: "url_user",
+                host: "urlhost",
+                database: "from_pg",
+                password: "from_pg_pass",
+                port: 6543,
+                timeout_seconds: 12
+              }} = CLI.resolve_connection_options(env, [])
+    end
+
+    test "partial URL without host keeps PGHOST" do
+      env = %{
+        "DATABASE_URL" => "postgres://only_user@/only_db",
+        "PGHOST" => "pg_host",
+        "PGPORT" => "6000"
+      }
+
+      assert {:ok,
+              %ConnectionOptions{
+                user: "only_user",
+                database: "only_db",
+                host: "pg_host",
+                port: 6000
+              }} = CLI.resolve_connection_options(env, [])
+    end
   end
 
   describe "Postgres.postgrex_opts/1 SSL wiring" do
