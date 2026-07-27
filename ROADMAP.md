@@ -96,10 +96,16 @@ parameter-name/Gleam parity ports, and Hex `0.1.0` / `0.2.0` releases.
 
 ### [v1.0.0](https://github.com/scripthungry/squirrelix/milestone/5) — Stability promise
 
+1.0 is a **stability / SemVer promise**. Prep work below can finish on schedule;
+**shipping is blocked on adoption** — do not tag until meaningful real-world usage /
+feedback validates the API (maintainer judgment). Completing #23–#26 is necessary but
+**not sufficient** without that gate (#28).
+
 - [ ] SemVer / stability / deprecation policy (#23)
 - [ ] Documented non-goals freeze (#24)
 - [ ] Docs freeze and HexDocs polish (#25)
-- [ ] Ship via `docs/RELEASE.md` (#26)
+- [ ] Adoption / feedback gate: sufficient real-world users (#28)
+- [ ] Ship via `docs/RELEASE.md` (#26) — after maintainer confirms #28
 
 ### Explicit non-goals (not on the 1.0 path)
 
