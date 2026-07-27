@@ -36,7 +36,7 @@ defmodule Squirrelix.Codegen do
   encode/decode helpers. Each query gets a raising function and an additive soft
   companion (`<name>_ok/arity`) that returns `{:ok, result} | {:error, Exception.t()}`.
   Soft command companions return `{:ok, num_rows}`. See [Writing Queries](writing_queries.html) and
-  [Types](types.html) for conventions and type mapping.
+  [Types](types.html) for conventions, type mapping, and Dialyzer expectations.
   """
 
   alias Squirrelix.Output
@@ -68,6 +68,11 @@ defmodule Squirrelix.Codegen do
       soft companion named `<name>_ok/arity` (via `Postgrex.query/3`) that returns
       `{:ok, result} | {:error, Exception.t()}`. Soft command companions return
       `{:ok, num_rows}` where `num_rows` is the affected-row count.
+
+      Public `@spec`s are Dialyzer-oriented for call sites under typical flags
+      (`:underspecs`, `:error_handling`, `:unknown`, `:unmatched_returns`). Enabling
+      Dialyzer `:overspecs` / `:specdiffs` may warn that row contracts are more
+      precise than success typing of shared decode helpers — that is intentional.
       \"\"\"
 
       @type column_spec :: {atom(), atom() | {:list, atom()}, boolean()}
@@ -324,11 +329,14 @@ defmodule Squirrelix.Codegen do
     if Enum.any?(queries, &(&1.returns == [])) do
       [
         """
+          @spec decode_command(Postgrex.Result.t()) :: :ok
           defp decode_command(%Postgrex.Result{}) do
             :ok
           end
 
-          defp decode_command_num_rows(%Postgrex.Result{num_rows: num_rows}) do
+          @spec decode_command_num_rows(Postgrex.Result.t()) :: non_neg_integer()
+          defp decode_command_num_rows(%Postgrex.Result{num_rows: num_rows})
+               when is_integer(num_rows) and num_rows >= 0 do
             num_rows
           end
         """
@@ -345,12 +353,10 @@ defmodule Squirrelix.Codegen do
 
       [
         """
-          @spec decode_rows(Postgrex.Result.t(), [column_spec()]) :: [map()]
           defp decode_rows(%Postgrex.Result{rows: rows}, column_specs) do
             Enum.map(rows, &decode_row(&1, column_specs))
           end
 
-          @spec decode_row(list(), [column_spec()]) :: map()
           defp decode_row(row, column_specs) do
             column_specs
             |> Enum.zip(row)
@@ -359,7 +365,6 @@ defmodule Squirrelix.Codegen do
             end)
           end
 
-          @spec decode_column_value(term(), atom() | {:list, atom()}, boolean()) :: term()
           defp decode_column_value(value, _type, true) when is_nil(value), do: nil
           defp decode_column_value(value, type, _nullable?), do: decode_scalar(value, type)
 
@@ -463,33 +468,43 @@ defmodule Squirrelix.Codegen do
     types
     |> then(fn types ->
       []
-      |> add_type_clause(types, :integer, "defp encode_value(value, :integer), do: value")
-      |> add_type_clause(types, :string, "defp encode_value(value, :string), do: value")
-      |> add_type_clause(types, :boolean, "defp encode_value(value, :boolean), do: value")
-      |> add_type_clause(types, :float, "defp encode_value(value, :float), do: value")
-      |> add_type_clause(types, :decimal, "defp encode_value(value, :decimal), do: value")
-      |> add_type_clause(types, :binary, "defp encode_value(value, :binary), do: value")
-      |> add_type_clause(types, :date, "defp encode_value(value, :date), do: value")
-      |> add_type_clause(types, :time, "defp encode_value(value, :time), do: value")
+      |> add_type_clause(types, :integer, encode_scalar_clause(:integer, "is_integer(value)"))
+      |> add_type_clause(types, :string, encode_scalar_clause(:string, "is_binary(value)"))
+      |> add_type_clause(types, :boolean, encode_scalar_clause(:boolean, "is_boolean(value)"))
+      |> add_type_clause(types, :float, encode_scalar_clause(:float, "is_float(value)"))
+      |> add_type_clause(
+        types,
+        :decimal,
+        encode_struct_clause(:decimal, "Decimal", "Decimal.t()")
+      )
+      |> add_type_clause(types, :binary, encode_scalar_clause(:binary, "is_binary(value)"))
+      |> add_type_clause(types, :date, encode_struct_clause(:date, "Date", "Date.t()"))
+      |> add_type_clause(types, :time, encode_struct_clause(:time, "Time", "Time.t()"))
       |> add_type_clause(
         types,
         :naive_datetime,
-        "defp encode_value(value, :naive_datetime), do: value"
+        encode_struct_clause(:naive_datetime, "NaiveDateTime", "NaiveDateTime.t()")
       )
       |> add_type_clause(
         types,
         :utc_datetime,
-        "defp encode_value(value, :utc_datetime), do: value"
+        encode_struct_clause(:utc_datetime, "DateTime", "DateTime.t()")
       )
       |> add_type_clause(
         types,
         :map,
-        "defp encode_value(value, :map), do: JSON.encode!(value)"
+        """
+        @spec encode_value(term(), :map) :: binary()
+        defp encode_value(value, :map), do: JSON.encode!(value)
+        """
       )
       |> add_type_clause(
         types,
         :uuid,
-        "defp encode_value(value, :uuid), do: uuid_from_string(value)"
+        """
+        @spec encode_value(String.t(), :uuid) :: <<_::128>>
+        defp encode_value(value, :uuid) when is_binary(value), do: uuid_from_string(value)
+        """
       )
       |> add_list_encode_clauses(types)
     end)
@@ -497,15 +512,38 @@ defmodule Squirrelix.Codegen do
     |> Enum.join("\n")
   end
 
+  defp encode_scalar_clause(type, guard) do
+    typespec = TypeMapper.typespec(type)
+
+    """
+    @spec encode_value(#{typespec}, #{inspect(type)}) :: #{typespec}
+    defp encode_value(value, #{inspect(type)}) when #{guard}, do: value
+    """
+  end
+
+  defp encode_struct_clause(type, struct_mod, typespec) do
+    """
+    @spec encode_value(#{typespec}, #{inspect(type)}) :: #{typespec}
+    defp encode_value(value, #{inspect(type)}) when is_struct(value, #{struct_mod}), do: value
+    """
+  end
+
   defp add_list_encode_clauses(clauses, types) do
     types
     |> Enum.filter(&match?({:list, _}, &1))
     |> Enum.reduce(clauses, fn {:list, type}, clauses ->
-      if Enum.any?(clauses, &String.contains?(&1, "{:list, #{inspect(type)}}")) do
+      marker = "{:list, #{inspect(type)}}"
+
+      if Enum.any?(clauses, &String.contains?(&1, marker)) do
         clauses
       else
+        inner = TypeMapper.typespec(type)
+
         [
-          "defp encode_value(value, {:list, #{inspect(type)}}) when is_list(value), do: Enum.map(value, &encode_value(&1, #{inspect(type)}))"
+          """
+          @spec encode_value([#{inner}], #{marker}) :: [#{inner}]
+          defp encode_value(value, #{marker}) when is_list(value), do: Enum.map(value, &encode_value(&1, #{inspect(type)}))
+          """
           | clauses
         ]
       end
@@ -533,6 +571,7 @@ defmodule Squirrelix.Codegen do
 
   defp uuid_helper_source(true, true) do
     """
+      @spec uuid_to_string(<<_::128>>) :: String.t()
       defp uuid_to_string(uuid) when is_binary(uuid) and byte_size(uuid) == 16 do
         hex = Base.encode16(uuid, case: :lower)
 
@@ -542,6 +581,7 @@ defmodule Squirrelix.Codegen do
         "\#{part1}-\#{part2}-\#{part3}-\#{part4}-\#{part5}"
       end
 
+      @spec uuid_from_string(binary()) :: <<_::128>>
       defp uuid_from_string(string) when is_binary(string) do
         case Base.decode16(String.replace(string, "-", ""), case: :mixed) do
           {:ok, <<_::128>> = uuid} ->
@@ -556,6 +596,7 @@ defmodule Squirrelix.Codegen do
 
   defp uuid_helper_source(true, false) do
     """
+      @spec uuid_from_string(binary()) :: <<_::128>>
       defp uuid_from_string(string) when is_binary(string) do
         case Base.decode16(String.replace(string, "-", ""), case: :mixed) do
           {:ok, <<_::128>> = uuid} ->
@@ -570,6 +611,7 @@ defmodule Squirrelix.Codegen do
 
   defp uuid_helper_source(false, true) do
     """
+      @spec uuid_to_string(<<_::128>>) :: String.t()
       defp uuid_to_string(uuid) when is_binary(uuid) and byte_size(uuid) == 16 do
         hex = Base.encode16(uuid, case: :lower)
 

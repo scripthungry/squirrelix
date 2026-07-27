@@ -63,8 +63,9 @@ defmodule SquirrelixCodegenTest do
     code = Codegen.generate_module(MyApp.SQL, [query], version: "v-test")
 
     assert code =~ "# --- Runtime helpers ---"
-    assert code =~ ~r/end\n\n  # --- Runtime helpers ---\n\n  @spec decode_rows/
+    assert code =~ ~r/end\n\n  # --- Runtime helpers ---\n\n  defp decode_rows/
     refute code =~ ~r/end\n\n\n  # --- Runtime helpers ---/
+    refute code =~ "@spec decode_rows("
   end
 
   test "generate_module deduplicates uuid helpers when multiple queries use uuids" do

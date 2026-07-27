@@ -69,6 +69,34 @@ At runtime, JSON values pass through as decoded Elixir terms.
 UUID columns use `String.t()` rather than a custom opaque type. Values are standard
 UUID strings such as `"550e8400-e29b-41d4-a716-446655440000"`.
 
+### Dialyzer
+
+Generated modules are written so **adopter Dialyzer** stays useful on call sites:
+
+- Public query `@spec`s and row `@type`s use precise stdlib types (`String.t()`,
+  `integer()`, `required/1` maps, `term()` for JSON, and so on).
+- Encode helpers carry matching `@spec`s plus guards (`is_integer/1`,
+  `is_binary/1`, `is_struct/2`, …) so invalid argument shapes fail early.
+- Soft companions document `{:ok, …} | {:error, Exception.t()}`; command soft
+  companions use `non_neg_integer()` for affected-row counts.
+- Shared private decode helpers intentionally omit broad `@spec`s that would be
+  underspecs (`[map()]` / `term()`) relative to per-query row types.
+
+**Recommended Dialyzer flags** for apps that include generated `sql.ex` files:
+`:error_handling`, `:underspecs`, `:unknown`, and `:unmatched_returns`.
+
+**Known limitations** (document, do not “fix away”):
+
+| Topic | Expectation |
+| --- | --- |
+| `:overspecs` / `:specdiffs` | May warn that public row contracts are more precise than success typing of shared `decode_rows` / `Map.new` helpers. That precision is intentional for call sites. |
+| `term()` JSON | JSON/JSONB cannot be narrowed further without lying about arrays/scalars. |
+| `Exception.t()` | Soft-error contracts use `Exception.t()`; Dialyzer success typing is often a looser exception map. |
+| `Postgrex.conn()` | Narrower than Dialyzer’s expanded conn success typing (pid / via / `DBConnection`). |
+
+Squirrelix does **not** ship Dialyxir as a dependency. Run Dialyzer in your app
+(see [Phoenix + CI Cookbook](phoenix.md#dialyzer-and-generated-modules)).
+
 ### Timestamptz
 
 Squirrelix maps `timestamptz` to `DateTime.t()`. Gleam Squirrel rejects
