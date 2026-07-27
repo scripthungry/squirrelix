@@ -166,6 +166,22 @@ Do not expect generated modules to accept `MyApp.Repo`, participate in
 `Repo.transaction/2` automatically, or replace `Ecto.Query`. If you need that
 integration layer, build a thin wrapper in your app — it is not part of Squirrelix.
 
+## Dialyzer and generated modules
+
+Generated `sql.ex` modules are meant to be Dialyzer-friendly under typical app
+flags (`:underspecs`, `:error_handling`, `:unknown`, `:unmatched_returns`). Public
+`@spec`s are precise for call sites; shared decode helpers omit underspec'd
+contracts. Enabling `:overspecs` / `:specdiffs` may warn about intentional
+precision (row types vs `Map.new` success typing) — see
+[Types → Dialyzer](types.md#dialyzer).
+
+Squirrelix does not depend on Dialyxir. Add Dialyxir in your Phoenix app if you
+want Dialyzer in CI:
+
+```elixir
+{:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
+```
+
 ## CI with `mix squirrelix.check`
 
 Commit generated `sql.ex` files. In CI, apply migrations, then fail the job when

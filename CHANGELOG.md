@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Generated query modules are Dialyzer-friendlier under typical adopter flags:
+  encode helpers gain matching `@spec`s and guards, command `num_rows` helpers
+  document `non_neg_integer()`, UUID helpers use precise binary specs, and
+  underspec'd private `decode_rows`/`decode_row` contracts are omitted. Types and
+  Phoenix guides document Dialyzer expectations and known `:overspecs`
+  limitations (no Dialyxir dependency).
+- User-facing errors for file I/O, missing/incomplete/invalid metadata, invalid
+  connection URLs, and invalid CLI options use the same structured titles/hints as
+  connection and query diagnostics (no raw `inspect/1` primary messages). Existing
+  structured connection error types from 0.2/0.3 are unchanged.
+
 ### Added
 
 - Multi-schema / `search_path` inference docs (Configuration + Writing Queries) and
@@ -15,13 +28,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI test coverage via ExCoveralls: HTML artifact + GitHub Actions job summary,
   soft floor warning (not a hard fail). Local `mix test` / `mix precommit`
   unchanged; opt in with `mix cover` / `mix coveralls.html`.
-
-### Changed
-
-- User-facing errors for file I/O, missing/incomplete/invalid metadata, invalid
-  connection URLs, and invalid CLI options use the same structured titles/hints as
-  connection and query diagnostics (no raw `inspect/1` primary messages). Existing
-  structured connection error types from 0.2/0.3 are unchanged.
 
 ## [0.4.0] — 2026-07-27
 
