@@ -7,10 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-07-27
+
 ### Added
 
 - `mix squirrelix.gen --watch` watches `{lib,test,dev}/**/sql/*.sql` and regenerates
   on change (same query source / connection options as a one-shot gen; Ctrl-C to stop).
+  Linux needs `inotify-tools`.
 - `--write-metadata PATH` on `mix squirrelix.gen` / `mix squirrelix.check` (requires
   `--infer`) exports a reloadable metadata file for offline check/codegen without
   Postgres.
@@ -19,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `SET (columns) = (...)` / `ROW(...)` lists (including `ON CONFLICT ... DO UPDATE SET`).
   Comparison/equality names still win over column-list inference; existing
   `UPDATE ... SET col = $n` and `INSERT (cols) VALUES` naming are unchanged.
+- Phoenix + CI cookbook guide (`guides/phoenix.md`) for Mix adoption: migrate-then-gen/check,
+  `DATABASE_URL`, Mix aliases, CI check jobs, and intentional Ecto coexistence.
 
 ## [0.3.0] — 2026-07-27
 
@@ -79,7 +84,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Generated SQL and `@doc` strings are embedded with `inspect/2` so `#{}` in `.sql`
   files cannot become Elixir interpolation in generated modules.
-- EXPLAIN nullability rejects multi-statement SQL before using the simple query
-  protocol (required for `$n` + `generic_plan`).
-- Plan JSON decoding uses stdlib `JSON` (no undeclared Jason dependency).
-- Overwrite protection trusts the generation marker only in the file header.

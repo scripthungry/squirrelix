@@ -100,7 +100,7 @@ Add Squirrelix as a **dev/test** dependency (codegen Mix tool) and keep Postgrex
 ```elixir
 def deps do
   [
-    {:squirr_elix, "~> 0.3.0", only: [:dev, :test], runtime: false},
+    {:squirr_elix, "~> 0.4.0", only: [:dev, :test], runtime: false},
     {:postgrex, "~> 0.22"}
   ]
 end

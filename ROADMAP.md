@@ -55,13 +55,16 @@ Gleam records, custom enum ADTs, or opaque tagged error values.
   - [x] `--infer` honors `DATABASE_URL` / SSL (`sslmode`) with documented precedence.
   - [x] Project-wide atomic generate/check (refuse all writes if any query errors).
   - [x] INSERT/VALUES structural parameter naming.
+  - [x] Broader structural parameter naming (comparisons, LIKE/ILIKE, SET/ROW lists).
+  - [x] `--write-metadata` export for offline check/codegen.
+  - [x] `mix squirrelix.gen --watch` for SQL file watching / regenerate.
   - [x] `mix squirrelix.gen` and `mix squirrelix.check` task documentation.
   - [x] Programmatic `Squirrelix.generate/3` and `Squirrelix.check/3` API.
 
 - **Package and docs**
   - [x] Hex package metadata, Apache-2.0 license, and ExDoc module grouping.
   - [x] README mirroring Gleam Squirrel structure (motivation, installation, types, FAQ).
-  - [x] Guides: getting started, writing queries, types, and configuration.
+  - [x] Guides: getting started, writing queries, types, configuration, and Phoenix + CI.
   - [x] ExDoc extras and module docs linking to guides.
 
 ## Remaining (path to 1.0)
@@ -72,18 +75,12 @@ Gleam-aligned where intentional, with a SemVer stability promise — not infinit
 
 ### Shipped slices (folded into Completed above)
 
-Post-0.1 roadmap items through **v0.3.0** are done: nullability expansion, structured
+Post-0.1 roadmap items through **v0.4.0** are done: nullability expansion, structured
 connection/timeout errors, ranges/unsupported built-ins, composite reject-with-hints,
 parameter-name/Gleam parity ports, Phoenix-ready `DATABASE_URL`/SSL `--infer`, atomic
-codegen, INSERT/VALUES parameter names, additive soft query companions with command
-row counts, and Hex `0.1.0` / `0.2.0` / `0.3.0` releases.
-
-### [v0.4.0](https://github.com/scripthungry/squirrelix/milestone/3) — Day-to-day workflow & adoption docs
-
-- [ ] Watch mode for `mix squirrelix.gen` (#14)
-- [x] Phoenix + CI cookbook guide (#15)
-- [x] Export inferred metadata for offline check (#16)
-- [x] Broader structural parameter naming beyond INSERT (#17)
+codegen, INSERT/VALUES and broader structural parameter naming, additive soft query
+companions with command row counts, watch mode, `--write-metadata`, Phoenix + CI
+cookbook, and Hex `0.1.0` / `0.2.0` / `0.3.0` / `0.4.0` releases.
 
 ### [v0.5.0](https://github.com/scripthungry/squirrelix/milestone/4) — Production hardening
 
@@ -92,6 +89,7 @@ row counts, and Hex `0.1.0` / `0.2.0` / `0.3.0` releases.
 - [ ] Public API surface audit (#20)
 - [ ] Adopter CI workflow example (#21)
 - [ ] User-facing error consistency pass (#22)
+- [ ] Test coverage metrics in CI (#33)
 
 ### [v1.0.0](https://github.com/scripthungry/squirrelix/milestone/5) — Stability promise
 

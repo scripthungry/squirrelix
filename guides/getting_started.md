@@ -11,7 +11,7 @@ Squirrelix is a **codegen Mix tool** — keep it out of production. Postgrex sta
 ```elixir
 def deps do
   [
-    {:squirr_elix, "~> 0.3.0", only: [:dev, :test], runtime: false},
+    {:squirr_elix, "~> 0.4.0", only: [:dev, :test], runtime: false},
     {:postgrex, "~> 0.22"}
   ]
 end
