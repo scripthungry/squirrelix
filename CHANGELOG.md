@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-07-27
+
 ### Added
 
 - Multi-schema / `search_path` inference docs (Configuration + Writing Queries) and
@@ -15,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI test coverage via ExCoveralls: HTML artifact + GitHub Actions job summary,
   soft floor warning (not a hard fail). Local `mix test` / `mix precommit`
   unchanged; opt in with `mix cover` / `mix coveralls.html`.
+- Adopter CI workflow examples under `examples/github-actions/` for live
+  `mix squirrelix.check --infer` and offline metadata check.
 
 ### Changed
 
