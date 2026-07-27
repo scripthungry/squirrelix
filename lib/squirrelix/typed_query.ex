@@ -33,6 +33,7 @@ defmodule Squirrelix.TypedQuery do
   defstruct [:file, :starting_line, :name, :comment, :content, :params, :returns]
 
   alias Squirrelix.Column
+  alias Squirrelix.Error
   alias Squirrelix.Error.DuplicateReturnColumns
   alias Squirrelix.Error.MissingQueryMetadataField
   alias Squirrelix.Error.QueryHasInvalidColumn
@@ -96,6 +97,15 @@ defmodule Squirrelix.TypedQuery do
              names: names
            }}
       end
+    end
+  end
+
+  @spec accumulate(Query.t(), keyword(), {[t()], [struct()]}) :: {[t()], [struct()]}
+  def accumulate(%Query{} = query, opts, {typed_queries, errors})
+      when is_list(opts) and is_list(typed_queries) and is_list(errors) do
+    case from_query(query, opts) do
+      {:ok, typed_query} -> {[typed_query | typed_queries], errors}
+      {:error, error} -> {typed_queries, errors ++ [Error.attach_query(error, query)]}
     end
   end
 

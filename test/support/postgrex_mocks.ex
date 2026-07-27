@@ -3,13 +3,12 @@ defmodule PostgrexRowsMock do
 
   def query!({_module, owner, rows: rows}, sql, params) do
     send(owner, {:query!, sql, params})
-
-    %Postgrex.Result{columns: ["name"], rows: rows}
+    SoftQueryResult.result(columns: ["name"], rows: rows)
   end
 
   def query({_module, owner, rows: rows}, sql, params) do
     send(owner, {:query, sql, params})
-    SoftQueryResult.ok(%Postgrex.Result{columns: ["name"], rows: rows})
+    SoftQueryResult.ok(SoftQueryResult.result(columns: ["name"], rows: rows))
   end
 end
 
@@ -18,13 +17,12 @@ defmodule PostgrexMock do
 
   def query!({_module, owner}, sql, params) do
     send(owner, {:query!, sql, params})
-
-    %Postgrex.Result{columns: ["name"], rows: [["Ada"]]}
+    SoftQueryResult.result(columns: ["name"], rows: [["Ada"]])
   end
 
   def query({_module, owner}, sql, params) do
     send(owner, {:query, sql, params})
-    SoftQueryResult.ok(%Postgrex.Result{columns: ["name"], rows: [["Ada"]]})
+    SoftQueryResult.ok(SoftQueryResult.result(columns: ["name"], rows: [["Ada"]]))
   end
 end
 
@@ -33,13 +31,15 @@ defmodule PostgrexCommandMock do
 
   def query!({_module, owner}, sql, params) do
     send(owner, {:query!, sql, params})
-
-    %Postgrex.Result{command: :insert, columns: nil, rows: nil, num_rows: 1}
+    SoftQueryResult.result(command: :insert, columns: nil, rows: nil, num_rows: 1)
   end
 
   def query({_module, owner}, sql, params) do
     send(owner, {:query, sql, params})
-    SoftQueryResult.ok(%Postgrex.Result{command: :insert, columns: nil, rows: nil, num_rows: 1})
+
+    SoftQueryResult.ok(
+      SoftQueryResult.result(command: :insert, columns: nil, rows: nil, num_rows: 1)
+    )
   end
 end
 
@@ -48,13 +48,12 @@ defmodule PostgrexQuotedStringMock do
 
   def query!({_module, owner}, sql, params) do
     send(owner, {:query!, sql, params})
-
-    %Postgrex.Result{columns: ["result"], rows: [[1]]}
+    SoftQueryResult.result(columns: ["result"], rows: [[1]])
   end
 
   def query({_module, owner}, sql, params) do
     send(owner, {:query, sql, params})
-    SoftQueryResult.ok(%Postgrex.Result{columns: ["result"], rows: [[1]]})
+    SoftQueryResult.ok(SoftQueryResult.result(columns: ["result"], rows: [[1]]))
   end
 end
 
@@ -63,19 +62,19 @@ defmodule PostgrexEnumMock do
 
   def query!({_module, owner}, sql, params) do
     send(owner, {:query!, sql, params})
-
-    %Postgrex.Result{columns: ["mood"], rows: [["happy"]]}
+    SoftQueryResult.result(columns: ["mood"], rows: [["happy"]])
   end
 
   def query({_module, owner}, sql, params) do
     send(owner, {:query, sql, params})
-    SoftQueryResult.ok(%Postgrex.Result{columns: ["mood"], rows: [["happy"]]})
+    SoftQueryResult.ok(SoftQueryResult.result(columns: ["mood"], rows: [["happy"]]))
   end
 end
 
 defmodule PostgrexSoftErrorMock do
   @moduledoc false
 
+  @spec query!(term(), term(), term()) :: no_return()
   def query!({_module, owner}, sql, params) do
     send(owner, {:query!, sql, params})
     SoftQueryResult.raise_error("boom")
@@ -89,6 +88,23 @@ end
 
 defmodule SoftQueryResult do
   @moduledoc false
+
+  @spec result(keyword()) :: Postgrex.Result.t()
+  def result(opts \\ []) do
+    rows = Keyword.get(opts, :rows)
+
+    num_rows =
+      Keyword.get_lazy(opts, :num_rows, fn -> if is_list(rows), do: length(rows), else: 0 end)
+
+    %Postgrex.Result{
+      command: Keyword.get(opts, :command, :select),
+      columns: Keyword.get(opts, :columns),
+      rows: rows,
+      num_rows: num_rows,
+      connection_id: Keyword.get(opts, :connection_id, 1),
+      messages: Keyword.get(opts, :messages, [])
+    }
+  end
 
   # Keep the return type a real ok/error union for generated soft companions.
   # Runtime always takes the first list element.
@@ -104,7 +120,7 @@ defmodule SoftQueryResult do
   def error(message) do
     List.first([
       {:error, %Postgrex.Error{message: message}},
-      {:ok, %Postgrex.Result{columns: [], rows: [], num_rows: 0}}
+      {:ok, result(columns: [], rows: [], num_rows: 0)}
     ])
   end
 

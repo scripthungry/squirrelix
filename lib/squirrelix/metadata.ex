@@ -118,7 +118,8 @@ defmodule Squirrelix.Metadata do
     |> IO.iodata_to_binary()
     |> Kernel.<>("\n")
   rescue
-    _ -> source <> "\n"
+    _e in [TokenMissingError, SyntaxError, MismatchedDelimiterError] ->
+      source <> "\n"
   end
 
   defp read_metadata_file(file) do
@@ -134,7 +135,15 @@ defmodule Squirrelix.Metadata do
       {_metadata, _binding} -> {:error, %InvalidQueryMetadataFile{file: file, reason: :not_a_map}}
     end
   rescue
-    error -> {:error, %InvalidQueryMetadataFile{file: file, reason: error}}
+    error in [
+      CompileError,
+      SyntaxError,
+      TokenMissingError,
+      MismatchedDelimiterError,
+      ArgumentError,
+      RuntimeError
+    ] ->
+      {:error, %InvalidQueryMetadataFile{file: file, reason: error}}
   end
 
   defp expand_query_paths(metadata, root) do

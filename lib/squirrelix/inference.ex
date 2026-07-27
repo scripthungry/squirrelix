@@ -71,9 +71,6 @@ defmodule Squirrelix.Inference do
   end
 
   defp typed_query_from_metadata(query, metadata, typed_queries, errors) do
-    case TypedQuery.from_query(query, metadata) do
-      {:ok, typed_query} -> {[typed_query | typed_queries], errors}
-      {:error, error} -> {typed_queries, errors ++ [Error.attach_query(error, query)]}
-    end
+    TypedQuery.accumulate(query, metadata, {typed_queries, errors})
   end
 end

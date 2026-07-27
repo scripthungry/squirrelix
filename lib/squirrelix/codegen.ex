@@ -128,16 +128,7 @@ defmodule Squirrelix.Codegen do
   @spec summarize_write_outcomes([{Path.t(), :ok | {:error, term()}, non_neg_integer()}]) ::
           Squirrelix.CodegenSummary.t()
   def summarize_write_outcomes(outcomes) when is_list(outcomes) do
-    {generated_count, errors} =
-      Enum.reduce(outcomes, {0, []}, fn
-        {_directory, :ok, query_count}, {generated_count, errors} ->
-          {generated_count + query_count, errors}
-
-        {directory, {:error, error}, _query_count}, {generated_count, errors} ->
-          {generated_count, [{directory, error} | errors]}
-      end)
-
-    errors = Enum.reverse(errors)
+    {generated_count, errors} = reduce_outcomes(outcomes)
 
     %Squirrelix.CodegenSummary{
       generated_count: generated_count,
@@ -149,22 +140,26 @@ defmodule Squirrelix.Codegen do
   @spec summarize_check_outcomes([{Path.t(), :ok | {:error, term()}, non_neg_integer()}]) ::
           Squirrelix.CodegenCheckSummary.t()
   def summarize_check_outcomes(outcomes) when is_list(outcomes) do
-    {checked_count, errors} =
-      Enum.reduce(outcomes, {0, []}, fn
-        {_directory, :ok, query_count}, {checked_count, errors} ->
-          {checked_count + query_count, errors}
-
-        {directory, {:error, error}, _query_count}, {checked_count, errors} ->
-          {checked_count, [{directory, error} | errors]}
-      end)
-
-    errors = Enum.reverse(errors)
+    {checked_count, errors} = reduce_outcomes(outcomes)
 
     %Squirrelix.CodegenCheckSummary{
       checked_count: checked_count,
       errors: errors,
       status: summary_status(checked_count, errors)
     }
+  end
+
+  defp reduce_outcomes(outcomes) do
+    {count, errors} =
+      Enum.reduce(outcomes, {0, []}, fn
+        {_directory, :ok, query_count}, {count, errors} ->
+          {count + query_count, errors}
+
+        {directory, {:error, error}, _query_count}, {count, errors} ->
+          {count, [{directory, error} | errors]}
+      end)
+
+    {count, Enum.reverse(errors)}
   end
 
   defp function_sources(queries, postgrex_module) do
@@ -678,8 +673,10 @@ defmodule Squirrelix.Codegen do
     Enum.map_join(sources, "\n\n", &String.trim/1)
   end
 
-  defp doc_source(%TypedQuery{comment: [], returns: [], params: params} = query)
-       when length(params) >= 8 do
+  defp doc_source(
+         %TypedQuery{comment: [], returns: [], params: [_, _, _, _, _, _, _, _ | _] = _params} =
+           query
+       ) do
     generated_function_doc(query)
   end
 
@@ -692,9 +689,9 @@ defmodule Squirrelix.Codegen do
   defp spec_args([]), do: ""
 
   defp spec_args(params) do
-    params
-    |> Enum.map(&TypeMapper.typespec(&1.type))
-    |> Enum.map_join("", &", #{&1}")
+    Enum.map_join(params, fn param ->
+      ", #{TypeMapper.typespec(param.type)}"
+    end)
   end
 
   defp row_type_source(%TypedQuery{returns: []}), do: ""

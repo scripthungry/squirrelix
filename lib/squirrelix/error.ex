@@ -540,7 +540,12 @@ defmodule Squirrelix.Error do
 
   defp format_duplicate_return_columns_error(%DuplicateReturnColumns{} = error) do
     pretty_names = Enum.map_join(error.names, ", ", &"`#{&1}`")
-    label = if length(error.names) == 1, do: "name", else: "names"
+
+    label =
+      case error.names do
+        [_] -> "name"
+        _ -> "names"
+      end
 
     [
       "Error: Duplicate names",
@@ -836,7 +841,6 @@ defmodule Squirrelix.Error do
       case pointer do
         {column_name, message} -> pointer_for({column_name, message}, content)
         nil -> pointer_for(error)
-        other -> other
       end
 
     lines = String.split(content, "\n")
@@ -910,20 +914,8 @@ defmodule Squirrelix.Error do
 
   defp offset_to_line_column(content, offset) do
     prefix = binary_part(content, 0, offset)
-
-    line_number =
-      prefix
-      |> String.graphemes()
-      |> Enum.count(&(&1 == "\n"))
-      |> Kernel.+(1)
-
-    column =
-      prefix
-      |> String.split("\n")
-      |> List.last()
-      |> then(&String.length(&1 || ""))
-
-    {line_number, column}
+    parts = String.split(prefix, "\n")
+    {length(parts), String.length(List.last(parts))}
   end
 
   defp identifier_reason_message(:empty), do: "Reason: the file name is empty"
@@ -936,20 +928,8 @@ defmodule Squirrelix.Error do
 
   defp position_to_line_column(content, position) do
     prefix = String.slice(content, 0, position - 1)
-
-    line_number =
-      prefix
-      |> String.graphemes()
-      |> Enum.count(&(&1 == "\n"))
-      |> Kernel.+(1)
-
-    column =
-      prefix
-      |> String.split("\n")
-      |> List.last()
-      |> then(&String.length(&1 || ""))
-
-    {line_number, column}
+    parts = String.split(prefix, "\n")
+    {length(parts), String.length(List.last(parts))}
   end
 
   defp constraint_error_message?(message) do
