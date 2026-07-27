@@ -788,7 +788,7 @@ defmodule SquirrelixPostgresTest do
               ]} = Postgres.infer(conn, query)
     end
 
-    test "infer rejects point and composite Postgres types", %{conn: conn} do
+    test "infer rejects point and composite Postgres types with actionable hints", %{conn: conn} do
       Postgrex.query!(conn, "drop type if exists squirr_elix_point cascade", [])
 
       Postgrex.query!(
@@ -797,16 +797,28 @@ defmodule SquirrelixPostgresTest do
         []
       )
 
-      assert {:error, %UnsupportedPostgresType{name: "point", hint: nil}} =
+      assert {:error, %UnsupportedPostgresType{name: "point", hint: point_hint}} =
                Postgres.infer(conn, query("select point(1, 2) as location"))
 
-      assert {:error, %UnsupportedPostgresType{name: "point", hint: nil}} =
+      assert point_hint =~ "point"
+      assert point_hint =~ ~r/text|json|numeric/i
+
+      assert {:error, %UnsupportedPostgresType{name: "point", hint: ^point_hint}} =
                Postgres.infer(conn, query("select $1::point as location"))
 
-      assert {:error, %UnsupportedPostgresType{name: "squirr_elix_point", hint: nil}} =
+      assert {:error, %UnsupportedPostgresType{name: "squirr_elix_point", hint: composite_hint}} =
                Postgres.infer(
                  conn,
                  query("select '(1,2)'::squirr_elix_point as location")
+               )
+
+      assert composite_hint =~ "composite"
+      assert composite_hint =~ ~r/field|json|text/i
+
+      assert {:error, %UnsupportedPostgresType{name: "squirr_elix_point", hint: ^composite_hint}} =
+               Postgres.infer(
+                 conn,
+                 query("select $1::squirr_elix_point as location")
                )
     end
   end

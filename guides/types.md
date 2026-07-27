@@ -117,12 +117,31 @@ type for both inference and code generation.
 
 ## Unsupported types
 
-Some Postgres types are not yet supported. When inference encounters them,
-Squirrelix returns `UnsupportedPostgresType` with the type name and, when
-available, a hint.
+Some Postgres types are intentionally unsupported. When inference encounters
+them, Squirrelix returns `UnsupportedPostgresType` with the type name and, when
+available, an actionable hint.
 
-Currently rejected types include composite types and some built-ins such as `point`.
-Check error output for actionable suggestions.
+### Composite types (policy)
+
+**Decision:** reject with actionable hints — do **not** generate nested row
+modules, map composites to `map()`/`term()`, or treat them as opaque strings.
+
+Postgres composite types (`create type ... as (field type, ...)`, `typtype = c`)
+are rejected. This matches [Gleam Squirrel](https://github.com/giacomocavalieri/squirrel)
+and keeps the Elixir-native API limited to stdlib typespecs and flat
+`required/1` row maps.
+
+Workarounds when a query would otherwise return a composite:
+
+- Select individual fields: `(location).x`, `(location).y`
+- Cast in SQL: `location::json`, `location::jsonb`, or `location::text`
+- Reshape the schema into ordinary columns
+
+### Other rejected built-ins
+
+Geometric types such as `point` are also rejected with hints (prefer separate
+numeric columns, or cast to `text`/`json`). Ranges and remaining unsupported
+built-ins are tracked separately on the roadmap.
 
 ## Metadata type atoms
 

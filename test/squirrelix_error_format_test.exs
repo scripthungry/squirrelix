@@ -33,4 +33,16 @@ defmodule SquirrelixErrorFormatTest do
     assert formatted =~ "`custom_type`"
     assert formatted =~ "Hint: Try using a supported built-in instead."
   end
+
+  test "format_unsupported_type_error surfaces composite policy hints from TypeMapper" do
+    assert {:error, error} =
+             Squirrelix.TypeMapper.from_postgres("inventory_item", kind: "c")
+
+    formatted = Error.format(error)
+
+    assert formatted =~ "Error: Unsupported type"
+    assert formatted =~ "`inventory_item`"
+    assert formatted =~ "Hint:"
+    assert formatted =~ "composite"
+  end
 end

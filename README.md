@@ -386,6 +386,17 @@ into a nullable column.
 See the [Writing Queries guide](guides/writing_queries.md#nullable-query-parameters)
 for recommended workarounds.
 
+### Why aren't Postgres composite types supported?
+
+Squirrelix intentionally rejects composite types (`create type ... as (...)`)
+with an actionable hint. Generating nested row modules (or mapping composites to
+`map()`/`term()`) would expand the Elixir-native surface beyond Gleam Squirrel's
+model and blur the flat `required/1` row maps used today.
+
+Select individual fields (for example `(location).x`), or cast to
+`json`/`jsonb`/`text` in the query. See the
+[Types guide](guides/types.md#composite-types-policy) for the full policy.
+
 ## Errors and troubleshooting
 
 Squirrelix reports structured errors during generation and checking. Common cases:
