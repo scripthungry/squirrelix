@@ -263,7 +263,7 @@ end
 
 defmodule Squirrelix.Error.CannotConnectToPostgres do
   @moduledoc """
-  Error returned when Squirrelix cannot connect to Postgres for inference.
+  Error returned when SquirrElix cannot connect to Postgres for inference.
 
   Covers TCP failures (refused, unreachable, closed) and authorization / catalog
   problems. Connection timeouts use `Squirrelix.Error.PostgresConnectionTimeout`.
@@ -295,7 +295,7 @@ end
 
 defmodule Squirrelix.Error do
   @moduledoc """
-  Formatting helpers for structured Squirrelix errors.
+  Formatting helpers for structured SquirrElix errors.
 
   Error **structs** under `Squirrelix.Error.*` are part of the supported public
   API — pattern-match them in tooling that inspects `CodegenSummary` /

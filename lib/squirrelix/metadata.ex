@@ -68,7 +68,7 @@ defmodule Squirrelix.Metadata do
   end
 
   @doc """
-  Serializes a metadata map to formatted Elixir source with relative query paths.
+  Serialises a metadata map to formatted Elixir source with relative query paths.
   """
   @spec dump(%{Path.t() => keyword()}, Path.t()) :: String.t()
   def dump(metadata, root) when is_map(metadata) and is_binary(root) do

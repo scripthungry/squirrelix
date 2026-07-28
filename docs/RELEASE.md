@@ -1,10 +1,11 @@
-# Release checklist (Squirrelix / squirr_elix)
+# Release checklist (SquirrElix / squirr_elix)
 
 ## Naming
 
 | Layer | Name |
 | --- | --- |
-| Brand / Elixir modules | `Squirrelix` |
+| Brand (docs / Hex display) | SquirrElix |
+| Elixir modules | `Squirrelix` |
 | Mix tasks | `mix squirrelix.gen`, `mix squirrelix.check` |
 | Hex package / OTP app | `squirr_elix` |
 | GitHub repo | `scripthungry/squirrelix` |

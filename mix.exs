@@ -1,7 +1,7 @@
 defmodule Squirrelix.MixProject do
   use Mix.Project
 
-  @version "0.5.3"
+  @version "0.5.4"
   @source_url "https://github.com/scripthungry/squirrelix"
 
   def project do
@@ -9,7 +9,7 @@ defmodule Squirrelix.MixProject do
       app: :squirr_elix,
       version: @version,
       elixir: "~> 1.20",
-      name: "Squirrelix",
+      name: "SquirrElix",
       description:
         "Generates typed Elixir query modules from plain SQL files using Postgres inference or static metadata.",
       start_permanent: Mix.env() == :prod,

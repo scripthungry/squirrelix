@@ -1,12 +1,12 @@
-# Squirrelix Roadmap
+# SquirrElix Roadmap
 
-Squirrelix reimplements [Gleam Squirrel](https://github.com/giacomocavalieri/squirrel)'s core
-SQL discovery, inference, and codegen behavior with an idiomatic **Elixir-native** public API.
+SquirrElix reimplements [Gleam Squirrel](https://github.com/giacomocavalieri/squirrel)'s core
+SQL discovery, inference, and codegen behaviour with an idiomatic **Elixir-native** public API.
 Upstream Squirrel remains the compatibility reference for query conventions and edge-case tests;
 Elixir conventions take precedence for API shape, `@spec` output, and runtime return values.
 
 **Elixir-native direction:** generated modules use stdlib typespecs (`String.t()`, `integer()`,
-`map()` with `required/1`, `term()` for JSON, and so on). Squirrelix does **not** generate
+`map()` with `required/1`, `term()` for JSON, and so on). SquirrElix does **not** generate
 Gleam records, custom enum ADTs, or opaque tagged error values.
 
 ## Completed
@@ -57,7 +57,7 @@ Gleam records, custom enum ADTs, or opaque tagged error values.
 - **Mix tasks and configuration**
   - [x] Metadata-file mode (`squirr_elix.exs` or `--metadata`).
   - [x] `--infer` mode with Postgrex connection options and `PG*` environment defaults.
-  - [x] `--infer` honors `DATABASE_URL` / SSL (`sslmode`) with documented precedence.
+  - [x] `--infer` honours `DATABASE_URL` / SSL (`sslmode`) with documented precedence.
   - [x] Project-wide atomic generate/check (query-error refuse-all + write-pass
     temp/rename with rollback).
   - [x] INSERT/VALUES structural parameter naming.
@@ -68,7 +68,7 @@ Gleam records, custom enum ADTs, or opaque tagged error values.
   - [x] Programmatic `Squirrelix.generate/3` and `Squirrelix.check/3` API.
 
 - **Package and docs**
-  - [x] Hex package metadata, Apache-2.0 license, and ExDoc module grouping.
+  - [x] Hex package metadata, Apache-2.0 licence, and ExDoc module grouping.
   - [x] README mirroring Gleam Squirrel structure (motivation, installation, types, FAQ).
   - [x] Guides: getting started, writing queries, types, configuration, and Phoenix + CI.
   - [x] Supported pre-1.0 public API inventory; internals `@moduledoc false`.
@@ -106,7 +106,7 @@ Point-release follow-ups from the multi-model review (not the 1.0 SemVer cut):
 
 1.0 is a **stability / SemVer promise**. Prep work below can finish on schedule;
 **shipping is blocked on adoption** — do not tag until meaningful real-world usage /
-feedback validates the API (maintainer judgment). Completing #23–#26 is necessary but
+feedback validates the API (maintainer judgement). Completing #23–#26 is necessary but
 **not sufficient** without that gate (#28).
 
 - [ ] SemVer / stability / deprecation policy (#23) — includes formal deprecation mechanism

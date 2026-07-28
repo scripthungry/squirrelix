@@ -1,12 +1,12 @@
 # Writing Queries
 
-Squirrelix follows a small set of conventions inherited from
+SquirrElix follows a small set of conventions inherited from
 [Gleam Squirrel](https://github.com/giacomocavalieri/squirrel). This guide covers
 where to put queries, how files map to functions, and practical tips for edge cases.
 
 ## One query per file
 
-Each `*.sql` file **must contain exactly one SQL statement.** Squirrelix turns the
+Each `*.sql` file **must contain exactly one SQL statement.** SquirrElix turns the
 file into a single Elixir function with the same name as the file (without the
 `.sql` extension).
 
@@ -78,11 +78,11 @@ The `.sql` filename must be a valid Elixir function name in `snake_case`:
 | `list_active_users.sql` | `find user.sql` |
 | `delete_by_id.sql` | `1st_query.sql` |
 
-If a filename cannot become a valid function name, Squirrelix reports a
+If a filename cannot become a valid function name, SquirrElix reports a
 `QueryFileHasInvalidName` error and may suggest a corrected name.
 
 Result column names must also be valid Elixir map keys. If a column name from Postgres
-is invalid, Squirrelix reports `QueryHasInvalidColumn` with a suggested alias.
+is invalid, SquirrElix reports `QueryHasInvalidColumn` with a suggested alias.
 
 Use `as` in your `select` list when needed:
 
@@ -95,7 +95,7 @@ from
 
 ## Parameter naming
 
-Squirrelix infers Elixir argument names from how `$1`, `$2`, ... appear in your
+SquirrElix infers Elixir argument names from how `$1`, `$2`, ... appear in your
 query.
 
 **Comparisons** (including `UPDATE ... SET col = $n` and `DELETE`/`UPDATE`/`SELECT`
@@ -152,7 +152,7 @@ and a column-list shape (`INSERT` or `SET (...)`) both name the same parameter
 index, the comparison/equality name wins. Names that would shadow the `conn`
 parameter or other reserved names are deconflicted.
 
-When the same parameter index appears more than once, Squirrelix renames arguments
+When the same parameter index appears more than once, SquirrElix renames arguments
 to keep generated code valid.
 
 ### Naming inventory (in scope vs leftovers)
@@ -181,7 +181,7 @@ and function names differ.
 
 ## Nullable result columns
 
-Squirrelix infers nullability for returned columns from Postgres metadata,
+SquirrElix infers nullability for returned columns from Postgres metadata,
 including outer join columns and foreign-key-derived cases. Nullable columns appear
 in `@spec`s and row types with `| nil`:
 
@@ -199,7 +199,7 @@ Inference also covers:
 - **Schema-qualified tables** — `schema.table` columns use catalog nullability for that
   schema (including tables outside `search_path`).
 - **Unqualified tables via `search_path`** — bare `from widgets` resolves through the
-  infer connection's session `search_path` (same as interactive Postgres). Squirrelix
+  infer connection's session `search_path` (same as interactive Postgres). SquirrElix
   does not set `search_path`; see [Configuration](configuration.md#multi-schema-and-search_path).
 - **Scalar subqueries in the select list** — treated as nullable (they can return no
   row). This is intentionally stricter than Gleam Squirrel, which treats
@@ -210,7 +210,7 @@ Inference also covers:
 
 ## Nullable query parameters
 
-Postgres does not expose nullability information for query **parameters**. Squirrelix
+Postgres does not expose nullability information for query **parameters**. SquirrElix
 therefore cannot infer that `$1` should accept `nil` when updating a nullable column.
 
 Consider this schema:
@@ -327,7 +327,7 @@ logged. Row queries whose sanitized type names collide raise at generate time.
 
 Queries with a `returning` clause produce row maps like any other select.
 
-## Running queries outside Squirrelix
+## Running queries outside SquirrElix
 
 Because queries live in plain `.sql` files, you can run them directly with `psql`,
 GUI clients, or migration tools:

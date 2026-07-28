@@ -1,22 +1,32 @@
-# 🐿️ Squirrelix — type-safe SQL in Elixir
+# 🐿️ SquirrElix — type-safe SQL in Elixir
 
-> Squirrelix (package `squirr_elix`)
+> SquirrElix (package `squirr_elix`)
 
 [![Hex Docs](https://img.shields.io/badge/hex-docs-ffaff3)](https://hexdocs.pm/squirr_elix/)
 
-Squirrelix turns plain `.sql` files into typed Elixir modules. You write one query
-per file; the generator discovers those files, resolves parameter and return types,
-and writes a sibling `sql.ex` module with `@spec`-annotated functions that run the
-queries through Postgrex.
+SquirrElix is a simple database interface that aims to reduce cognitive load when working
+with SQL through Postgres and Postgrex.
 
-It targets **Elixir 1.20** and uses native typespecs rather than custom ADTs or
-Gleam-style records. See the [Gleam Squirrel](https://github.com/giacomocavalieri/squirrel)
-project for the upstream SQL discovery, inference, and query conventions that
-Squirrelix follows.
+You stay close to the database by writing plain `.sql` files, which are converted into typed
+Elixir modules. You write one query per file; the generator discovers those files, resolves
+parameter and return types, and writes a sibling `sql.ex` module with `@spec`-annotated
+functions that run the queries through Postgrex.
 
-## What's Squirrelix?
+For many applications that is enough: generated convenience functions and typing, full control
+over your SQL, no extra abstraction to learn, and easier visibility when you need to optimise
+queries.
 
-If you need to talk with a database in Elixir you'll often write something like this:
+This project currently targets **Elixir 1.20** and uses native typespecs. Earlier versions of
+Elixir may get support in future, but have yet to be tested.
+
+The [Gleam Squirrel](https://github.com/giacomocavalieri/squirrel) project is the inspiration
+and basis for this work. SquirrElix brings Squirrel's idea and general architecture to native
+Elixir code and Elixir-native typing, following Elixir idioms.
+
+## What's SquirrElix?
+
+Database access in Elixir is often handled using an ORM such as Ecto, or by writing something
+like this:
 
 ```elixir
 def find_user(conn, id) do
@@ -33,18 +43,17 @@ end
 This is probably fine if you have a few small queries but it can become quite the
 burden when you have a lot of queries:
 
-- The SQL query you write is just a plain string. You do not get syntax highlighting,
+* The SQL query you write is just a plain string. You do not get syntax highlighting,
   auto formatting, suggestions... all the little niceties you would otherwise get if
   you were writing a plain `*.sql` file.
-- This also means you lose the ability to run these queries on their own with other
+* This also means you lose the ability to run these queries on their own with other
   external tools, inspect them and so on.
-- You have to manually keep row decoding in sync with the query's output.
+* You have to manually keep row decoding in sync with the query's output.
 
 One might be tempted to hide all of this by reaching for something like an ORM.
-Squirrelix proposes a different approach: instead of trying to hide the SQL it
-_embraces it and leaves you in control._ You write the SQL queries in plain old
-`*.sql` files and Squirrelix will take care of generating all the corresponding
-functions.
+SquirrElix adopts a different approach: instead of trying to hide the SQL, it
+*embraces it and leaves you in control.* You write the SQL queries in plain old
+`*.sql` files and SquirrElix takes care of generating the corresponding functions.
 
 Instead of the hand-written example shown earlier you can instead just write the
 following query:
@@ -74,27 +83,83 @@ rows = SQL.find_user(conn, 42)
 # => [%{name: "Ada", age: 36}]
 ```
 
-Behind the scenes Squirrelix generates the decode helpers and functions you need;
+Behind the scenes SquirrElix generates the decode helpers and functions you need;
 and it's pretty-printed, standard Elixir code. So now you get the best of both worlds:
 
-- You don't have to take care of keeping encoders and decoders in sync — Squirrelix
+* You don't have to take care of keeping encoders and decoders in sync — SquirrElix
   does that for you.
-- And you're not compromising on type safety either: Squirrelix is able to
+* And you're not compromising on type safety either: SquirrElix is able to
   understand the types of your query and produce correct `@spec`s and runtime decoders.
-- You can stick to writing plain SQL in `*.sql` files. You'll have better editor
+* You can stick to writing plain SQL in `*.sql` files. You'll have better editor
   support, syntax highlighting and completions.
-- You can run each query on its own: need to `explain` a query? No big deal, it's
+* You can run each query on its own: need to `explain` a query? No big deal, it's
   just a plain old `*.sql` file.
+
+## When SquirrElix may not be the right fit
+
+SquirrElix is opinionated: Postgres only, one query per file, convention over
+configuration, and generated modules that talk to Postgrex — not to an Ecto `Repo`.
+That is a strength when those constraints match your needs, and a mismatch when they
+do not.
+
+**Consider something else when:**
+
+* You need a database other than Postgres (MySQL, SQLite, …). SquirrElix will not help.
+* Most of your data access is CRUD through schemas, changesets, and associations, and
+  you rarely write hand-tuned SQL. An ORM / query builder (in Elixir, usually Ecto) is
+  the better default.
+* You need dynamic query construction at runtime (composable filters, optional joins,
+  ad-hoc `order by` / pagination assembled in Elixir). File-based SQL is a poor fit;
+  prefer `Ecto.Query` or similar.
+* You want first-class participation in `Repo.transaction/2`, Multi, or other Ecto
+  Repo APIs without wrapping Postgrex yourself. SquirrElix does not integrate with
+  `Repo`.
+* Your team is new to SQL and wants the database access layer to hide it. SquirrElix
+  does the opposite — it keeps SQL front and centre.
+* You only have a handful of queries and are happy maintaining small `Postgrex.query/3`
+  helpers by hand. Codegen may be more process than payoff.
+
+**Alternatives to consider:**
+
+| Need | Typical choice |
+| --- | --- |
+| Schemas, changesets, migrations, associations | [Ecto](https://hexdocs.pm/ecto) |
+| Composable / dynamic queries in Elixir | `Ecto.Query` (or raw SQL via `Repo.query/2`) |
+| One-off or few static queries, no codegen | Direct [Postgrex](https://hexdocs.pm/postgrex) |
+| File-based SQL with a different stack | [yesql](https://github.com/krisajenkins/yesql)-style approaches, or [sqlx](https://github.com/launchbadge/sqlx) outside Elixir |
+| Gleam instead of Elixir | Upstream [Squirrel](https://github.com/giacomocavalieri/squirrel) |
+
+### Using SquirrElix alongside an ORM
+
+Yes — that is a common and intentional setup, especially in Phoenix apps that already
+use Ecto.
+
+A practical split:
+
+* **Ecto** for migrations, schema modules, changesets, and write paths that benefit
+  from validation and associations.
+* **SquirrElix** for read-heavy or carefully reviewed SQL you want as plain `.sql`
+  files with generated types and decoders.
+* **Postgrex** at runtime for executing those generated functions (`Postgrex.conn()`).
+
+SquirrElix never reads your Ecto schemas or `config/*.exs`. Point `--infer` at the
+same database Ecto migrates (via `DATABASE_URL` / `PG*` / Mix flags). Generated
+functions do not accept `MyApp.Repo` and do not automatically join Ecto transactions —
+if you need that bridge, wrap a Postgrex connection (or pool) in your app.
+
+See the [Phoenix + CI Cookbook](guides/phoenix.md#coexistence-with-ecto-intentional)
+for layout, Mix aliases, and coexistence details. The short FAQ answer below points
+at the same policy.
 
 ## Requirements
 
-- Elixir ~> 1.20
-- Postgrex ~> 0.22 (for generated query modules and optional `--infer` mode)
-- PostgreSQL >= 16 (when using `--infer` mode)
+* Elixir ~> 1.20
+* Postgrex ~> 0.22 (for generated query modules and optional `--infer` mode)
+* PostgreSQL >= 16 (when using `--infer` mode)
 
 ## Installation
 
-Add Squirrelix as a **dev/test** dependency (codegen Mix tool) and keep Postgrex as a
+Add SquirrElix as a **dev/test** dependency (codegen Mix tool) and keep Postgrex as a
 **runtime** dependency for generated query modules:
 
 ```elixir
@@ -120,7 +185,7 @@ locally with `mix docs`.
 
 ## Quick start
 
-Squirrelix discovers queries under conventional Elixir source roots. Put one SQL
+SquirrElix discovers queries under conventional Elixir source roots. Put one SQL
 query per file inside a `sql/` directory:
 
 ```txt
@@ -161,17 +226,17 @@ See the [Getting Started guide](guides/getting_started.md) for a full walkthroug
 
 ## Writing SQL queries
 
-Squirrelix follows a small set of conventions:
+SquirrElix follows a small set of conventions:
 
-- Squirrelix looks for all `sql/` directories under your project's `lib/`, `test/`,
+* SquirrElix looks for all `sql/` directories under your project's `lib/`, `test/`,
   and `dev/` roots and reads all the `*.sql` files in there (in glob terms
   `{lib,test,dev}/**/sql/*.sql`).
-- Each `sql/` directory is turned into a single Elixir module containing a function
+* Each `sql/` directory is turned into a single Elixir module containing a function
   for each `*.sql` file inside it. The generated module is located next to the
   corresponding `sql/` directory and is named `sql.ex`.
-- Each `*.sql` file **must contain a single SQL query.** The name of the file is
+* Each `*.sql` file **must contain a single SQL query.** The name of the file is
   the name of the corresponding Elixir function to run that query.
-- Leading SQL comments (`-- ...`) become `@doc` strings on the generated functions.
+* Leading SQL comments (`-- ...`) become `@doc` strings on the generated functions.
 
 > **Example.** Given the project layout above, running `mix squirrelix.gen --infer`
 > creates `lib/my_app/accounts/sql.ex` defining two functions — `find_user/2` and
@@ -182,13 +247,13 @@ conventions, and tips for nullable parameters.
 
 ## Generated code overview
 
-For each query Squirrelix generates:
+For each query SquirrElix generates:
 
-- A per-query row `@type` (PascalCase of the function name + `_row`) describing the
+* A per-query row `@type` (PascalCase of the function name + `_row`) describing the
   returned map shape.
-- An `@spec` on the function with a `Postgrex.conn()` connection argument followed
+* An `@spec` on the function with a `Postgrex.conn()` connection argument followed
   by inferred parameter types.
-- A function body that prepares the query, encodes parameters, executes through
+* A function body that prepares the query, encodes parameters, executes through
   Postgrex, and decodes rows into maps.
 
 Example generated output:
@@ -222,12 +287,12 @@ re-run `mix squirrelix.gen` instead of editing the Elixir module directly.
 
 ## CLI commands
 
-Squirrelix offers the following Mix tasks to streamline your workflow:
+SquirrElix offers the following Mix tasks to streamline your workflow:
 
-- `mix squirrelix.gen` — Generates typed Elixir code for all SQL queries found
+* `mix squirrelix.gen` — Generates typed Elixir code for all SQL queries found
   under `{lib,test,dev}/**/sql/*.sql`. Pass `--watch` to regenerate when those
   `.sql` files change (Ctrl-C to stop).
-- `mix squirrelix.check` — Validates that the generated Elixir code is up-to-date
+* `mix squirrelix.check` — Validates that the generated Elixir code is up-to-date
   with the SQL queries. This is particularly useful to run in a CI pipeline to make
   sure you don't forget to run `mix squirrelix.gen`.
 
@@ -290,7 +355,7 @@ Other `Squirrelix.*` modules are internal and may change before 1.0.
 
 ## Configuration and connection
 
-In order to understand the type of your queries, Squirrelix needs to connect to
+In order to understand the type of your queries, SquirrElix needs to connect to
 the Postgres server where the database schema is defined when you use `--infer`.
 
 Pass a connection URL on the CLI, or set `DATABASE_URL` (prefer env secrets over
@@ -308,18 +373,18 @@ URL `sslmode` / `ssl` query parameters map into Postgrex `:ssl` options (see the
 [Configuration](guides/configuration.md) guide). Unix sockets are not supported.
 
 Or set [Postgres environment variables](https://www.postgresql.org/docs/current/libpq-envars.html).
-When a value is not set, Squirrelix uses these defaults:
+When a value is not set, SquirrElix uses these defaults:
 
 | Variable | Default |
 | --- | --- |
-| `DATABASE_URL` | _(unset — fall back to `PG*`)_ |
+| `DATABASE_URL` | *(unset — fall back to `PG*`)* |
 | `PGHOST` | `"localhost"` |
 | `PGPORT` | `5432` |
 | `PGUSER` | `"postgres"` |
 | `PGDATABASE` | `"postgres"` |
 | `PGPASSWORD` | `""` |
 | `PGCONNECT_TIMEOUT` | `5` seconds |
-| `PGSSLMODE` | _(no SSL)_ |
+| `PGSSLMODE` | *(no SSL)* |
 
 You can also pass individual flags: `--hostname`, `--port`, `--username`, `--password`,
 and `--database`. Precedence (highest first): flags → `--url` → `DATABASE_URL` →
@@ -335,12 +400,12 @@ programmatic API, and CI setup.
 
 ## Supported types
 
-Squirrelix takes care of the mapping between Postgres types and Elixir types.
+SquirrElix takes care of the mapping between Postgres types and Elixir types.
 This is needed in two places:
 
-- Elixir values need to be _encoded_ into Postgres values when you're filling in the
+* Elixir values need to be *encoded* into Postgres values when you're filling in the
   holes of a prepared statement (`$1`, `$2`, ...).
-- Postgres values need to be _decoded_ into Elixir ones when you're reading the rows
+* Postgres values need to be *decoded* into Elixir ones when you're reading the rows
   returned by a query.
 
 The types that are currently supported are:
@@ -373,9 +438,9 @@ Prefer casting to a supported type in SQL or selecting scalar bounds/fields.
 
 ### Enums
 
-If your queries deal with user-defined Postgres enums, Squirrelix maps them to
+If your queries deal with user-defined Postgres enums, SquirrElix maps them to
 `String.t()` in generated `@spec`s. Enum labels are passed through at runtime as
-plain strings — Squirrelix does **not** generate Elixir enum modules or
+plain strings — SquirrElix does **not** generate Elixir enum modules or
 Gleam-style custom types.
 
 For example, given this enum:
@@ -393,21 +458,21 @@ A column of type `squirrel_colour` is typed as `String.t()` and decoded as
 
 ## FAQ
 
-### What flavour of SQL does Squirrelix support?
+### What flavour of SQL does SquirrElix support?
 
-Squirrelix only supports Postgres. It supports all versions `>= 16`.
+SquirrElix only supports Postgres. It supports all versions `>= 16`.
 
-### Why isn't Squirrelix configurable in any way?
+### Why isn't SquirrElix configurable in any way?
 
-By going the "convention over configuration" route, Squirrelix enforces that all
+By going the "convention over configuration" route, SquirrElix enforces that all
 projects adopting it will always have the same structure. If you need to contribute
-to a project using Squirrelix you'll immediately know which directories and modules
+to a project using SquirrElix you'll immediately know which directories and modules
 to look for.
 
 This makes it easier to get started with a new project and cuts down on bike shedding:
-_"Where should I put my queries?"_, _"How many queries should go in one file?"_, ...
+*"Where should I put my queries?"*, *"How many queries should go in one file?"*, ...
 
-### Can Squirrelix read my `.env` file?
+### Can SquirrElix read my `.env` file?
 
 The approach we recommend is either use your shell's built-in functionality for loading
 environment variables or use a convenience tool which builds upon that capability, such
@@ -416,9 +481,9 @@ environment rather than the application itself.
 
 ### How do I deal with nullable query parameters?
 
-Squirrelix works by inspecting the data that Postgres itself exposes about a query.
+SquirrElix works by inspecting the data that Postgres itself exposes about a query.
 Postgres doesn't expose any data about the nullability of query parameters, so
-Squirrelix can't generate the correct nullable type when, for example, inserting
+SquirrElix can't generate the correct nullable type when, for example, inserting
 into a nullable column.
 
 See the [Writing Queries guide](guides/writing_queries.md#nullable-query-parameters)
@@ -426,7 +491,7 @@ for recommended workarounds.
 
 ### Why aren't Postgres composite types supported?
 
-Squirrelix intentionally rejects composite types (`create type ... as (...)`)
+SquirrElix intentionally rejects composite types (`create type ... as (...)`)
 with an actionable hint. Generating nested row modules (or mapping composites to
 `map()`/`term()`) would expand the Elixir-native surface beyond Gleam Squirrel's
 model and blur the flat `required/1` row maps used today.
@@ -435,16 +500,18 @@ Select individual fields (for example `(location).x`), or cast to
 `json`/`jsonb`/`text` in the query. See the
 [Types guide](guides/types.md#composite-types-policy) for the full policy.
 
-### Does Squirrelix integrate with Ecto `Repo`?
+### Does SquirrElix integrate with Ecto `Repo`?
 
-No — and that is intentional. Use Ecto for schemas and migrations; put typed SQL
-in `sql/` directories and call generated modules with a `Postgrex.conn()`.
-Squirrelix is not a `Repo` wrapper and does not provide query macros. See the
+No — and that is intentional. SquirrElix is not a `Repo` wrapper and does not provide
+query macros. You can still use it *alongside* Ecto (migrations / schemas / changesets
+via Ecto; typed `.sql` queries via SquirrElix + Postgrex). See
+[When SquirrElix may not be the right fit](#when-squirrelix-may-not-be-the-right-fit)
+and the
 [Phoenix + CI Cookbook](guides/phoenix.md#coexistence-with-ecto-intentional).
 
 ## Errors and troubleshooting
 
-Squirrelix reports structured errors during generation and checking. Common cases:
+SquirrElix reports structured errors during generation and checking. Common cases:
 
 | Error | Typical cause | What to do |
 | --- | --- | --- |
@@ -476,15 +543,15 @@ pass prepares every `sql.ex` before committing (temp + rename with rollback).
 
 ## Relationship to Gleam Squirrel
 
-Squirrelix is an Elixir port of [Gleam Squirrel](https://github.com/giacomocavalieri/squirrel)
+SquirrElix is an Elixir port of [Gleam Squirrel](https://github.com/giacomocavalieri/squirrel)
 by Giacomo Cavalieri. It follows upstream query conventions — one query per file,
 `sql/` directory layout, comment-to-doc mapping, parameter name inference, and
 Postgres type inference — while producing idiomatic Elixir output:
 
-- Row results are plain maps, not Gleam records.
-- Types use stdlib typespecs (`String.t()`, `integer()`, `map()` with `required/1`).
-- Postgres enums map to `String.t()`, not generated enum ADTs.
-- Generated modules use Postgrex, not `pog`.
+* Row results are plain maps, not Gleam records.
+* Types use stdlib typespecs (`String.t()`, `integer()`, `map()` with `required/1`).
+* Postgres enums map to `String.t()`, not generated enum ADTs.
+* Generated modules use Postgrex, not `pog`.
 
 Both projects are licensed under Apache 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE)
 for attribution.
@@ -515,13 +582,13 @@ See [ROADMAP.md](ROADMAP.md) for completed work and remaining compatibility slic
 
 ## Guides
 
-- [Getting Started](guides/getting_started.md)
-- [Writing Queries](guides/writing_queries.md)
-- [Types](guides/types.md)
-- [Configuration](guides/configuration.md)
-- [Phoenix + CI Cookbook](guides/phoenix.md)
-- [Adopter CI workflows](examples/github-actions/) — copy-pasteable GitHub Actions for `squirrelix.check`
+* [Getting Started](guides/getting_started.md)
+* [Writing Queries](guides/writing_queries.md)
+* [Types](guides/types.md)
+* [Configuration](guides/configuration.md)
+* [Phoenix + CI Cookbook](guides/phoenix.md)
+* [Adopter CI workflows](examples/github-actions/) — copy-pasteable GitHub Actions for `squirrelix.check`
 
 ## License
 
-Squirrelix is licensed under the Apache License 2.0. See [LICENSE](LICENSE).
+SquirrElix is licensed under the Apache License 2.0. See [LICENSE](LICENSE).

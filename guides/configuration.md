@@ -1,12 +1,12 @@
 # Configuration
 
-Squirrelix is intentionally minimal: convention over configuration. This guide
+SquirrElix is intentionally minimal: convention over configuration. This guide
 covers the two query sources (Postgres inference and metadata files), connection
 settings, Mix task options, and the programmatic API.
 
 ## Query sources
 
-Every generation or check pass needs type information for each query. Squirrelix
+Every generation or check pass needs type information for each query. SquirrElix
 accepts one of two sources:
 
 | Mode | When to use | How to enable |
@@ -50,7 +50,7 @@ Practical guidance:
 
 Intentional gaps (out of scope):
 
-- Squirrelix does not migrate objects across schemas or rewrite SQL to add qualifiers.
+- SquirrElix does not migrate objects across schemas or rewrite SQL to add qualifiers.
 - Cross-database federation is unsupported.
 - Connection options do not expose a `search_path` override; configure it in Postgres
   (or qualify names in SQL) instead.
@@ -58,7 +58,7 @@ Intentional gaps (out of scope):
 Nullability for schema-qualified and `search_path`-resolved columns is covered in
 [Writing Queries](writing_queries.md#nullable-result-columns).
 
-If connection fails, Squirrelix reports a structured error (refused host/port,
+If connection fails, SquirrElix reports a structured error (refused host/port,
 timeout, invalid credentials, or missing database) with hints for `PG*` variables
 and Mix flags. Timeouts are reported separately from other connection failures.
 When you cannot reach Postgres at generation time, use a metadata file instead of
@@ -105,7 +105,7 @@ point it at trusted SQL and a database you intend to use for codegen.
 
 ### Environment variables
 
-Squirrelix reads `DATABASE_URL` (when set) and standard
+SquirrElix reads `DATABASE_URL` (when set) and standard
 [libpq environment variables](https://www.postgresql.org/docs/current/libpq-envars.html):
 
 | Variable | Default |
@@ -138,7 +138,7 @@ direnv allow
 mix squirrelix.gen --infer
 ```
 
-Squirrelix does not read `.env` files directly. Use your shell, `direnv`, or
+SquirrElix does not read `.env` files directly. Use your shell, `direnv`, or
 similar tools to load environment variables.
 
 ### CLI flags
@@ -157,7 +157,7 @@ environment variables → defaults. Prefer `PGPASSWORD` / `DATABASE_URL` over
 
 ## Metadata files
 
-When `--infer` is not passed, Squirrelix loads a metadata file that maps query file
+When `--infer` is not passed, SquirrElix loads a metadata file that maps query file
 paths to parameter and return type descriptors.
 
 Default path: `squirr_elix.exs` in the project root.
@@ -340,7 +340,7 @@ A typical CI step runs the check task after migrations:
 - name: Apply migrations
   run: mix ecto.migrate
 
-- name: Check Squirrelix output
+- name: Check SquirrElix output
   env:
     PGDATABASE: my_app_test
     PGHOST: localhost
@@ -352,7 +352,7 @@ When some jobs cannot reach Postgres, export metadata where the database is
 available and check offline elsewhere:
 
 ```yaml
-- name: Export Squirrelix metadata
+- name: Export SquirrElix metadata
   env:
     PGDATABASE: my_app_test
     PGHOST: localhost
@@ -360,7 +360,7 @@ available and check offline elsewhere:
   run: mix squirrelix.gen --infer --write-metadata squirr_elix.exs
 
 # In a later job without Postgres:
-- name: Check Squirrelix output (offline)
+- name: Check SquirrElix output (offline)
   run: mix squirrelix.check
 ```
 
@@ -383,7 +383,7 @@ For Phoenix apps — Mix aliases, `DATABASE_URL`, and cookbook context — see t
 
 ## Safe overwrite rules
 
-Squirrelix only overwrites files whose header contains the Squirrelix generation
+SquirrElix only overwrites files whose header contains the SquirrElix generation
 marker (written into `@moduledoc`). If a `sql.ex` file exists without that header
 marker, generation fails with `CannotOverwriteFile`.
 
@@ -397,7 +397,7 @@ Code generation is **project-wide atomic** (Gleam squirrel 4.5+ parity):
    file names, missing metadata, inference failures, unsupported types, and so
    on), `mix squirrelix.gen` writes **nothing**. Directories that would otherwise
    succeed are left untouched until every error is fixed.
-2. **Write-pass atomicity** — When every directory is query-valid, Squirrelix
+2. **Write-pass atomicity** — When every directory is query-valid, SquirrElix
    prepares all `sql.ex` writes first. If any prepare fails (for example
    `CannotOverwriteFile`), nothing is written. Successful commits use temp files
    + rename, and roll back earlier renames if a later one fails mid-pass.
