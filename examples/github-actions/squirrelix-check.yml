@@ -15,7 +15,7 @@
 #
 # Docs: https://hexdocs.pm/squirr_elix/phoenix.html#ci-with-mix-squirrelix-check
 
-name: Squirrelix check
+name: SquirrElix check
 
 on:
   push:
@@ -55,7 +55,7 @@ jobs:
 
       - uses: erlef/setup-beam@v1
         with:
-          # Match your app (Squirrelix requires Elixir ~> 1.20).
+          # Match your app (SquirrElix requires Elixir ~> 1.20).
           elixir-version: "1.20.0"
           otp-version: "28.0"
 
@@ -77,7 +77,7 @@ jobs:
           mix ecto.create --quiet
           mix ecto.migrate
 
-      - name: Check Squirrelix generated modules
+      - name: Check SquirrElix generated modules
         # Non-zero exit when any sql/ directory has query errors or sql.ex drift.
         # Equivalent with Mix aliases from the Phoenix cookbook: mix sql.check
         run: mix squirrelix.check --infer

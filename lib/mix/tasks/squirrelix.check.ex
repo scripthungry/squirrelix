@@ -35,7 +35,7 @@ defmodule Mix.Tasks.Squirrelix.Check do
 
   use Mix.Task
 
-  @shortdoc "Checks Squirrelix query modules are current"
+  @shortdoc "Checks SquirrElix query modules are current"
 
   @impl Mix.Task
   def run(args) do

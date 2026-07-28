@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.4] — 2026-07-28
+
+### Docs
+
+- Standardise on **SquirrElix** as the brand name in documentation (Hex package
+  remains `squirr_elix`; Elixir modules remain `Squirrelix`) (#55).
+- Expand the README with when SquirrElix may not be the right fit, alternatives,
+  and using it alongside an ORM such as Ecto (#55).
+- Prefer British English in documentation prose where appropriate (#55).
+
 ## [0.5.3] — 2026-07-27
 
 ### Added
@@ -117,7 +127,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (**additive**, not breaking). See Writing Queries and Getting Started guides.
 - Parameter name inference from `INSERT ... (columns) VALUES (...)` placeholders
   (equality / `UPDATE ... SET` naming unchanged; equality wins on conflicts).
-- `--infer` honors `DATABASE_URL` with documented precedence: flags → `--url` →
+- `--infer` honours `DATABASE_URL` with documented precedence: flags → `--url` →
   `DATABASE_URL` → `PG*` → defaults. URL/`PGSSLMODE` `sslmode` (and `ssl=true` /
   `ssl=false`) map into Postgrex `:ssl` options.
 
@@ -150,7 +160,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- First public release of Squirrelix (Hex package `squirr_elix`): typed Elixir query
+- First public release of SquirrElix (Hex package `squirr_elix`): typed Elixir query
   modules from plain `.sql` files via Postgres inference or metadata.
 - Mix tasks `mix squirrelix.gen` and `mix squirrelix.check`.
 - Guides for getting started, writing queries, types, and configuration.

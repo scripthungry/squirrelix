@@ -4,12 +4,12 @@
 day-to-day Mix workflow: migrate before generate/check, recommended aliases, CI
 with `mix squirrelix.check`, and intentional coexistence with Ecto.
 
-Squirrelix is **not** an Ecto `Repo` wrapper. Use Ecto for schemas and migrations;
+SquirrElix is **not** an Ecto `Repo` wrapper. Use Ecto for schemas and migrations;
 put typed queries in `sql/` and call the generated modules with a `Postgrex.conn()`.
 
 ## Dependencies
 
-Keep Squirrelix as a **dev/test** Mix tool and Postgrex as a **runtime** dependency
+Keep SquirrElix as a **dev/test** Mix tool and Postgrex as a **runtime** dependency
 (Phoenix apps already depend on Postgrex via Ecto SQL):
 
 ```elixir
@@ -39,12 +39,12 @@ lib/
 ```
 
 Ecto schemas and migrations stay where Phoenix puts them (`lib/my_app/accounts/user.ex`,
-`priv/repo/migrations/`). Squirrelix never reads those modules; it only needs the
+`priv/repo/migrations/`). SquirrElix never reads those modules; it only needs the
 **database schema** to exist when you run `--infer`.
 
 ## `DATABASE_URL` and connection config
 
-Squirrelix does **not** read `config/*.exs` or your `Ecto.Repo` settings. Point it
+SquirrElix does **not** read `config/*.exs` or your `Ecto.Repo` settings. Point it
 at the same database Ecto uses via `DATABASE_URL`, `PG*` variables, or Mix flags.
 
 Precedence (highest first): flags → `--url` → `DATABASE_URL` → `PG*` → defaults.
@@ -142,7 +142,7 @@ the raising API.
 
 A common Phoenix setup is a supervised Postgrex pool configured from the same
 URL / credentials as `MyApp.Repo`, then pass that pool into generated functions.
-Sharing one Ecto transaction with Squirrelix queries is **out of scope** — there is
+Sharing one Ecto transaction with SquirrElix queries is **out of scope** — there is
 no first-class `Repo` integration (see below).
 
 ## Coexistence with Ecto (intentional)
@@ -150,21 +150,21 @@ no first-class `Repo` integration (see below).
 | Concern | Tool |
 | --- | --- |
 | Migrations, schema modules, changesets | Ecto |
-| Typed, file-based SQL queries | Squirrelix (`sql/` → `sql.ex`) |
+| Typed, file-based SQL queries | SquirrElix (`sql/` → `sql.ex`) |
 | Runtime execution of generated queries | Postgrex (`Postgrex.conn()`) |
 
 This split is intentional:
 
-- Squirrelix embraces plain `.sql` files and Postgrex — the same model as
+- SquirrElix embraces plain `.sql` files and Postgrex — the same model as
   [Gleam Squirrel](https://github.com/giacomocavalieri/squirrel).
 - First-class Ecto `Repo` integration / query macros are an **explicit non-goal**
   (see [ROADMAP](../ROADMAP.md#explicit-non-goals-not-on-the-10-path)).
-- You can use both in one app: Ecto for writes and schema evolution, Squirrelix for
+- You can use both in one app: Ecto for writes and schema evolution, SquirrElix for
   read-heavy or carefully reviewed SQL that benefits from typed codegen.
 
 Do not expect generated modules to accept `MyApp.Repo`, participate in
 `Repo.transaction/2` automatically, or replace `Ecto.Query`. If you need that
-integration layer, build a thin wrapper in your app — it is not part of Squirrelix.
+integration layer, build a thin wrapper in your app — it is not part of SquirrElix.
 
 ## Dialyzer and generated modules
 
@@ -175,7 +175,7 @@ contracts. Enabling `:overspecs` / `:specdiffs` may warn about intentional
 precision (row types vs `Map.new` success typing) — see
 [Types → Dialyzer](types.md#dialyzer).
 
-Squirrelix does not depend on Dialyxir. Add Dialyxir in your Phoenix app if you
+SquirrElix does not depend on Dialyxir. Add Dialyxir in your Phoenix app if you
 want Dialyzer in CI:
 
 ```elixir
@@ -224,7 +224,7 @@ steps:
       mix ecto.create --quiet
       mix ecto.migrate
 
-  - name: Check Squirrelix generated modules
+  - name: Check SquirrElix generated modules
     run: mix squirrelix.check --infer
 ```
 

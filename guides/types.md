@@ -1,6 +1,6 @@
 # Types
 
-Squirrelix maps Postgres column and parameter types to Elixir typespecs used in
+SquirrElix maps Postgres column and parameter types to Elixir typespecs used in
 generated `@spec`s and row `@type` definitions. This guide describes the supported
 mappings and intentional differences from Gleam Squirrel.
 
@@ -94,12 +94,12 @@ Generated modules are written so **adopter Dialyzer** stays useful on call sites
 | `Exception.t()` | Soft-error contracts use `Exception.t()`; Dialyzer success typing is often a looser exception map. |
 | `Postgrex.conn()` | Narrower than Dialyzer’s expanded conn success typing (pid / via / `DBConnection`). |
 
-Squirrelix does **not** ship Dialyxir as a dependency. Run Dialyzer in your app
+SquirrElix does **not** ship Dialyxir as a dependency. Run Dialyzer in your app
 (see [Phoenix + CI Cookbook](phoenix.md#dialyzer-and-generated-modules)).
 
 ### Timestamptz
 
-Squirrelix maps `timestamptz` to `DateTime.t()`. Gleam Squirrel rejects
+SquirrElix maps `timestamptz` to `DateTime.t()`. Gleam Squirrel rejects
 `timestamptz` with a hint to prefer plain `timestamp`; mapping to `DateTime.t()`
 is an intentional Elixir-native choice. Prefer `timestamp` columns when you want
 to avoid time-zone conversion surprises at the Postgres connection layer.
@@ -119,7 +119,7 @@ Nullable elements inside arrays follow Postgrex decoding behaviour.
 ## Postgres enums
 
 User-defined Postgres enums (`create type ... as enum`) map to `String.t()` in
-generated code. Squirrelix does **not** generate Elixir enum modules.
+generated code. SquirrElix does **not** generate Elixir enum modules.
 
 Given:
 
@@ -144,7 +144,7 @@ type for both inference and code generation.
 ## Unsupported types
 
 Some Postgres types are intentionally unsupported. When inference encounters them,
-Squirrelix returns `UnsupportedPostgresType` with the type name and an actionable
+SquirrElix returns `UnsupportedPostgresType` with the type name and an actionable
 hint where one is defined.
 
 ### Composite types (policy)
@@ -179,7 +179,7 @@ Workarounds:
   `lower(ages)`, `upper(ages)`).
 - Cast the range to `text` or `jsonb` in SQL if you need the literal form.
 
-Postgrex can decode ranges as `Postgrex.Range` at runtime, but Squirrelix does not
+Postgrex can decode ranges as `Postgrex.Range` at runtime, but SquirrElix does not
 generate typed helpers for them — keeping the supported surface aligned with
 Gleam Squirrel and Elixir stdlib typespecs.
 
@@ -235,7 +235,7 @@ Example metadata entry:
 
 ## Differences from Gleam Squirrel
 
-| Aspect | Gleam Squirrel | Squirrelix |
+| Aspect | Gleam Squirrel | SquirrElix |
 | --- | --- | --- |
 | Row shape | Custom record type | `map()` with `required/1` |
 | Postgres enums | Generated enum ADT | `String.t()` |

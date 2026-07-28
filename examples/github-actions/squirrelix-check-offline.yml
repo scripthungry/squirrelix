@@ -12,7 +12,7 @@
 #
 # Docs: https://hexdocs.pm/squirr_elix/configuration.html#exporting-inferred-metadata
 
-name: Squirrelix check (offline)
+name: SquirrElix check (offline)
 
 on:
   push:
@@ -52,6 +52,6 @@ jobs:
       - run: mix deps.get
       - run: mix compile --warnings-as-errors
 
-      - name: Check Squirrelix generated modules
+      - name: Check SquirrElix generated modules
         # Defaults to ./squirr_elix.exs; pass --metadata PATH if yours differs.
         run: mix squirrelix.check
