@@ -58,7 +58,5 @@ defmodule Mix.Tasks.Squirrelix.Gen do
   @shortdoc "Generates SquirrElix query modules from SQL files"
 
   @impl Mix.Task
-  def run(args) do
-    Squirrelix.MixTask.generate(args)
-  end
+  def run(args), do: Squirrelix.MixTask.generate(args)
 end
