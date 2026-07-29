@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.5] — 2026-07-29
+
+### Changed
+
+- Generate encode/decode/UUID runtime helpers from quoted AST in
+  `Squirrelix.Codegen.Runtime` so helper bodies are compile-checked in the
+  library while generated modules stay self-contained (no SquirrElix runtime
+  dependency) (#58).
+- Reject unsupported parameter types at generate time and emit a catch-all
+  `encode_value/2` that raises with a clear error (#58).
+
+### Docs
+
+- Clarify the release-skill `gh release create` notes example as pseudocode and
+  remove a machine-local path from the skill metadata (#58).
+
 ## [0.5.4] — 2026-07-28
 
 ### Docs

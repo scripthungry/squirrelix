@@ -35,6 +35,7 @@ end
 defmodule Squirrelix.Codegen do
   @moduledoc false
 
+  alias Squirrelix.Codegen.Runtime
   alias Squirrelix.Output
   alias Squirrelix.Parameter
   alias Squirrelix.Project
@@ -50,6 +51,9 @@ defmodule Squirrelix.Codegen do
 
     sorted_queries = Enum.sort_by(queries, & &1.file)
 
+    # Scaffold only: embeds the generated `@moduledoc` and splices query/helper
+    # source. Per-query names stay textual so codegen does not create Mix VM atoms.
+    # Runtime helpers are quoted in `Squirrelix.Codegen.Runtime`.
     source = """
     defmodule #{inspect(module)} do
       @moduledoc \"\"\"
@@ -74,7 +78,7 @@ defmodule Squirrelix.Codegen do
 
       @type column_spec :: {atom(), atom() | {:list, atom()}, boolean()}
 
-    #{sorted_queries |> function_sources(postgrex_module) |> join_function_sources()}#{runtime_helpers_section(queries)}
+    #{sorted_queries |> function_sources(postgrex_module) |> join_function_sources()}#{Runtime.section(queries)}
     end
     """
 
@@ -193,15 +197,17 @@ defmodule Squirrelix.Codegen do
     all_args = ["conn" | args]
     encoded_params = encode_params_call(args, query.params)
 
-    """
-      #{doc_source(query)}
-      #{row_type_source(query)}@spec #{query.name}(Postgrex.conn()#{spec_args(query.params)}) :: #{function_return_typespec(query)}
-      def #{query.name}(#{Enum.join(all_args, ", ")}) do
-        conn
-        |> #{inspect(postgrex_module)}.query!(#{sql_string_literal(query.content)}, #{encoded_params})
-        |> #{decode_call(query.returns)}
-      end
-    """
+    [
+      doc_source(query),
+      row_type_source(query),
+      "  @spec #{query.name}(Postgrex.conn()#{spec_args(query.params)}) :: #{function_return_typespec(query)}\n",
+      "  def #{query.name}(#{Enum.join(all_args, ", ")}) do\n",
+      "    conn\n",
+      "    |> #{inspect(postgrex_module)}.query!(#{sql_string_literal(query.content)}, #{encoded_params})\n",
+      "    |> #{decode_call(query.returns)}\n",
+      "  end\n"
+    ]
+    |> Enum.join()
   end
 
   defp soft_function_source(%TypedQuery{} = query, postgrex_module, soft_name) do
@@ -210,16 +216,17 @@ defmodule Squirrelix.Codegen do
     encoded_params = encode_params_call(args, query.params)
     arity = length(all_args)
 
-    """
-      #{soft_doc_source(query, arity)}
-      @spec #{soft_name}(Postgrex.conn()#{spec_args(query.params)}) :: #{soft_function_return_typespec(query)}
-      def #{soft_name}(#{Enum.join(all_args, ", ")}) do
-        case #{inspect(postgrex_module)}.query(conn, #{sql_string_literal(query.content)}, #{encoded_params}) do
-          {:ok, result} -> {:ok, result |> #{soft_decode_call(query.returns)}}
-          {:error, reason} -> {:error, reason}
-        end
-      end
-    """
+    [
+      soft_doc_source(query, arity),
+      "  @spec #{soft_name}(Postgrex.conn()#{spec_args(query.params)}) :: #{soft_function_return_typespec(query)}\n",
+      "  def #{soft_name}(#{Enum.join(all_args, ", ")}) do\n",
+      "    case #{inspect(postgrex_module)}.query(conn, #{sql_string_literal(query.content)}, #{encoded_params}) do\n",
+      "      {:ok, result} -> {:ok, result |> #{soft_decode_call(query.returns)}}\n",
+      "      {:error, reason} -> {:error, reason}\n",
+      "    end\n",
+      "  end\n"
+    ]
+    |> Enum.join()
   end
 
   defp soft_companion_name(name, claimed_names) when is_binary(name) do
@@ -293,351 +300,6 @@ defmodule Squirrelix.Codegen do
     |> then(&"[#{Enum.join(&1, ", ")}]")
   end
 
-  @runtime_helpers_header "# --- Runtime helpers ---"
-
-  defp runtime_helpers_section([]), do: ""
-
-  defp runtime_helpers_section(queries) do
-    case runtime_helper_sources(queries) do
-      [] ->
-        ""
-
-      sources ->
-        """
-
-        #{@runtime_helpers_header}
-
-        #{Enum.join(sources, "\n\n")}
-        """
-    end
-  end
-
-  defp runtime_helper_sources(queries) do
-    []
-    |> maybe_add_command_helper(queries)
-    |> maybe_add_rows_helper(queries)
-    |> maybe_add_encode_helpers(queries)
-    |> maybe_add_uuid_helpers(queries)
-    |> Enum.reverse()
-  end
-
-  defp param_types(queries) do
-    queries
-    |> Enum.flat_map(fn query -> Enum.map(query.params, & &1.type) end)
-    |> MapSet.new()
-  end
-
-  defp return_types(queries) do
-    queries
-    |> Enum.flat_map(fn query -> Enum.map(query.returns, & &1.type) end)
-    |> MapSet.new()
-  end
-
-  defp maybe_add_command_helper(sources, queries) do
-    if Enum.any?(queries, &(&1.returns == [])) do
-      [
-        """
-          @spec decode_command(Postgrex.Result.t()) :: :ok
-          defp decode_command(%Postgrex.Result{}) do
-            :ok
-          end
-
-          @spec decode_command_num_rows(Postgrex.Result.t()) :: non_neg_integer()
-          defp decode_command_num_rows(%Postgrex.Result{num_rows: num_rows})
-               when is_integer(num_rows) and num_rows >= 0 do
-            num_rows
-          end
-        """
-        | sources
-      ]
-    else
-      sources
-    end
-  end
-
-  defp maybe_add_rows_helper(sources, queries) do
-    if Enum.any?(queries, &(&1.returns != [])) do
-      types = return_types(queries)
-
-      [
-        """
-          defp decode_rows(%Postgrex.Result{rows: rows}, column_specs) do
-            Enum.map(rows, &decode_row(&1, column_specs))
-          end
-
-          defp decode_row(row, column_specs) do
-            column_specs
-            |> Enum.zip(row)
-            |> Map.new(fn {{name, type, nullable?}, value} ->
-              {name, decode_column_value(value, type, nullable?)}
-            end)
-          end
-
-          defp decode_column_value(value, _type, true) when is_nil(value), do: nil
-          defp decode_column_value(value, type, _nullable?), do: decode_scalar(value, type)
-
-          #{decode_type_clauses(types)}
-        """
-        | sources
-      ]
-    else
-      sources
-    end
-  end
-
-  defp decode_type_clauses(types) do
-    types
-    |> then(fn types ->
-      []
-      |> add_type_clause(types, :integer, "defp decode_scalar(value, :integer), do: value")
-      |> add_type_clause(types, :string, "defp decode_scalar(value, :string), do: value")
-      |> add_type_clause(types, :boolean, "defp decode_scalar(value, :boolean), do: value")
-      |> add_type_clause(types, :float, "defp decode_scalar(value, :float), do: value")
-      |> add_type_clause(types, :decimal, "defp decode_scalar(value, :decimal), do: value")
-      |> add_type_clause(types, :binary, "defp decode_scalar(value, :binary), do: value")
-      |> add_type_clause(types, :date, "defp decode_scalar(value, :date), do: value")
-      |> add_type_clause(types, :time, "defp decode_scalar(value, :time), do: value")
-      |> add_type_clause(
-        types,
-        :naive_datetime,
-        "defp decode_scalar(value, :naive_datetime), do: value"
-      )
-      |> add_type_clause(
-        types,
-        :utc_datetime,
-        "defp decode_scalar(value, :utc_datetime), do: value"
-      )
-      |> add_type_clause(
-        types,
-        :map,
-        """
-        defp decode_scalar(value, :map) when is_map(value), do: value
-        defp decode_scalar(value, :map) when is_binary(value), do: JSON.decode!(value)
-        """
-      )
-      |> add_type_clause(
-        types,
-        :uuid,
-        """
-        defp decode_scalar(value, :uuid) when is_binary(value) and byte_size(value) == 16,
-          do: uuid_to_string(value)
-
-        defp decode_scalar(value, :uuid), do: value
-        """
-      )
-      |> add_list_type_clauses(types)
-    end)
-    |> Enum.reverse()
-    |> Kernel.++([
-      "defp decode_scalar(value, _type), do: value"
-    ])
-    |> Enum.join("\n")
-  end
-
-  defp add_type_clause(clauses, types, type, source) do
-    if MapSet.member?(types, type) or list_element_type?(types, type) do
-      [source | clauses]
-    else
-      clauses
-    end
-  end
-
-  defp add_list_type_clauses(clauses, types) do
-    types
-    |> Enum.filter(&match?({:list, _}, &1))
-    |> Enum.reduce(clauses, fn {:list, type}, clauses ->
-      if Enum.any?(clauses, &String.contains?(&1, "{:list, #{inspect(type)}}")) do
-        clauses
-      else
-        [
-          "defp decode_scalar(value, {:list, #{inspect(type)}}) when is_list(value), do: Enum.map(value, &decode_scalar(&1, #{inspect(type)}))"
-          | clauses
-        ]
-      end
-    end)
-  end
-
-  defp maybe_add_encode_helpers(sources, queries) do
-    if Enum.any?(queries, &(&1.params != [])) do
-      types = param_types(queries)
-
-      [
-        """
-          #{encode_type_clauses(types)}
-        """
-        | sources
-      ]
-    else
-      sources
-    end
-  end
-
-  defp encode_type_clauses(types) do
-    types
-    |> then(fn types ->
-      []
-      |> add_type_clause(types, :integer, encode_scalar_clause(:integer, "is_integer(value)"))
-      |> add_type_clause(types, :string, encode_scalar_clause(:string, "is_binary(value)"))
-      |> add_type_clause(types, :boolean, encode_scalar_clause(:boolean, "is_boolean(value)"))
-      |> add_type_clause(types, :float, encode_scalar_clause(:float, "is_float(value)"))
-      |> add_type_clause(
-        types,
-        :decimal,
-        encode_struct_clause(:decimal, "Decimal", "Decimal.t()")
-      )
-      |> add_type_clause(types, :binary, encode_scalar_clause(:binary, "is_binary(value)"))
-      |> add_type_clause(types, :date, encode_struct_clause(:date, "Date", "Date.t()"))
-      |> add_type_clause(types, :time, encode_struct_clause(:time, "Time", "Time.t()"))
-      |> add_type_clause(
-        types,
-        :naive_datetime,
-        encode_struct_clause(:naive_datetime, "NaiveDateTime", "NaiveDateTime.t()")
-      )
-      |> add_type_clause(
-        types,
-        :utc_datetime,
-        encode_struct_clause(:utc_datetime, "DateTime", "DateTime.t()")
-      )
-      |> add_type_clause(
-        types,
-        :map,
-        """
-        @spec encode_value(term(), :map) :: binary()
-        defp encode_value(value, :map), do: JSON.encode!(value)
-        """
-      )
-      |> add_type_clause(
-        types,
-        :uuid,
-        """
-        @spec encode_value(String.t(), :uuid) :: <<_::128>>
-        defp encode_value(value, :uuid) when is_binary(value), do: uuid_from_string(value)
-        """
-      )
-      |> add_list_encode_clauses(types)
-    end)
-    |> Enum.reverse()
-    |> Enum.join("\n")
-  end
-
-  defp encode_scalar_clause(type, guard) do
-    typespec = TypeMapper.typespec(type)
-
-    """
-    @spec encode_value(#{typespec}, #{inspect(type)}) :: #{typespec}
-    defp encode_value(value, #{inspect(type)}) when #{guard}, do: value
-    """
-  end
-
-  defp encode_struct_clause(type, struct_mod, typespec) do
-    """
-    @spec encode_value(#{typespec}, #{inspect(type)}) :: #{typespec}
-    defp encode_value(value, #{inspect(type)}) when is_struct(value, #{struct_mod}), do: value
-    """
-  end
-
-  defp add_list_encode_clauses(clauses, types) do
-    types
-    |> Enum.filter(&match?({:list, _}, &1))
-    |> Enum.reduce(clauses, fn {:list, type}, clauses ->
-      marker = "{:list, #{inspect(type)}}"
-
-      if Enum.any?(clauses, &String.contains?(&1, marker)) do
-        clauses
-      else
-        inner = TypeMapper.typespec(type)
-
-        [
-          """
-          @spec encode_value([#{inner}], #{marker}) :: [#{inner}]
-          defp encode_value(value, #{marker}) when is_list(value), do: Enum.map(value, &encode_value(&1, #{inspect(type)}))
-          """
-          | clauses
-        ]
-      end
-    end)
-  end
-
-  defp maybe_add_uuid_helpers(sources, queries) do
-    param_type_set = param_types(queries)
-    return_type_set = return_types(queries)
-
-    encode_uuid? =
-      MapSet.member?(param_type_set, :uuid) or list_element_type?(param_type_set, :uuid)
-
-    decode_uuid? =
-      MapSet.member?(return_type_set, :uuid) or list_element_type?(return_type_set, :uuid)
-
-    case {encode_uuid?, decode_uuid?} do
-      {false, false} ->
-        sources
-
-      {encode_uuid?, decode_uuid?} ->
-        [uuid_helper_source(encode_uuid?, decode_uuid?) | sources]
-    end
-  end
-
-  defp uuid_helper_source(true, true) do
-    """
-      @spec uuid_to_string(<<_::128>>) :: String.t()
-      defp uuid_to_string(uuid) when is_binary(uuid) and byte_size(uuid) == 16 do
-        hex = Base.encode16(uuid, case: :lower)
-
-        <<part1::binary-size(8), part2::binary-size(4), part3::binary-size(4),
-          part4::binary-size(4), part5::binary>> = hex
-
-        "\#{part1}-\#{part2}-\#{part3}-\#{part4}-\#{part5}"
-      end
-
-      @spec uuid_from_string(binary()) :: <<_::128>>
-      defp uuid_from_string(string) when is_binary(string) do
-        case Base.decode16(String.replace(string, "-", ""), case: :mixed) do
-          {:ok, <<_::128>> = uuid} ->
-            uuid
-
-          _ ->
-            raise ArgumentError, "invalid UUID: \#{inspect(string)}"
-        end
-      end
-    """
-  end
-
-  defp uuid_helper_source(true, false) do
-    """
-      @spec uuid_from_string(binary()) :: <<_::128>>
-      defp uuid_from_string(string) when is_binary(string) do
-        case Base.decode16(String.replace(string, "-", ""), case: :mixed) do
-          {:ok, <<_::128>> = uuid} ->
-            uuid
-
-          _ ->
-            raise ArgumentError, "invalid UUID: \#{inspect(string)}"
-        end
-      end
-    """
-  end
-
-  defp uuid_helper_source(false, true) do
-    """
-      @spec uuid_to_string(<<_::128>>) :: String.t()
-      defp uuid_to_string(uuid) when is_binary(uuid) and byte_size(uuid) == 16 do
-        hex = Base.encode16(uuid, case: :lower)
-
-        <<part1::binary-size(8), part2::binary-size(4), part3::binary-size(4),
-          part4::binary-size(4), part5::binary>> = hex
-
-        "\#{part1}-\#{part2}-\#{part3}-\#{part4}-\#{part5}"
-      end
-    """
-  end
-
-  defp list_element_type?(types, element_type) do
-    Enum.any?(types, fn
-      {:list, ^element_type} -> true
-      _ -> false
-    end)
-  end
-
   defp decode_call([]), do: "decode_command()"
 
   defp decode_call(columns) do
@@ -709,9 +371,7 @@ defmodule Squirrelix.Codegen do
         "required(#{atom_literal(column.name)}) => #{spec}"
       end)
 
-    """
-      @type #{row_type_name(query)} :: %{#{fields}}
-    """
+    "  @type #{row_type_name(query)} :: %{#{fields}}\n"
   end
 
   defp function_return_typespec(%TypedQuery{returns: []}), do: ":ok"

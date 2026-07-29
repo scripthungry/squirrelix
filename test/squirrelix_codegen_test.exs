@@ -88,6 +88,38 @@ defmodule SquirrelixCodegenTest do
     assert function_position(code, "one") < function_position(code, "other")
   end
 
+  test "generate_module rejects unsupported parameter types for encoding" do
+    bad_atom =
+      typed_query("bad.sql", "bad", "select $1", [
+        %Parameter{index: 1, name: "x", type: :inet}
+      ])
+
+    assert_raise ArgumentError, ~r/unsupported parameter type\(s\).*\:inet/, fn ->
+      Codegen.generate_module(MyApp.SQL, [bad_atom], version: "v-test")
+    end
+
+    bad_list =
+      typed_query("bad_list.sql", "bad_list", "select $1", [
+        %Parameter{index: 1, name: "xs", type: {:list, :inet}}
+      ])
+
+    assert_raise ArgumentError, ~r/unsupported parameter type\(s\).*\{:list, :inet\}/, fn ->
+      Codegen.generate_module(MyApp.SQL, [bad_list], version: "v-test")
+    end
+  end
+
+  test "generate_module emits a catch-all encode_value clause" do
+    query =
+      typed_query("encode.sql", "encode", "select $1", [
+        %Parameter{index: 1, name: "id", type: :integer}
+      ])
+
+    code = Codegen.generate_module(MyApp.SQL, [query], version: "v-test")
+
+    assert code =~ ~r/defp encode_value\(value, type\) do/
+    assert code =~ "cannot encode"
+  end
+
   test "generate_module uses String.t() for multiple enum-using queries without enum modules" do
     queries = [
       typed_query(

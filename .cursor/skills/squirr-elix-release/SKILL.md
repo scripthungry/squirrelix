@@ -12,7 +12,6 @@ description: >-
 Canonical setup and secrets: [`docs/RELEASE.md`](../../../docs/RELEASE.md).
 
 **Repo:** `scripthungry/squirrelix`  
-**Local path often:** `/Users/michael/Developer/elixir/squirrelixir`  
 **Project board:** owner `scripthungry`, project **Squirrelix** `#1`  
 **Status options:** Todo · In Progress · Done
 
@@ -69,8 +68,10 @@ After merge to `main` and CI green:
 git checkout main && git pull
 git tag vX.Y.Z
 git push origin vX.Y.Z
+# Pseudocode — replace the heredoc body with the real CHANGELOG summary for X.Y.Z
+# before running (do not leave a placeholder in the published notes).
 gh release create vX.Y.Z --title "vX.Y.Z" --notes-file - <<'EOF'
-…summary from CHANGELOG…
+<CHANGELOG summary for X.Y.Z>
 EOF
 ```
 

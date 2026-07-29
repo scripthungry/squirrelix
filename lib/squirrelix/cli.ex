@@ -190,10 +190,9 @@ defmodule Squirrelix.CLI do
   defp prefer_ssl(ssl, _base), do: ssl
 
   defp do_discover_sql_directories(path) do
-    if Path.basename(path) == "sql" do
-      list_sql_files(path)
-    else
-      discover_nested_sql_directories(path)
+    case Path.basename(path) do
+      "sql" -> list_sql_files(path)
+      _ -> discover_nested_sql_directories(path)
     end
   end
 
