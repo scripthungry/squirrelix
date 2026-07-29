@@ -105,6 +105,76 @@ defmodule SquirrelixConnectionErrorTest do
                message: "database \"missing_db\" does not exist"
              } = error
     end
+
+    test "classifies unreachable, nxdomain, closed, and unknown TCP messages" do
+      opts = connection_options()
+
+      assert %CannotConnectToPostgres{reason: :unreachable} =
+               Error.connection_error(
+                 %DBConnection.ConnectionError{
+                   message: "tcp connect: network is unreachable - :ehostunreach",
+                   reason: :error
+                 },
+                 opts
+               )
+
+      assert %CannotConnectToPostgres{reason: :nxdomain} =
+               Error.connection_error(
+                 %DBConnection.ConnectionError{
+                   message: "tcp connect (missing.example): non-existing domain - :nxdomain",
+                   reason: :error
+                 },
+                 opts
+               )
+
+      assert %CannotConnectToPostgres{reason: :closed} =
+               Error.connection_error(
+                 %DBConnection.ConnectionError{
+                   message: "tcp connect (127.0.0.1:5432): closed",
+                   reason: :error
+                 },
+                 opts
+               )
+
+      assert %CannotConnectToPostgres{reason: :unknown, detail: detail} =
+               Error.connection_error(
+                 %DBConnection.ConnectionError{
+                   message: "tcp connect: something unexpected",
+                   reason: :error
+                 },
+                 opts
+               )
+
+      assert detail =~ "unexpected"
+    end
+
+    test "classifies atom connection reasons" do
+      opts = connection_options()
+
+      assert %PostgresConnectionTimeout{} = Error.connection_error(:timeout, opts)
+
+      assert %CannotConnectToPostgres{reason: :refused} =
+               Error.connection_error(:econnrefused, opts)
+
+      assert %CannotConnectToPostgres{reason: :unreachable} =
+               Error.connection_error(:ehostunreach, opts)
+
+      assert %CannotConnectToPostgres{reason: :nxdomain} = Error.connection_error(:nxdomain, opts)
+      assert %CannotConnectToPostgres{reason: :closed} = Error.connection_error(:closed, opts)
+
+      assert %CannotConnectToPostgres{reason: :unknown, detail: :weird} =
+               Error.connection_error(:weird, opts)
+    end
+
+    test "classifies unknown Postgrex codes as unknown connection errors" do
+      opts = connection_options()
+
+      assert %CannotConnectToPostgres{reason: :unknown} =
+               Error.connection_error(
+                 %Postgrex.Error{postgres: %{code: :too_many_connections, message: "busy"}},
+                 opts
+               )
+    end
   end
 
   describe "Error.format/1 for connection failures" do
@@ -196,6 +266,73 @@ defmodule SquirrelixConnectionErrorTest do
       assert formatted =~ "Error: Cannot connect to Postgres"
       assert formatted =~ "`missing_db`"
       assert formatted =~ "PGDATABASE"
+    end
+
+    test "formats missing database without an extra message line" do
+      formatted =
+        Error.format(%CannotConnectToPostgres{
+          host: "localhost",
+          port: 5432,
+          user: "postgres",
+          database: "missing_db",
+          reason: :invalid_catalog,
+          message: nil
+        })
+
+      assert formatted =~ "`missing_db`"
+      assert formatted =~ "PGDATABASE"
+      refute formatted =~ "does not exist"
+    end
+
+    test "formats closed, unreachable, nxdomain, and unknown TCP failures" do
+      closed =
+        Error.format(%CannotConnectToPostgres{
+          host: "db.example.com",
+          port: 5432,
+          reason: :closed
+        })
+
+      assert closed =~ "closed the connection"
+
+      unreachable =
+        Error.format(%CannotConnectToPostgres{
+          host: "db.example.com",
+          port: 5432,
+          reason: :unreachable
+        })
+
+      assert unreachable =~ "is unreachable"
+
+      nxdomain =
+        Error.format(%CannotConnectToPostgres{
+          host: "missing.example",
+          port: 5432,
+          reason: :nxdomain
+        })
+
+      assert nxdomain =~ "could not be resolved"
+
+      unknown_nil =
+        Error.format(%CannotConnectToPostgres{
+          host: "db.example.com",
+          port: 5432,
+          reason: :unknown,
+          detail: nil,
+          message: nil
+        })
+
+      assert unknown_nil =~ "unexpected connection error"
+
+      unknown_term =
+        Error.format(%CannotConnectToPostgres{
+          host: "db.example.com",
+          port: 5432,
+          reason: :unknown,
+          detail: {:posix, :econnreset},
+          message: nil
+        })
+
+      assert unknown_term =~ "{:posix, :econnreset}"
     end
   end
 

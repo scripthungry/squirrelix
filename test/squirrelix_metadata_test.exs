@@ -168,4 +168,38 @@ defmodule SquirrelixMetadataTest do
     assert {:error, %Squirrelix.Error.CannotWriteFile{file: ^metadata_file}} =
              Metadata.to_file(metadata_file, %{}, root: root)
   end
+
+  test "to_file reports write failures when the path is a directory" do
+    root = Squirrelix.TestSupport.tmp_dir!("squirr_elix-metadata")
+    metadata_file = Path.join(root, "squirr_elix.exs")
+    File.mkdir_p!(metadata_file)
+
+    assert {:error, %Squirrelix.Error.CannotWriteFile{file: ^metadata_file}} =
+             Metadata.to_file(metadata_file, %{}, root: root)
+  end
+
+  test "to_file serialises Column structs in returns" do
+    root = Squirrelix.TestSupport.tmp_dir!("squirr_elix-metadata")
+    query = Path.join(root, "lib/a/sql/q.sql")
+    file = Path.join(root, "squirr_elix.exs")
+
+    metadata = %{
+      query => [
+        params: [:integer],
+        returns: [%Column{name: "n", type: :string, nullable?: false}]
+      ]
+    }
+
+    assert :ok = Metadata.to_file(file, metadata, root: root)
+    assert File.read!(file) =~ ~s(name: "n")
+    assert File.read!(file) =~ ":string"
+  end
+
+  test "dump keeps absolute paths that fall outside root" do
+    root = Squirrelix.TestSupport.tmp_dir!("squirr_elix-metadata")
+    outside = "/tmp/other-project/lib/a/sql/q.sql"
+
+    dumped = Metadata.dump(%{outside => [params: [], returns: []]}, root)
+    assert dumped =~ outside
+  end
 end

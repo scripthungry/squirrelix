@@ -449,6 +449,125 @@ defmodule MixTasksSquirrelixTest do
     end
   end
 
+  test "mix squirrelix.gen rejects unexpected arguments" do
+    assert_raise Mix.Error, ~r/Unexpected arguments: extra/, fn ->
+      Mix.Task.run("squirrelix.gen", ["extra"])
+    end
+  end
+
+  test "mix squirrelix.gen reports when no SQL queries exist" do
+    root = tmp_project(:acorn_counter)
+    File.mkdir_p!(Path.join(root, "lib"))
+    File.write!(Path.join(root, "squirr_elix.exs"), "%{}\n")
+
+    output =
+      File.cd!(root, fn ->
+        capture_io(fn -> Mix.Task.run("squirrelix.gen", []) end)
+      end)
+
+    assert output =~ "No SQL queries found."
+  end
+
+  test "mix squirrelix.check reports when no SQL queries exist" do
+    root = tmp_project(:acorn_counter)
+    File.mkdir_p!(Path.join(root, "lib"))
+    File.write!(Path.join(root, "squirr_elix.exs"), "%{}\n")
+
+    output =
+      File.cd!(root, fn ->
+        capture_io(fn -> Mix.Task.run("squirrelix.check", []) end)
+      end)
+
+    assert output =~ "No SQL queries found."
+  end
+
+  test "mix squirrelix.gen pluralizes generated query count" do
+    root = tmp_project(:acorn_counter)
+    q1 = write_query(root)
+    sql_dir = Path.dirname(q1)
+    q2 = Path.join(sql_dir, "list_accounts.sql")
+    File.write!(q2, "select name from accounts")
+
+    File.write!(Path.join(root, "squirr_elix.exs"), """
+    %{
+      "lib/accounts/sql/find_account.sql" => [
+        params: [:integer],
+        returns: [%{name: "name", type: :string, nullable?: false}]
+      ],
+      "lib/accounts/sql/list_accounts.sql" => [
+        params: [],
+        returns: [%{name: "name", type: :string, nullable?: false}]
+      ]
+    }
+    """)
+
+    output =
+      File.cd!(root, fn ->
+        capture_io(fn -> Mix.Task.run("squirrelix.gen", []) end)
+      end)
+
+    assert output =~ "Generated 2 queries."
+  end
+
+  test "mix squirrelix.gen formats invalid options that include values" do
+    error =
+      assert_raise Mix.Error, fn ->
+        Mix.Task.run("squirrelix.gen", ["--port", "not-a-number"])
+      end
+
+    message = Exception.message(error)
+    assert message =~ "Invalid options"
+    assert message =~ "--port=not-a-number"
+  end
+
+  test "mix squirrelix.gen --infer --write-metadata reports write failures" do
+    root = tmp_project(:acorn_counter)
+    write_query(root, "select $1::text as name")
+    blocker = Path.join(root, "not-a-dir")
+    File.write!(blocker, "x")
+
+    error =
+      assert_raise Mix.Error, fn ->
+        File.cd!(root, fn ->
+          Mix.Task.run("squirrelix.gen", [
+            "--infer",
+            "--database",
+            "postgres",
+            "--write-metadata",
+            Path.join(blocker, "meta.exs")
+          ])
+        end)
+      end
+
+    assert Exception.message(error) =~ "Could not write Squirrelix metadata"
+  end
+
+  test "mix squirrelix.gen --infer --write-metadata skips export when inference has errors" do
+    root = tmp_project(:acorn_counter)
+    write_query(root, "select * from definitely_missing_table_xyz")
+    metadata_file = Path.join(root, "exported.exs")
+
+    output =
+      File.cd!(root, fn ->
+        capture_io(:stderr, fn ->
+          capture_io(fn ->
+            assert_raise Mix.Error, fn ->
+              Mix.Task.run("squirrelix.gen", [
+                "--infer",
+                "--database",
+                "postgres",
+                "--write-metadata",
+                metadata_file
+              ])
+            end
+          end)
+        end)
+      end)
+
+    refute File.exists?(metadata_file)
+    refute output =~ "Wrote metadata"
+  end
+
   defp restore_env(key, nil), do: System.delete_env(key)
   defp restore_env(key, value), do: System.put_env(key, value)
 

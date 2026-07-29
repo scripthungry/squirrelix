@@ -62,6 +62,39 @@ defmodule SquirrelixQueryCompatibilityTest do
             }} = Query.from_file(path)
   end
 
+  test "from_file reports unreadable files" do
+    file = Path.join(Squirrelix.TestSupport.tmp_dir!("squirr_elix-query"), "missing.sql")
+
+    assert {:error, %Squirrelix.Error.CannotReadFile{file: ^file, reason: :enoent}} =
+             Query.from_file(file)
+  end
+
+  test "from_file takes a leading comment with no trailing newline" do
+    path = write_temp_sql("solo_comment.sql", "-- only comment")
+
+    assert {:ok, %Query{comment: ["only comment"], content: "-- only comment"}} =
+             Query.from_file(path)
+  end
+
+  test "from_file rejects invalid graphemes after a valid prefix" do
+    path = write_temp_sql("find-squirrels.sql", "select 1")
+
+    assert {:error,
+            %QueryFileHasInvalidName{
+              file: ^path,
+              reason: {:invalid_grapheme, 4, "-"},
+              suggested_name: "find_squirrels"
+            }} = Query.from_file(path)
+  end
+
+  test "from_file rejects multi-codepoint graphemes in query names" do
+    # Combining acute accent is one grapheme made of multiple codepoints.
+    path = write_temp_sql("find_e\u0301.sql", "select 1")
+
+    assert {:error, %QueryFileHasInvalidName{reason: {:invalid_grapheme, _, _}}} =
+             Query.from_file(path)
+  end
+
   defp write_temp_sql(file_name, content) do
     dir = Squirrelix.TestSupport.tmp_dir!("squirr_elix-query")
     path = Path.join(dir, file_name)

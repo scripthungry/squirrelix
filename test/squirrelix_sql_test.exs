@@ -304,4 +304,63 @@ defmodule SquirrelixSQLTest do
     refute SQL.single_statement?("select 1; select 2")
     refute SQL.single_statement?("select 1; drop table users")
   end
+
+  test "infer_parameter_names ignores malformed SET column lists" do
+    assert SQL.infer_parameter_names("update users set (name, email) ($1, $2)") == %{}
+  end
+
+  test "infer_parameter_names ignores INSERT with unclosed column list" do
+    assert SQL.infer_parameter_names("insert into users (name, email values ($1, $2)") == %{}
+  end
+
+  test "infer_parameter_names ignores INSERT with unclosed quoted identifier" do
+    assert SQL.infer_parameter_names(~s|insert into users ("name) values ($1)|) == %{}
+  end
+
+  test "infer_parameter_names maps multi-row VALUES with a trailing comma" do
+    sql = """
+    insert into users (name, email)
+    values ($1, $2),
+    """
+
+    assert SQL.infer_parameter_names(sql) == %{1 => "name", 2 => "email"}
+  end
+
+  test "infer_parameter_names handles nested parens in INSERT values" do
+    sql = "insert into users (name, email) values (($1), $2)"
+
+    assert SQL.infer_parameter_names(sql) == %{2 => "email"}
+  end
+
+  test "infer_parameter_names handles escaped quotes in INSERT columns" do
+    sql = ~s|insert into users ("odd""name", email) values ($1, $2)|
+
+    assert SQL.infer_parameter_names(sql) == %{1 => "odd_name", 2 => "email"}
+  end
+
+  test "infer_parameter_names handles nested parens in SET lists" do
+    sql = "update users set (name, email) = ($1, lower($2)) where id = $3"
+
+    assert SQL.infer_parameter_names(sql) == %{1 => "name", 3 => "id"}
+  end
+
+  test "infer_parameter_names strips unterminated comments and strings" do
+    assert SQL.infer_parameter_names("select * from t where id = $1 -- dangling") == %{1 => "id"}
+    assert SQL.infer_parameter_names("select * from t /* unclosed and id = $1") == %{}
+    assert SQL.infer_parameter_names("select * from t where note = 'unclosed and id = $1") == %{}
+  end
+
+  test "infer_parameter_names keeps doubled quotes and newlines inside strings" do
+    sql = "select * from t where note = 'it''s\nfine' and id = $1"
+
+    assert SQL.infer_parameter_names(sql) == %{1 => "id"}
+  end
+
+  test "similar_identifier and identifier_error skip non-ascii graphemes" do
+    assert SQL.similar_identifier("find_😀_me") == "find___me"
+    assert SQL.identifier_error("a😀") == {:invalid_grapheme, 1, "😀"}
+    assert SQL.identifier_error("a\u0301") == {:invalid_grapheme, 0, "a\u0301"}
+    # Multi-codepoint grapheme after a valid start hits digit?/letter? catch-alls.
+    assert SQL.identifier_error("ab\u0301") == {:invalid_grapheme, 1, "b\u0301"}
+  end
 end
