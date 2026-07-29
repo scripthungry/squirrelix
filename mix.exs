@@ -1,7 +1,7 @@
 defmodule Squirrelix.MixProject do
   use Mix.Project
 
-  @version "0.5.5"
+  @version "0.5.6"
   @source_url "https://github.com/scripthungry/squirrelix"
 
   def project do
@@ -131,7 +131,7 @@ defmodule Squirrelix.MixProject do
         "credo.strict",
         "dialyzer",
         "ex_dna --max-clones 0",
-        "reach.check --arch --smells"
+        "reach.check --arch --smells --strict"
       ]
     ]
   end

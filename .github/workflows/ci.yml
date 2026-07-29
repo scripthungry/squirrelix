@@ -90,7 +90,7 @@ jobs:
         run: mix ex_dna --max-clones 0
 
       - name: Reach architecture and smells
-        run: mix reach.check --arch --smells
+        run: mix reach.check --arch --smells --strict
 
       - name: Run tests with coverage
         run: |

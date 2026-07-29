@@ -91,7 +91,7 @@ jobs:
       - run: mix credo --strict --all
       - run: mix dialyzer
       - run: mix ex_dna --max-clones 0
-      - run: mix reach.check --arch --smells
+      - run: mix reach.check --arch --smells --strict
       - run: mix test
 
       - name: Publish package and docs

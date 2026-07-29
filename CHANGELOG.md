@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.6] — 2026-07-29
+
+### Fixed
+
+- Treat Reach Cross-Function Smell findings as hard failures in CI, Hex Publish,
+  and `mix ci` (`--strict`), and set `smells: [strict: true]` in `.reach.exs`
+  (#60).
+- Clear Reach smells in `Squirrelix.Codegen.Runtime` (iolist section join;
+  prepend+reverse for list encode/decode accumulators) (#60).
+
 ## [0.5.5] — 2026-07-29
 
 ### Changed

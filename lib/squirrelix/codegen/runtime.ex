@@ -14,7 +14,11 @@ defmodule Squirrelix.Codegen.Runtime do
         ""
 
       sources ->
-        "\n\n# --- Runtime helpers ---\n\n" <> Enum.join(sources, "\n\n") <> "\n"
+        IO.iodata_to_binary([
+          "\n\n# --- Runtime helpers ---\n\n",
+          Enum.intersperse(sources, "\n\n"),
+          "\n"
+        ])
     end
   end
 
@@ -169,18 +173,22 @@ defmodule Squirrelix.Codegen.Runtime do
   end
 
   defp add_list_decode_asts(clauses, types) do
-    types
-    |> Enum.filter(&match?({:list, _}, &1))
-    |> Enum.uniq()
-    |> Enum.reduce(clauses, fn {:list, type} = list_type, clauses ->
-      clauses ++
+    list_asts =
+      types
+      |> Enum.filter(&match?({:list, _}, &1))
+      |> Enum.uniq()
+      |> Enum.reduce([], fn {:list, type} = list_type, acc ->
         [
           quote do
             defp decode_scalar(value, unquote(list_type)) when is_list(value),
               do: Enum.map(value, &decode_scalar(&1, unquote(type)))
           end
+          | acc
         ]
-    end)
+      end)
+      |> Enum.reverse()
+
+    clauses ++ list_asts
   end
 
   defp encode_helpers(types) do
@@ -320,21 +328,26 @@ defmodule Squirrelix.Codegen.Runtime do
   end
 
   defp add_list_encode_asts(clauses, types) do
-    types
-    |> Enum.filter(&match?({:list, _}, &1))
-    |> Enum.uniq()
-    |> Enum.reduce(clauses, fn {:list, type} = list_type, clauses ->
-      inner = typespec_ast(type)
+    list_asts =
+      types
+      |> Enum.filter(&match?({:list, _}, &1))
+      |> Enum.uniq()
+      |> Enum.reduce([], fn {:list, type} = list_type, acc ->
+        inner = typespec_ast(type)
 
-      clauses ++
-        flatten_quoted(
+        [
           quote do
             @spec encode_value([unquote(inner)], unquote(list_type)) :: [unquote(inner)]
             defp encode_value(value, unquote(list_type)) when is_list(value),
               do: Enum.map(value, &encode_value(&1, unquote(type)))
           end
-        )
-    end)
+          | acc
+        ]
+      end)
+      |> Enum.reverse()
+      |> Enum.flat_map(&flatten_quoted/1)
+
+    clauses ++ list_asts
   end
 
   defp uuid_helpers({true, true}) do
