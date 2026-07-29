@@ -5,10 +5,14 @@ defmodule SquirrelixErrorFormatTest do
   alias Squirrelix.Error.CannotOverwriteFile
   alias Squirrelix.Error.CannotReadFile
   alias Squirrelix.Error.CannotWriteFile
+  alias Squirrelix.Error.DuplicateReturnColumns
   alias Squirrelix.Error.InvalidQueryMetadataFile
   alias Squirrelix.Error.MissingQueryMetadata
   alias Squirrelix.Error.MissingQueryMetadataField
   alias Squirrelix.Error.OutdatedFile
+  alias Squirrelix.Error.QueryFileHasInvalidName
+  alias Squirrelix.Error.QueryHasInvalidColumn
+  alias Squirrelix.Error.QueryHasInvalidEnum
   alias Squirrelix.Error.UnsupportedPostgresType
 
   test "format_outdated_file_error matches upstream Squirrel wording" do
@@ -132,5 +136,149 @@ defmodule SquirrelixErrorFormatTest do
     assert formatted =~ "`int4range`"
     assert formatted =~ "Hint:"
     assert formatted =~ "range"
+  end
+
+  test "format_unsupported_type_error omits Hint when hint is nil" do
+    formatted = Error.format(%UnsupportedPostgresType{name: "mystery", hint: nil})
+
+    assert formatted =~ "Error: Unsupported type"
+    assert formatted =~ "`mystery`"
+    refute formatted =~ "Hint:"
+  end
+
+  test "format_query_file_name_error covers empty and invalid grapheme reasons" do
+    empty =
+      Error.format(%QueryFileHasInvalidName{
+        file: "lib/accounts/sql/.sql",
+        reason: :empty,
+        suggested_name: nil
+      })
+
+    assert empty =~ "Error: Query file with invalid name"
+    assert empty =~ "Reason: the file name is empty"
+    refute empty =~ "Maybe try renaming"
+
+    at_start =
+      Error.format(%QueryFileHasInvalidName{
+        file: "lib/accounts/sql/1find.sql",
+        reason: {:invalid_grapheme, 0, "1"},
+        suggested_name: "find"
+      })
+
+    assert at_start =~ ~s|cannot start with "1"|
+    assert at_start =~ "Maybe try renaming it to `find`?"
+
+    mid =
+      Error.format(%QueryFileHasInvalidName{
+        file: "lib/accounts/sql/find-user.sql",
+        reason: {:invalid_grapheme, 4, "-"},
+        suggested_name: "find_user"
+      })
+
+    assert mid =~ ~s|invalid character "-" at position 4|
+    assert mid =~ "Maybe try renaming it to `find_user`?"
+  end
+
+  test "format_invalid_enum_error explains missing variants" do
+    formatted =
+      Error.format(%QueryHasInvalidEnum{
+        file: "q.sql",
+        starting_line: 1,
+        content: "select status from accounts",
+        enum_name: "account_status",
+        reason: :no_variants
+      })
+
+    assert formatted =~ "Error: Query with invalid enum"
+    assert formatted =~ "`account_status`"
+    assert formatted =~ "no variants"
+  end
+
+  test "format_duplicate_return_columns_error pluralizes names" do
+    singular =
+      Error.format(%DuplicateReturnColumns{
+        file: "q.sql",
+        starting_line: 1,
+        content: "select 1 as name, 2 as name",
+        names: ["name"]
+      })
+
+    assert singular =~ "same name:"
+    assert singular =~ "`name`"
+
+    plural =
+      Error.format(%DuplicateReturnColumns{
+        file: "q.sql",
+        starting_line: 1,
+        content: "select 1 as a, 2 as a, 3 as b, 4 as b",
+        names: ["a", "b"]
+      })
+
+    assert plural =~ "same names:"
+    assert plural =~ "`a`"
+    assert plural =~ "`b`"
+  end
+
+  test "format_invalid_column_error omits suggestion when suggested_name is nil" do
+    formatted =
+      Error.format(%QueryHasInvalidColumn{
+        file: "q.sql",
+        starting_line: 1,
+        content: ~s|select 1 as "123"|,
+        column_name: "123",
+        reason: {:invalid_grapheme, 0, "1"},
+        suggested_name: nil
+      })
+
+    assert formatted =~ "Error: Column with invalid name"
+    assert formatted =~ "This is not a valid Elixir identifier"
+    refute formatted =~ "maybe try"
+  end
+
+  test "format_cannot_read_file_error inspects non-atom reasons" do
+    formatted = Error.format(%CannotReadFile{file: "q.sql", reason: "weird"})
+
+    assert formatted =~ "Error: Cannot read file"
+    assert formatted =~ ~s|"weird"|
+  end
+
+  test "format_invalid_query_metadata_file_error formats exception and binary reasons" do
+    from_exception =
+      Error.format(%InvalidQueryMetadataFile{
+        file: "squirr_elix.exs",
+        reason: %RuntimeError{message: "boom"}
+      })
+
+    assert from_exception =~ "boom"
+
+    from_binary =
+      Error.format(%InvalidQueryMetadataFile{file: "squirr_elix.exs", reason: "bad meta"})
+
+    assert from_binary =~ "bad meta"
+
+    from_other =
+      Error.format(%InvalidQueryMetadataFile{file: "squirr_elix.exs", reason: {:bad, :shape}})
+
+    assert from_other =~ "{:bad, :shape}"
+  end
+
+  test "format falls back to inspect for unknown errors" do
+    formatted = Error.format(%{not_an_error: true})
+
+    assert formatted =~ "Error:"
+    assert formatted =~ "not_an_error"
+  end
+
+  test "postgresql_code maps known atoms and returns nil for unrelated errors" do
+    assert Error.postgresql_code(%Squirrelix.Error.PostgresInferenceError{
+             file: "q.sql",
+             starting_line: 1,
+             content: "select 1",
+             message: "x",
+             code: :syntax_error,
+             position: nil
+           }) == "42601"
+
+    assert Error.postgresql_code(%CannotReadFile{file: "q.sql", reason: :enoent}) == nil
   end
 end

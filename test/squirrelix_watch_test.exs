@@ -122,6 +122,30 @@ defmodule SquirrelixWatchTest do
       assert_receive {:watch_result, :ok}, 500
       _ = Task.await(task)
     end
+
+    test "stops cleanly on filesystem :stop event" do
+      parent = self()
+
+      task =
+        Task.async(fn ->
+          capture_io(fn ->
+            result =
+              Watch.run_loop(%{
+                root: "/tmp",
+                debounce_ms: 20,
+                watcher_pid: parent,
+                timer: nil,
+                on_change: fn -> :ok end
+              })
+
+            send(parent, {:watch_result, result})
+          end)
+        end)
+
+      send(task.pid, {:file_event, parent, :stop})
+      assert_receive {:watch_result, :ok}, 500
+      _ = Task.await(task)
+    end
   end
 
   describe "watchable_dirs/1" do
@@ -135,6 +159,48 @@ defmodule SquirrelixWatchTest do
       assert Path.join(root, "lib") in dirs
       assert Path.join(root, "dev") in dirs
       refute Path.join(root, "test") in dirs
+    end
+  end
+
+  describe "watch!/1" do
+    test "reports when there are no watchable directories" do
+      root = Squirrelix.TestSupport.tmp_dir!("squirr_elix-watch-empty")
+
+      output =
+        capture_io(:stderr, fn ->
+          assert :ok = Watch.watch!(root: root, dirs: [], on_change: fn -> :ok end)
+        end)
+
+      assert output =~ "no lib/, test/, or dev/ directories"
+      assert output =~ root
+    end
+
+    test "raises when FileSystem fails to start" do
+      root = Squirrelix.TestSupport.tmp_dir!("squirr_elix-watch-fs-error")
+      File.mkdir_p!(Path.join(root, "lib"))
+
+      name = :"squirr_elix_watch_fs_#{System.unique_integer([:positive])}"
+      {:ok, _pid} = FileSystem.start_link(dirs: [Path.join(root, "lib")], name: name)
+
+      previous = Application.get_env(:squirr_elix, :watch_filesystem_opts)
+
+      try do
+        Application.put_env(:squirr_elix, :watch_filesystem_opts, name: name)
+
+        error =
+          assert_raise Mix.Error, fn ->
+            Watch.watch!(root: root, on_change: fn -> :ok end)
+          end
+
+        assert Exception.message(error) =~ "Could not start the file watcher"
+        assert Exception.message(error) =~ "already_started"
+      after
+        if previous == nil do
+          Application.delete_env(:squirr_elix, :watch_filesystem_opts)
+        else
+          Application.put_env(:squirr_elix, :watch_filesystem_opts, previous)
+        end
+      end
     end
   end
 end

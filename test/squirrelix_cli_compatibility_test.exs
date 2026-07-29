@@ -194,6 +194,29 @@ defmodule SquirrelixCliCompatibilityTest do
             ]} = CLI.query_directories(tmp)
   end
 
+  test "query_files and query_directories propagate discover errors" do
+    tmp = tmp_dir("squirr_elix-cli-unreadable")
+    blocked = Path.join(tmp, "lib")
+    File.mkdir_p!(blocked)
+    File.write!(Path.join(tmp, "mix.exs"), "defmodule Temp.MixProject do\nend\n")
+    File.chmod!(blocked, 0o000)
+
+    try do
+      assert {:error, %Squirrelix.Error.CannotReadFile{file: ^blocked}} = CLI.query_files(tmp)
+
+      assert {:error, %Squirrelix.Error.CannotReadFile{file: ^blocked}} =
+               CLI.query_directories(tmp)
+    after
+      File.chmod!(blocked, 0o755)
+    end
+  end
+
+  test "discover_sql_directories treats a missing sql basename as empty" do
+    missing = Path.join(tmp_dir("squirr_elix-missing-sql"), "sql")
+
+    assert CLI.discover_sql_directories(missing) == {:ok, %{}}
+  end
+
   test "directory_to_output_file maps sql directory to sibling sql.ex" do
     assert CLI.directory_to_output_file("/tmp/my_app/src/admin/sql") ==
              "/tmp/my_app/src/admin/sql.ex"

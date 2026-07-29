@@ -42,6 +42,27 @@ defmodule SquirrelixConnectionOptionsTest do
                CLI.parse_connection_url("postgres://u@h/db?ssl=false")
     end
 
+    test "parses sslmode=allow and prefer as ssl: false" do
+      assert {:ok, %ConnectionOptions{ssl: false}} =
+               CLI.parse_connection_url("postgres://u@h/db?sslmode=allow")
+
+      assert {:ok, %ConnectionOptions{ssl: false}} =
+               CLI.parse_connection_url("postgres://u@h/db?sslmode=prefer")
+    end
+
+    test "rejects invalid connect_timeout and ssl query values" do
+      assert {:error, :invalid_url} =
+               CLI.parse_connection_url("postgres://u@h/db?connect_timeout=abc")
+
+      assert {:error, :invalid_url} =
+               CLI.parse_connection_url("postgres://u@h/db?ssl=maybe")
+    end
+
+    test "leaves ssl unset for empty sslmode" do
+      assert {:ok, %ConnectionOptions{ssl: nil}} =
+               CLI.parse_connection_url("postgres://u@h/db?sslmode=")
+    end
+
     test "rejects unknown sslmode" do
       assert {:error, :invalid_url} =
                CLI.parse_connection_url("postgres://u@h/db?sslmode=nonsense")
@@ -162,6 +183,28 @@ defmodule SquirrelixConnectionOptionsTest do
 
       assert {:ok, %ConnectionOptions{password: "from_env"}} =
                CLI.resolve_connection_options(env, [])
+    end
+
+    test "explicit empty password in URL does not wipe PGPASSWORD" do
+      env = %{
+        "DATABASE_URL" => "postgres://user:@host/db",
+        "PGPASSWORD" => "from_env"
+      }
+
+      assert {:ok, %ConnectionOptions{password: "from_env"}} =
+               CLI.resolve_connection_options(env, [])
+    end
+
+    test "invalid PGSSLMODE falls back to false" do
+      env = %{"PGHOST" => "localhost", "PGSSLMODE" => "nonsense"}
+
+      assert {:ok, %ConnectionOptions{ssl: false}} = CLI.resolve_connection_options(env, [])
+    end
+
+    test "invalid PGPORT falls back to default" do
+      env = %{"PGHOST" => "localhost", "PGPORT" => "nope"}
+
+      assert {:ok, %ConnectionOptions{port: 5432}} = CLI.resolve_connection_options(env, [])
     end
 
     test "percent-decodes userinfo in DATABASE_URL" do

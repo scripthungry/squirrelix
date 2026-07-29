@@ -431,6 +431,23 @@ defmodule SquirrelixGenerateTest do
              "defmodule AcornCounter.Billing.SQL do"
   end
 
+  test "generate and check report discovery failures as summaries" do
+    root = tmp_project(:acorn_counter)
+    blocked = Path.join(root, "lib")
+    File.mkdir_p!(blocked)
+    File.chmod!(blocked, 0o000)
+
+    try do
+      assert %CodegenSummary{status: :error, generated_count: 0, errors: [{^root, _}]} =
+               Squirrelix.generate(root, %{}, version: "v-test")
+
+      assert %CodegenCheckSummary{status: :error, checked_count: 0, errors: [{^root, _}]} =
+               Squirrelix.check(root, %{}, version: "v-test")
+    after
+      File.chmod!(blocked, 0o755)
+    end
+  end
+
   defp tmp_project(app) do
     path = Squirrelix.TestSupport.tmp_dir!("squirr_elix-generate")
 
