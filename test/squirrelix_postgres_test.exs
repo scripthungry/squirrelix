@@ -653,6 +653,60 @@ defmodule SquirrelixPostgresTest do
             ]} = Postgres.infer(conn, query)
   end
 
+  test "infer strips ! force-non-null override and keeps non-nullable column", %{conn: conn} do
+    Postgrex.query!(conn, "drop table if exists squirr_elix_bang_acorns", [])
+
+    Postgrex.query!(
+      conn,
+      "create temporary table squirr_elix_bang_acorns (name text primary key, acorns int)",
+      []
+    )
+
+    query = query(~s|select acorns as "acorns!" from squirr_elix_bang_acorns|)
+
+    assert {:ok, metadata} = Postgres.infer(conn, query)
+
+    assert [
+             params: [],
+             returns: [
+               %Column{name: "acorns", type: :integer, nullable?: false}
+             ]
+           ] = metadata
+
+    assert {:ok, typed} = Squirrelix.TypedQuery.from_query(query, metadata)
+    code = Squirrelix.Codegen.generate_module(BangAcorns.SQL, [typed], version: "v-test")
+    assert code =~ "required(:acorns) => integer()"
+    refute code =~ "required(:\"acorns!\")"
+    refute code =~ "{:acorns!, "
+  end
+
+  test "infer strips ? force-null override and keeps nullable column", %{conn: conn} do
+    Postgrex.query!(conn, "drop table if exists squirr_elix_qmark_people", [])
+
+    Postgrex.query!(
+      conn,
+      "create temporary table squirr_elix_qmark_people (id integer not null, name text not null)",
+      []
+    )
+
+    query = query(~s|select name as "name?" from squirr_elix_qmark_people|)
+
+    assert {:ok, metadata} = Postgres.infer(conn, query)
+
+    assert [
+             params: [],
+             returns: [
+               %Column{name: "name", type: :string, nullable?: true}
+             ]
+           ] = metadata
+
+    assert {:ok, typed} = Squirrelix.TypedQuery.from_query(query, metadata)
+    code = Squirrelix.Codegen.generate_module(QmarkPeople.SQL, [typed], version: "v-test")
+    assert code =~ "required(:name) => String.t() | nil"
+    refute code =~ "required(:\"name?\")"
+    refute code =~ "{:name?, "
+  end
+
   test "infer marks schema-qualified not-null columns as non-nullable", %{conn: conn} do
     Postgrex.query!(conn, "drop schema if exists squirr_elix_other cascade", [])
     Postgrex.query!(conn, "create schema squirr_elix_other", [])
