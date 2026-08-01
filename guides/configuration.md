@@ -269,7 +269,15 @@ Watch mode:
 
 `--watch` is not supported by `mix squirrelix.check` (use check in CI for drift detection).
 
-On Linux, watch mode needs [inotify-tools](https://github.com/rvoicilas/inotify-tools/wiki)
+Watch mode needs the optional [`file_system`](https://hex.pm/packages/file_system)
+dependency. Add it to your Mix project if you use `--watch` (one-shot `gen` / `check`
+do not need it):
+
+```elixir
+{:file_system, "~> 1.0", only: [:dev, :test], runtime: false}
+```
+
+On Linux, watch mode also needs [inotify-tools](https://github.com/rvoicilas/inotify-tools/wiki)
 (e.g. `apt install inotify-tools`). macOS and Windows use built-in file-system backends.
 
 ## Programmatic API

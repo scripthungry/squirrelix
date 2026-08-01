@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Make `file_system` an optional dependency used only by `mix squirrelix.gen --watch`;
+  missing dep raises a clear install hint (#50).
+
 ## [0.5.7] — 2026-08-02
 
 ### Fixed

@@ -175,6 +175,33 @@ defmodule SquirrelixWatchTest do
       assert output =~ root
     end
 
+    test "raises a clear error when the optional file_system dependency is missing" do
+      root = Squirrelix.TestSupport.tmp_dir!("squirr_elix-watch-no-fs")
+      File.mkdir_p!(Path.join(root, "lib"))
+
+      previous = Application.get_env(:squirr_elix, :file_system_available)
+
+      try do
+        Application.put_env(:squirr_elix, :file_system_available, false)
+
+        error =
+          assert_raise Mix.Error, fn ->
+            Watch.watch!(root: root, on_change: fn -> :ok end)
+          end
+
+        message = Exception.message(error)
+        assert message =~ "file_system"
+        assert message =~ "--watch"
+        assert message =~ ~r/mix deps\.get/i
+      after
+        if previous == nil do
+          Application.delete_env(:squirr_elix, :file_system_available)
+        else
+          Application.put_env(:squirr_elix, :file_system_available, previous)
+        end
+      end
+    end
+
     test "raises when FileSystem fails to start" do
       root = Squirrelix.TestSupport.tmp_dir!("squirr_elix-watch-fs-error")
       File.mkdir_p!(Path.join(root, "lib"))

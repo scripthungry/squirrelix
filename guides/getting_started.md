@@ -142,7 +142,8 @@ mix squirrelix.gen --infer --watch
 ```
 
 Watch uses the same metadata / `--infer` connection options as a one-shot generate.
-Press Ctrl-C to stop. See [Configuration](configuration.md#watch-mode) for details.
+It needs the optional `file_system` dependency (see
+[Configuration](configuration.md#watch-mode)). Press Ctrl-C to stop.
 
 ## Use the generated module
 

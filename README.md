@@ -166,13 +166,16 @@ Add SquirrElix as a **dev/test** dependency (codegen Mix tool) and keep Postgrex
 def deps do
   [
     {:squirr_elix, "~> 0.5.0", only: [:dev, :test], runtime: false},
-    {:postgrex, "~> 0.22"}
+    {:postgrex, "~> 0.22"},
+    # Optional — only needed for `mix squirrelix.gen --watch`
+    {:file_system, "~> 1.0", only: [:dev, :test], runtime: false}
   ]
 end
 ```
 
 `only: [:dev, :test]` keeps the generator out of production while still available for
 `mix squirrelix.check` in CI. `runtime: false` prevents starting it with your app.
+`file_system` is an optional SquirrElix dependency: omit it unless you use `--watch`.
 
 Then fetch dependencies:
 
@@ -291,7 +294,7 @@ SquirrElix offers the following Mix tasks to streamline your workflow:
 
 * `mix squirrelix.gen` — Generates typed Elixir code for all SQL queries found
   under `{lib,test,dev}/**/sql/*.sql`. Pass `--watch` to regenerate when those
-  `.sql` files change (Ctrl-C to stop).
+  `.sql` files change (Ctrl-C to stop; requires the optional `file_system` dep).
 * `mix squirrelix.check` — Validates that the generated Elixir code is up-to-date
   with the SQL queries. This is particularly useful to run in a CI pipeline to make
   sure you don't forget to run `mix squirrelix.gen`.
