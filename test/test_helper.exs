@@ -19,11 +19,20 @@ defmodule Squirrelix.TestSupport do
   end
 
   def compile_string(code) when is_binary(code) do
-    code
-    |> module_from_code!()
-    |> unload_module()
+    module = module_from_code!(code)
 
-    Code.compile_string(code)
+    # Serialize per module name: async tests often generate the same MyApp.SQL
+    # module and race on unload/compile ("currently being defined").
+    case :global.trans({:squirr_elix_test_compile, module}, fn ->
+           unload_module(module)
+           Code.compile_string(code)
+         end) do
+      {:aborted, reason} ->
+        raise "could not acquire compile lock for #{inspect(module)}: #{inspect(reason)}"
+
+      compiled ->
+        compiled
+    end
   end
 
   def unload_module(module) when is_atom(module) do

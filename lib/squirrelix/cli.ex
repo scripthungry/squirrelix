@@ -330,7 +330,9 @@ defmodule Squirrelix.CLI do
 
   # Maps libpq sslmode values to Postgrex `:ssl` options.
   # `allow`/`prefer` cannot negotiate fallback in Postgrex; treat as off.
-  # `require` encrypts without CA verification (common hosted-DB DATABASE_URL shape).
+  # `require` encrypts without CA verification — intentional libpq parity and
+  # Phoenix/`DATABASE_URL` compatibility. Do not silently harden to verify_peer;
+  # adopters wanting CA/hostname checks should use verify-ca / verify-full.
   # `verify-ca`/`verify-full` use Postgrex secure defaults (`ssl: true`).
   defp ssl_from_mode(nil), do: nil
   defp ssl_from_mode(""), do: nil

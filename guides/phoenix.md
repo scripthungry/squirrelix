@@ -63,6 +63,10 @@ export DATABASE_URL=postgres://user:pass@host:5432/database?sslmode=require
 mix squirrelix.gen --infer
 ```
 
+`sslmode=require` encrypts without CA verification (libpq-aligned, common for hosted
+`DATABASE_URL`s). Prefer `sslmode=verify-full` when you need certificate and hostname
+checks — see [Configuration](configuration.md).
+
 If your `dev.exs` hardcodes Repo hostname and database without `DATABASE_URL`,
 export matching `PG*` variables (or a URL) before generating — see
 [Configuration](configuration.md#environment-variables).

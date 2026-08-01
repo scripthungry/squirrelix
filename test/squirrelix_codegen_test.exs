@@ -972,7 +972,8 @@ defmodule SquirrelixCodegenTest do
 
     query = typed_query("query.sql", "query", content, params, [])
 
-    code = Codegen.generate_module(MyApp.SQL, [query], version: "v-test")
+    code =
+      Codegen.generate_module(Squirrelix.GeneratedManyArgsTest.SQL, [query], version: "v-test")
 
     assert code =~ "Runs the `query` query defined in `query.sql`."
     assert code =~ ":: :ok"
