@@ -92,6 +92,8 @@ defmodule Squirrelix.SQL do
   @spec single_statement?(String.t()) :: boolean()
   def single_statement?(sql) when is_binary(sql) do
     sql
+    |> String.trim_leading()
+    |> String.replace(~r/^;+\s*/, "")
     |> strip_comments_and_strings()
     |> String.trim()
     |> String.trim_trailing(";")
@@ -450,8 +452,72 @@ defmodule Squirrelix.SQL do
     strip_single_quoted_string(rest, [?\s | acc])
   end
 
+  defp strip_normal([?$ | rest], acc) do
+    case take_dollar_quote_tag(rest) do
+      {:ok, tag, after_open} ->
+        open_len = 1 + length(tag) + 1
+        strip_dollar_quoted(after_open, tag, List.duplicate(?\s, open_len) ++ acc)
+
+      :error ->
+        strip_normal(rest, [?$ | acc])
+    end
+  end
+
   defp strip_normal([char | rest], acc) do
     strip_normal(rest, [char | acc])
+  end
+
+  # Postgres dollar-quotes: `$tag$…$tag$` / `$$…$$` (tag is optional identifier).
+  defp take_dollar_quote_tag([?$ | rest]), do: {:ok, [], rest}
+
+  defp take_dollar_quote_tag([char | _] = chars)
+       when char in ?A..?Z or char in ?a..?z or char == ?_ do
+    take_dollar_quote_tag_chars(chars, [])
+  end
+
+  defp take_dollar_quote_tag(_chars), do: :error
+
+  defp take_dollar_quote_tag_chars([?$ | rest], tag), do: {:ok, Enum.reverse(tag), rest}
+
+  defp take_dollar_quote_tag_chars([char | rest], tag)
+       when char in ?A..?Z or char in ?a..?z or char in ?0..?9 or char == ?_ do
+    take_dollar_quote_tag_chars(rest, [char | tag])
+  end
+
+  defp take_dollar_quote_tag_chars(_chars, _tag), do: :error
+
+  defp strip_dollar_quoted([], _tag, acc), do: acc
+
+  defp strip_dollar_quoted([?$ | rest], tag, acc) do
+    case match_dollar_quote_tag(rest, tag) do
+      {:ok, after_close} ->
+        close_len = 1 + length(tag) + 1
+        strip_normal(after_close, List.duplicate(?\s, close_len) ++ acc)
+
+      :error ->
+        strip_dollar_quoted(rest, tag, [?\s | acc])
+    end
+  end
+
+  defp strip_dollar_quoted([?\n | rest], tag, acc) do
+    strip_dollar_quoted(rest, tag, [?\n | acc])
+  end
+
+  defp strip_dollar_quoted([_char | rest], tag, acc) do
+    strip_dollar_quoted(rest, tag, [?\s | acc])
+  end
+
+  defp match_dollar_quote_tag(chars, []), do: match_empty_dollar_tag(chars)
+  defp match_dollar_quote_tag(chars, tag), do: match_tagged_dollar_tag(chars, tag)
+
+  defp match_empty_dollar_tag([?$ | rest]), do: {:ok, rest}
+  defp match_empty_dollar_tag(_chars), do: :error
+
+  defp match_tagged_dollar_tag(chars, tag) do
+    case Enum.split(chars, length(tag)) do
+      {^tag, [?$ | rest]} -> {:ok, rest}
+      _other -> :error
+    end
   end
 
   defp strip_line_comment([], acc), do: acc

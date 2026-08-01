@@ -2,6 +2,7 @@ defmodule SquirrelixQueryCompatibilityTest do
   use ExUnit.Case, async: true
 
   alias Squirrelix.Error.QueryFileHasInvalidName
+  alias Squirrelix.Error.QueryHasMultipleStatements
   alias Squirrelix.Query
 
   test "from_file reads a query and derives its name from the file basename" do
@@ -37,6 +38,13 @@ defmodule SquirrelixQueryCompatibilityTest do
       write_temp_sql("with_comments.sql", "\n\n-- first comment\n  -- second comment  \nselect 1")
 
     assert {:ok, %Query{comment: ["first comment", "second comment"]}} =
+             Query.from_file(path)
+  end
+
+  test "from_file rejects multi-statement SQL files" do
+    path = write_temp_sql("batch.sql", "select 1; select 2")
+
+    assert {:error, %QueryHasMultipleStatements{file: ^path, starting_line: 1}} =
              Query.from_file(path)
   end
 

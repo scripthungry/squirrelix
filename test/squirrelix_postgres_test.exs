@@ -540,6 +540,17 @@ defmodule SquirrelixPostgresTest do
             ]} = Postgres.infer(conn, query)
   end
 
+  test "infer rejects multi-statement SQL with a structured error", %{conn: conn} do
+    query = query("select 1::int4 as one; select 2::int4 as two")
+
+    assert {:error, %Squirrelix.Error.QueryHasMultipleStatements{} = error} =
+             Postgres.infer(conn, query)
+
+    formatted = Squirrelix.Error.format(error)
+    assert formatted =~ "Multiple SQL statements"
+    assert formatted =~ "one query per file"
+  end
+
   # https://github.com/giacomocavalieri/squirrel/issues/41
   test "infer keeps left joined not-null columns nullable", %{conn: conn} do
     Postgrex.query!(conn, "drop table if exists profile_issue41 cascade", [])
@@ -935,12 +946,12 @@ defmodule SquirrelixPostgresTest do
       end $$;
       """)
 
-    log =
+    # DO bodies may contain `;` inside dollar-quotes; that must not look like a batch.
+    # EXPLAIN nullability often cannot plan DO blocks — that is a soft fallback, not a hard reject.
+    _log =
       capture_log(fn ->
         assert {:ok, [params: [], returns: []]} = Postgres.infer(conn, query)
       end)
-
-    assert log =~ "skipping EXPLAIN nullability" or log =~ "not a single statement"
   end
 
   test "inferrer can generate modules from a live Postgres connection", %{conn: conn} do

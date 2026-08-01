@@ -299,8 +299,22 @@ defmodule SquirrelixSQLTest do
   test "single_statement? allows a trailing semicolon and rejects batches" do
     assert SQL.single_statement?("select 1")
     assert SQL.single_statement?("select 1;")
+    assert SQL.single_statement?(";select 1")
     assert SQL.single_statement?("select ';';")
     assert SQL.single_statement?("-- note;\nselect 1")
+
+    assert SQL.single_statement?("""
+           do $$ begin
+             select 1;
+           end $$;
+           """)
+
+    assert SQL.single_statement?("""
+           do $body$ begin
+             select 1;
+           end $body$;
+           """)
+
     refute SQL.single_statement?("select 1; select 2")
     refute SQL.single_statement?("select 1; drop table users")
   end

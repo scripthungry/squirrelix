@@ -21,6 +21,7 @@ defmodule Squirrelix.Query do
 
   alias Squirrelix.Error.CannotReadFile
   alias Squirrelix.Error.QueryFileHasInvalidName
+  alias Squirrelix.Error.QueryHasMultipleStatements
   alias Squirrelix.SQL
 
   @type t :: %__MODULE__{
@@ -33,9 +34,12 @@ defmodule Squirrelix.Query do
 
   @doc false
   @spec from_file(String.t()) ::
-          {:ok, t()} | {:error, CannotReadFile.t() | QueryFileHasInvalidName.t()}
+          {:ok, t()}
+          | {:error,
+             CannotReadFile.t() | QueryFileHasInvalidName.t() | QueryHasMultipleStatements.t()}
   def from_file(file) when is_binary(file) do
     with {:ok, content} <- read_query_file(file),
+         :ok <- ensure_single_statement(file, content),
          {:ok, name} <- query_name(file) do
       {:ok,
        %__MODULE__{
@@ -43,6 +47,19 @@ defmodule Squirrelix.Query do
          starting_line: 1,
          name: name,
          comment: take_comment(content),
+         content: content
+       }}
+    end
+  end
+
+  defp ensure_single_statement(file, content) do
+    if SQL.single_statement?(content) do
+      :ok
+    else
+      {:error,
+       %QueryHasMultipleStatements{
+         file: file,
+         starting_line: 1,
          content: content
        }}
     end

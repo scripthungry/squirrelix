@@ -20,6 +20,7 @@ defmodule Squirrelix.Postgres do
   alias Squirrelix.Error.PostgresInferenceError
   alias Squirrelix.Error.PostgresSyntaxError
   alias Squirrelix.Error.QueryHasInvalidEnum
+  alias Squirrelix.Error.QueryHasMultipleStatements
   alias Squirrelix.Error.UnsupportedPostgresVersion
   alias Squirrelix.Query
   alias Squirrelix.SQL
@@ -184,10 +185,24 @@ defmodule Squirrelix.Postgres do
   @doc false
   @spec infer(Postgrex.conn(), Query.t()) :: {:ok, keyword()} | {:error, struct()}
   def infer(conn, %Query{} = query) do
-    with {:ok, prepared_query} <- prepare(conn, query),
+    with :ok <- ensure_single_statement(query),
+         {:ok, prepared_query} <- prepare(conn, query),
          {:ok, params} <- describe_oids(conn, prepared_query.param_oids || [], query),
          {:ok, returns} <- describe_returns(conn, prepared_query, query) do
       {:ok, [params: params, returns: returns]}
+    end
+  end
+
+  defp ensure_single_statement(%Query{} = query) do
+    if SQL.single_statement?(query.content) do
+      :ok
+    else
+      {:error,
+       %QueryHasMultipleStatements{
+         file: query.file,
+         starting_line: query.starting_line,
+         content: query.content
+       }}
     end
   end
 
@@ -341,33 +356,25 @@ defmodule Squirrelix.Postgres do
   defp query_plan(conn, query) do
     content = explainable_query_content(query.content)
 
-    if SQL.single_statement?(content) do
-      # Simple protocol is required so `$n` placeholders work with
-      # `generic_plan` without binding params. Multi-statement SQL is rejected
-      # above; prepare/2 already validated the query as a single statement.
-      explain_query = "explain (format json, verbose, generic_plan) " <> content
+    # Multi-statement SQL is rejected in `infer/2` / `Query.from_file/1`.
+    # Simple protocol is required so `$n` placeholders work with `generic_plan`
+    # without binding params.
+    explain_query = "explain (format json, verbose, generic_plan) " <> content
 
-      try do
-        with {:ok, %Postgrex.Result{rows: [[plan_json]]}} <-
-               explain_json_query(conn, explain_query),
-             {:ok, root_plan} <- decode_plan_json(plan_json) do
-          {:ok, parse_plan(root_plan)}
-        else
-          _ ->
-            warn_explain_unavailable(query.file)
-            :error
-        end
-      rescue
-        _e in [DBConnection.ConnectionError, Postgrex.Error, ArgumentError] ->
+    try do
+      with {:ok, %Postgrex.Result{rows: [[plan_json]]}} <-
+             explain_json_query(conn, explain_query),
+           {:ok, root_plan} <- decode_plan_json(plan_json) do
+        {:ok, parse_plan(root_plan)}
+      else
+        _ ->
           warn_explain_unavailable(query.file)
           :error
       end
-    else
-      Logger.warning(
-        "Squirrelix: skipping EXPLAIN nullability for #{query.file} because the SQL is not a single statement"
-      )
-
-      :error
+    rescue
+      _e in [DBConnection.ConnectionError, Postgrex.Error, ArgumentError] ->
+        warn_explain_unavailable(query.file)
+        :error
     end
   end
 

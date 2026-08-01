@@ -89,6 +89,23 @@ defmodule Squirrelix.Error.QueryHasInvalidColumn do
         }
 end
 
+defmodule Squirrelix.Error.QueryHasMultipleStatements do
+  @moduledoc """
+  Error returned when a `.sql` file contains more than one SQL statement.
+
+  SquirrElix requires exactly one statement per query file (matching Gleam Squirrel).
+  """
+
+  @enforce_keys [:file, :starting_line, :content]
+  defstruct [:file, :starting_line, :content]
+
+  @type t :: %__MODULE__{
+          file: String.t(),
+          starting_line: pos_integer(),
+          content: String.t()
+        }
+end
+
 defmodule Squirrelix.Error.MissingQueryMetadata do
   @moduledoc """
   Error returned when no parameter and return metadata is available for a query.
@@ -348,6 +365,7 @@ defmodule Squirrelix.Error do
   alias Squirrelix.Error.QueryFileHasInvalidName
   alias Squirrelix.Error.QueryHasInvalidColumn
   alias Squirrelix.Error.QueryHasInvalidEnum
+  alias Squirrelix.Error.QueryHasMultipleStatements
   alias Squirrelix.Error.UnsupportedPostgresType
   alias Squirrelix.Error.UnsupportedPostgresVersion
   alias Squirrelix.Query
@@ -481,7 +499,8 @@ defmodule Squirrelix.Error do
         "PostgresInferenceError",
         "DuplicateReturnColumns",
         "QueryHasInvalidEnum",
-        "QueryHasInvalidColumn"
+        "QueryHasInvalidColumn",
+        "QueryHasMultipleStatements"
       ]
     end)
   end
@@ -493,6 +512,10 @@ defmodule Squirrelix.Error do
 
   defp do_format(%QueryHasInvalidColumn{} = error), do: format_invalid_column_error(error)
   defp do_format(%QueryHasInvalidEnum{} = error), do: format_invalid_enum_error(error)
+
+  defp do_format(%QueryHasMultipleStatements{} = error),
+    do: format_multiple_statements_error(error)
+
   defp do_format(%UnsupportedPostgresType{} = error), do: format_unsupported_type_error(error)
   defp do_format(%OutdatedFile{} = error), do: format_outdated_file_error(error)
   defp do_format(%CannotOverwriteFile{} = error), do: format_cannot_overwrite_file_error(error)
@@ -577,6 +600,17 @@ defmodule Squirrelix.Error do
       "",
       code_block(error),
       "This query returns multiple values sharing the same #{label}: #{pretty_names}."
+    ]
+    |> Enum.join("\n")
+  end
+
+  defp format_multiple_statements_error(%QueryHasMultipleStatements{} = error) do
+    [
+      "Error: Multiple SQL statements",
+      "",
+      code_block(error),
+      "This query file contains more than one SQL statement.",
+      "Hint: Put each statement in its own `.sql` file (one query per file)."
     ]
     |> Enum.join("\n")
   end
