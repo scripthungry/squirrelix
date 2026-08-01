@@ -256,7 +256,11 @@ defmodule Squirrelix.Postgres do
               plan_available?
             )
 
-          %Column{name: name, type: type, nullable?: nullable?}
+          %Column{
+            name: strip_nullability_override(name),
+            type: type,
+            nullable?: nullable?
+          }
         end)
 
       {:ok, returns}
@@ -490,6 +494,16 @@ defmodule Squirrelix.Postgres do
 
       true ->
         source_nullable?(conn, Enum.at(column_sources, index), plan_available?)
+    end
+  end
+
+  # Trailing `!` / `?` aliases force nullability (above); strip before TypedQuery
+  # identifier validation so generated map keys stay valid Elixir atoms.
+  defp strip_nullability_override(name) when is_binary(name) do
+    cond do
+      String.ends_with?(name, "!") -> String.replace_suffix(name, "!", "")
+      String.ends_with?(name, "?") -> String.replace_suffix(name, "?", "")
+      true -> name
     end
   end
 
