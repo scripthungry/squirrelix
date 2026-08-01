@@ -25,6 +25,31 @@ defmodule SquirrelixPostgresTest do
     end
   end
 
+  test "connect accepts Postgres 16+ servers used for --infer" do
+    pg = Squirrelix.TestSupport.postgres_opts()
+
+    opts = %Squirrelix.ConnectionOptions{
+      host: Keyword.fetch!(pg, :hostname),
+      port: Keyword.get(pg, :port, 5432),
+      user: Keyword.fetch!(pg, :username),
+      password: Keyword.get(pg, :password) || "",
+      database: Keyword.fetch!(pg, :database),
+      timeout_seconds: 5
+    }
+
+    assert {:ok, conn} = Postgres.connect(opts)
+
+    try do
+      assert {:ok, %Postgrex.Result{rows: [[version]]}} =
+               Postgrex.query(conn, "select current_setting('server_version_num')", [])
+
+      {version_num, ""} = Integer.parse(version)
+      assert Postgres.server_version_supported?(version_num)
+    after
+      GenServer.stop(conn)
+    end
+  end
+
   test "infer infers parameter and return types from a prepared query", %{conn: conn} do
     query = query("select 1::int4 as id, $1::text as name")
 

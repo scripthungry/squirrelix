@@ -5,6 +5,8 @@ defmodule SquirrelixConnectionErrorTest do
   alias Squirrelix.Error
   alias Squirrelix.Error.CannotConnectToPostgres
   alias Squirrelix.Error.PostgresConnectionTimeout
+  alias Squirrelix.Error.UnsupportedPostgresVersion
+  alias Squirrelix.Postgres
 
   describe "Error.connection_error/2" do
     test "classifies TCP connection refused" do
@@ -333,6 +335,45 @@ defmodule SquirrelixConnectionErrorTest do
         })
 
       assert unknown_term =~ "{:posix, :econnreset}"
+    end
+
+    test "formats unsupported Postgres version below 16" do
+      formatted =
+        Error.format(%UnsupportedPostgresVersion{
+          host: "db.example.com",
+          port: 5432,
+          version_num: 150_004,
+          minimum_version_num: 160_000
+        })
+
+      assert formatted =~ "Error: Unsupported Postgres version"
+      assert formatted =~ "15.0.4"
+      assert formatted =~ "150004"
+      assert formatted =~ "16.0.0"
+      assert formatted =~ "generic_plan"
+      assert formatted =~ "squirr_elix.exs"
+      assert formatted =~ "`db.example.com`"
+    end
+  end
+
+  describe "Postgres server version gate" do
+    test "rejects server_version_num below 160000" do
+      refute Postgres.server_version_supported?(159_999)
+      refute Postgres.server_version_supported?(150_004)
+      assert Postgres.server_version_supported?(160_000)
+      assert Postgres.server_version_supported?(170_000)
+      assert Postgres.minimum_server_version_num() == 160_000
+    end
+
+    test "builds a structured unsupported-version error" do
+      opts = connection_options(host: "pg.local", port: 5433)
+
+      assert %UnsupportedPostgresVersion{
+               host: "pg.local",
+               port: 5433,
+               version_num: 140_008,
+               minimum_version_num: 160_000
+             } = Postgres.unsupported_server_version_error(opts, 140_008)
     end
   end
 
