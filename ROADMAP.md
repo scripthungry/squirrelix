@@ -98,8 +98,9 @@ examples, error-message consistency, CI coverage), and Hex `0.1.0`–`0.5.2` rel
 
 Point-release follow-ups from the multi-model review (not the 1.0 SemVer cut):
 
-- [ ] Optional `file_system` (watch-only) (#50)
-- [ ] Revisit `sslmode=require` → `verify_none` hardening without breaking adopter UX (#70)
+- Optional `file_system` (watch-only) (#50) — **0.5.8**
+- Document intentional `sslmode=require` → `verify_none` (libpq-aligned; no silent
+  hardening) (#70) — **0.5.8**
 - Strip bang/`?` nullability overrides (#64) — **0.5.7**
 - Postgres ≥ 16 version guard on `--infer` connect (#65) — **0.5.7**
 - Hard-reject multi-statement `.sql` files (#66) — **0.5.7**

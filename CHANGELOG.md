@@ -7,10 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.8] — 2026-08-02
+
 ### Changed
 
 - Make `file_system` an optional dependency used only by `mix squirrelix.gen --watch`;
   missing dep raises a clear install hint (#50).
+
+### Fixed
+
+- Serialize async test compiles of the same generated module name to avoid flaky
+  `MyApp.SQL` “currently being defined” failures under CI parallelism.
 
 ### Docs
 
