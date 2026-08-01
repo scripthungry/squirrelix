@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.7] — 2026-08-02
+
+### Fixed
+
+- Strip trailing `!` / `?` nullability override aliases from result column names
+  after applying force-nullability, so guide examples generate valid Elixir map
+  keys (#64).
+- Fail `--infer` connect on Postgres `server_version_num < 160000` with
+  structured `UnsupportedPostgresVersion` instead of silently treating unknown
+  columns as nullable (#65).
+- Generate nested-array encode/decode (and nested UUID list) runtime helpers by
+  expanding collected list types (#67).
+
+### Added
+
+- Hard-reject multi-statement `.sql` files at parse and infer with
+  `QueryHasMultipleStatements`; dollar-quote-aware `single_statement?/1` so
+  `DO` blocks remain valid (#66).
+
+### Docs
+
+- Soften overstated Gleam parity claims in test moduledocs; document
+  `numeric` → `Decimal.t()` in the types divergence table; remove unused
+  `timestamptz` reject hint; document EXPLAIN nullability fallback (#68, #69).
+
 ## [0.5.6] — 2026-07-29
 
 ### Fixed
