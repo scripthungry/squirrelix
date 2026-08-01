@@ -283,6 +283,26 @@ defmodule SquirrelixRuntimeDecodingTest do
 
       assert encode_params([["red", "grey"]], [{:list, :string}]) == [["red", "grey"]]
     end
+
+    test "decodes and encodes nested integer arrays" do
+      nested = [[1, 2], [3]]
+
+      assert decode_row([nested], [
+               %Column{name: "res", type: {:list, {:list, :integer}}, nullable?: false}
+             ]) == %{res: nested}
+
+      assert encode_params([nested], [{:list, {:list, :integer}}]) == [nested]
+    end
+
+    test "decodes and encodes nested uuid arrays" do
+      nested = [[@uuid_binary], []]
+
+      assert decode_row([nested], [
+               %Column{name: "res", type: {:list, {:list, :uuid}}, nullable?: false}
+             ]) == %{res: [[@uuid], []]}
+
+      assert encode_params([[[@uuid], []]], [{:list, {:list, :uuid}}]) == [nested]
+    end
   end
 
   describe "command queries" do

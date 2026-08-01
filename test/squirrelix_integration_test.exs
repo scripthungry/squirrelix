@@ -1,6 +1,6 @@
 defmodule SquirrelixIntegrationTest do
   @moduledoc """
-  End-to-end integration tests proving Squirrelix is a complete Elixir Squirrel.
+  End-to-end integration tests for the Elixir-native SquirrElix generate path.
 
   ## Elixir workflow vs Gleam Squirrel
 
@@ -8,21 +8,24 @@ defmodule SquirrelixIntegrationTest do
   under a `sql/` directory, file names become function names, and leading SQL
   comments become documentation. Discovery walks conventional source roots.
 
-  Where they diverge is the generated surface and query-source wiring:
+  SquirrElix is **not** a line-for-line Gleam clone: it intentionally emits
+  Elixir-native modules (`@spec`, stdlib types, Postgrex) rather than Gleam ADTs
+  and `pog` decoders. These tests cover that Elixir path — not a full upstream
+  audit.
 
     * **Gleam Squirrel** emits Gleam modules with custom ADTs, `Result` types, and
       Gleam-specific decoders. Metadata often lives in a Gleam config module.
-    * **Squirrelix** emits Elixir modules with `@spec` annotations, stdlib types
+    * **SquirrElix** emits Elixir modules with `@spec` annotations, stdlib types
       (`String.t()`, `integer()`, `map/0` row shapes), and Postgrex at runtime.
       Query sources are either a metadata map (like `squirr_elix.exs`) or a
       Postgres inferrer callback — the same split as `mix squirrelix.gen`
       with or without `--infer`.
 
-  These tests exercise the full Elixir path: temp Mix project → `Squirrelix.generate/3`
-  → sibling `sql.ex` on disk → `Squirrelix.TestSupport.compile_string/1` → invoke generated functions.
-  Live Postgres coverage is optional (`@tag :postgres`) and skips when no local DB
-  is available; the default integration tests use static metadata or a stub inferrer
-  plus a Postgrex mock so CI does not require a database.
+  These tests exercise: temp Mix project → `Squirrelix.generate/3` → sibling
+  `sql.ex` on disk → `Squirrelix.TestSupport.compile_string/1` → invoke generated
+  functions. Live Postgres coverage is optional (`@tag :postgres`); default
+  integration tests use static metadata or a stub inferrer plus a Postgrex mock
+  so CI does not require a database.
   """
 
   use ExUnit.Case, async: false

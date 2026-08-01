@@ -62,9 +62,6 @@ defmodule Squirrelix.TypeMapper do
   @timetz_hint "timetz is not mapped. Prefer time (without time zone) columns."
 
   @type_hints %{
-    "timestamptz" =>
-      "In Postgres a timestamptz is converted to a regular timestamp using the connection's " <>
-        "time zone. This is very error prone and should be avoided in favour of using regular timestamps.",
     "int4range" => @range_hint,
     "int8range" => @range_hint,
     "numrange" => @range_hint,

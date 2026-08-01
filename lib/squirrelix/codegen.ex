@@ -76,7 +76,8 @@ defmodule Squirrelix.Codegen do
       precise than success typing of shared decode helpers — that is intentional.
       \"\"\"
 
-      @type column_spec :: {atom(), atom() | {:list, atom()}, boolean()}
+      @type elixir_type :: atom() | {:list, elixir_type()}
+      @type column_spec :: {atom(), elixir_type(), boolean()}
 
     #{sorted_queries |> function_sources(postgrex_module) |> join_function_sources()}#{Runtime.section(queries)}
     end

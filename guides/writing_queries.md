@@ -208,6 +208,13 @@ Inference also covers:
   are treated as non-nullable, matching Gleam Squirrel's `table_oid = 0` behaviour.
   Override with a `"name?"` / `"name!"` column alias when needed.
 
+Nullability for table columns relies on Postgres **16+**
+(`EXPLAIN … generic_plan`). `--infer` refuses older servers. If EXPLAIN is
+unavailable for a particular query (for example some `DO` blocks), SquirrElix
+logs a warning and treats unknown columns as nullable so generation can still
+proceed — prefer verifying those columns with `"name!"` / `"name?"` overrides
+or checking the generated `| nil` types.
+
 ## Nullable query parameters
 
 Postgres does not expose nullability information for query **parameters**. SquirrElix

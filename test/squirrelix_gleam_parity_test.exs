@@ -1,10 +1,11 @@
 defmodule SquirrelixGleamParityTest do
   @moduledoc """
-  Gleam Squirrel upstream parity reference.
+  Selected Gleam Squirrel behavioural ports for SquirrElix.
 
-  Maps every `pub fn *_test()` in Gleam's `test/squirrel_test.gleam` and
-  `test/integration_test.gleam` to ExUnit coverage. See module doc in the
-  commit message / ROADMAP for the full audit table.
+  Tracks important upstream conventions with focused ExUnit coverage where the
+  Elixir-native API is intentionally aligned. This is **not** a claim of full
+  Gleam test-suite parity — many Birdie snapshots and Gleam-only surfaces are
+  intentionally omitted (see below).
 
   ## Intentional Elixir differences (no ExUnit port)
 

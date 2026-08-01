@@ -99,6 +99,13 @@ examples, error-message consistency, CI coverage), and Hex `0.1.0`–`0.5.2` rel
 Point-release follow-ups from the multi-model review (not the 1.0 SemVer cut):
 
 - [ ] Optional `file_system` (watch-only) (#50)
+- [ ] Revisit `sslmode=require` → `verify_none` hardening without breaking adopter UX (#70)
+- Strip bang/`?` nullability overrides (#64)
+- Postgres ≥ 16 version guard on `--infer` connect (#65)
+- Hard-reject multi-statement `.sql` files (#66)
+- Nested array runtime helper recursion (#67)
+- Docs hygiene: soften parity claims, `numeric` divergence, dead `timestamptz` hint (#68)
+- Document EXPLAIN nullability fallback (#69)
 - Library Dialyzer CI job for the package itself (#51) — **0.5.3**
 - Write-pass atomicity (#49) — **0.5.2**
 

@@ -52,8 +52,7 @@ defmodule SquirrelixTypeMapperTest do
     assert hint =~ "Geometric"
   end
 
-  test "hint_for returns guidance for timestamptz and point" do
-    assert TypeMapper.hint_for("timestamptz") =~ "time zone"
+  test "hint_for returns guidance for point" do
     assert TypeMapper.hint_for("point") =~ "Geometric"
   end
 
@@ -115,13 +114,8 @@ defmodule SquirrelixTypeMapperTest do
       assert TypeMapper.from_postgres("name", array_dimensions: 1) == {:ok, {:list, :string}}
     end
 
-    test "hint_for returns timestamptz guidance matching upstream Squirrel" do
-      hint = TypeMapper.hint_for("timestamptz")
-
-      assert hint =~ "timestamptz"
-      assert hint =~ "time zone"
-      assert hint =~ "error prone"
-      assert hint =~ "regular timestamps"
+    test "hint_for has no reject hint for mapped timestamptz" do
+      assert TypeMapper.hint_for("timestamptz") == nil
     end
 
     test "from_postgres rejects point with a geometric hint" do
