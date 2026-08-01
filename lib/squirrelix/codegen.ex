@@ -36,6 +36,7 @@ defmodule Squirrelix.Codegen do
   @moduledoc false
 
   alias Squirrelix.Codegen.Runtime
+  alias Squirrelix.Discover
   alias Squirrelix.Output
   alias Squirrelix.Parameter
   alias Squirrelix.Project
@@ -106,7 +107,7 @@ defmodule Squirrelix.Codegen do
     case Project.module_for_sql_directory(root, sql_directory) do
       {:ok, module} ->
         content = generate_module(module, queries, opts)
-        output_file = sql_directory |> Path.dirname() |> Path.join("sql.ex")
+        output_file = Discover.directory_to_output_file(sql_directory)
         Output.prepare_write(output_file, content)
 
       {:error, :invalid_sql_directory} ->
@@ -121,7 +122,7 @@ defmodule Squirrelix.Codegen do
     case Project.module_for_sql_directory(root, sql_directory) do
       {:ok, module} ->
         content = generate_module(module, queries, opts)
-        output_file = sql_directory |> Path.dirname() |> Path.join("sql.ex")
+        output_file = Discover.directory_to_output_file(sql_directory)
 
         Output.check_file(output_file, content)
 
@@ -360,21 +361,12 @@ defmodule Squirrelix.Codegen do
   defp row_type_source(%TypedQuery{returns: []}), do: ""
 
   defp row_type_source(%TypedQuery{returns: returns} = query) do
-    fields =
-      Enum.map_join(returns, ", ", fn column ->
-        spec =
-          if column.nullable? do
-            "#{TypeMapper.typespec(column.type)} | nil"
-          else
-            TypeMapper.typespec(column.type)
-          end
-
-        "required(#{atom_literal(column.name)}) => #{spec}"
-      end)
-
-    "  @type #{row_type_name(query)} :: %{#{fields}}\n"
+    columns = Enum.map(returns, &{&1.name, &1.type, &1.nullable?})
+    "  @type #{row_type_name(query)} :: #{TypeMapper.row_typespec(columns)}\n"
   end
 
+  # Named row types (`find_user_row()`) rather than inlining `TypeMapper.return_typespec/1`
+  # so generated modules keep stable, Dialyzer-friendly aliases per query.
   defp function_return_typespec(%TypedQuery{returns: []}), do: ":ok"
 
   defp function_return_typespec(%TypedQuery{} = query) do

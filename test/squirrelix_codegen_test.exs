@@ -328,9 +328,10 @@ defmodule SquirrelixCodegenTest do
     assert row_type =~ "required(:name) => String.t() | nil"
     assert row_type =~ "required(:age) => integer()"
 
+    # Codegen must share TypeMapper for field typespecs (string column names).
     assert String.replace(row_type, ~r/\s+/, "") ==
              String.replace(
-               TypeMapper.row_typespec([{:name, :string, true}, {:age, :integer, false}]),
+               TypeMapper.row_typespec([{"name", :string, true}, {"age", :integer, false}]),
                ~r/\s+/,
                ""
              )

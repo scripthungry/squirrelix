@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Move SQL directory discovery from `Squirrelix.CLI` into `Squirrelix.Discover`
+  (connection parsing stays on `CLI`); codegen shares `TypeMapper.row_typespec/1`
+  for generated row field typespecs (#52).
+
 ## [0.5.8] — 2026-08-02
 
 ### Changed

@@ -158,13 +158,17 @@ defmodule Squirrelix.TypeMapper do
   def typespec({:list, type}), do: "[#{typespec(type)}]"
   def typespec(_type), do: "term()"
 
-  @spec column_typespec(atom(), elixir_type(), boolean()) :: String.t()
-  def column_typespec(name, type, nullable?) do
+  @type column_name :: atom() | String.t()
+  @type column_desc :: {column_name(), elixir_type(), boolean()}
+
+  @spec column_typespec(column_name(), elixir_type(), boolean()) :: String.t()
+  def column_typespec(name, type, nullable?)
+      when (is_atom(name) or is_binary(name)) and is_boolean(nullable?) do
     spec = if nullable?, do: "#{typespec(type)} | nil", else: typespec(type)
-    "required(#{inspect(name)}) => #{spec}"
+    "required(#{field_name_literal(name)}) => #{spec}"
   end
 
-  @spec row_typespec([{atom(), elixir_type(), boolean()}]) :: String.t()
+  @spec row_typespec([column_desc()]) :: String.t()
   def row_typespec(columns) when is_list(columns) do
     columns
     |> Enum.map_join(", ", fn {name, type, nullable?} ->
@@ -173,12 +177,17 @@ defmodule Squirrelix.TypeMapper do
     |> then(&"%{#{&1}}")
   end
 
-  @spec return_typespec([] | [{atom(), elixir_type(), boolean()}]) :: String.t()
+  @spec return_typespec([] | [column_desc()]) :: String.t()
   def return_typespec([]), do: ":ok"
 
   def return_typespec(columns) when is_list(columns) do
     "[#{row_typespec(columns)}]"
   end
+
+  # Validated snake_case identifiers — emit `:name` without creating Mix VM atoms
+  # when the column name is still a string (codegen path).
+  defp field_name_literal(name) when is_atom(name), do: inspect(name)
+  defp field_name_literal(name) when is_binary(name), do: ":#{name}"
 
   defp base_type(_name, "e", _base), do: {:ok, :string}
 

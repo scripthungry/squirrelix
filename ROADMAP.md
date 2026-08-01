@@ -120,7 +120,7 @@ feedback validates the API (maintainer judgement). Completing #23–#26 is neces
 - [ ] SemVer / stability / deprecation policy (#23) — includes formal deprecation mechanism
 - [ ] Documented non-goals freeze (#24)
 - [ ] Docs freeze and HexDocs polish (#25)
-- [ ] Prune internal APIs before 1.0 (#52)
+- [x] Prune internal APIs before 1.0 (#52)
 - [ ] Adoption / feedback gate: sufficient real-world users (#28)
 - [ ] Ship via `docs/RELEASE.md` (#26) — after maintainer confirms #28
 
