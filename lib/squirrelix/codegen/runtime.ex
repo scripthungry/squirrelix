@@ -396,19 +396,36 @@ defmodule Squirrelix.Codegen.Runtime do
   defp param_types(queries) do
     queries
     |> Enum.flat_map(fn query -> Enum.map(query.params, & &1.type) end)
-    |> MapSet.new()
+    |> expand_types()
   end
 
   defp return_types(queries) do
     queries
     |> Enum.flat_map(fn query -> Enum.map(query.returns, & &1.type) end)
-    |> MapSet.new()
+    |> expand_types()
   end
+
+  # Nested arrays need every intermediate `{:list, _}` wrapper plus the scalar
+  # element so encode/decode clauses and UUID helpers are generated.
+  defp expand_types(types) do
+    Enum.reduce(types, MapSet.new(), &expand_type/2)
+  end
+
+  defp expand_type({:list, inner} = type, acc) do
+    acc
+    |> MapSet.put(type)
+    |> then(&expand_type(inner, &1))
+  end
+
+  defp expand_type(type, acc), do: MapSet.put(acc, type)
 
   defp list_element_type?(types, element_type) do
     Enum.any?(types, fn
-      {:list, ^element_type} -> true
-      _ -> false
+      {:list, inner} ->
+        inner == element_type or list_element_type?(MapSet.new([inner]), element_type)
+
+      _ ->
+        false
     end)
   end
 

@@ -241,6 +241,7 @@ Example metadata entry:
 | Postgres enums | Generated enum ADT | `String.t()` |
 | UUID | `uuid.Uuid` opaque type | `String.t()` |
 | JSON decode | `String` (Gleam) | `term()` |
+| `numeric` | `Float` | `Decimal.t()` |
 | `timestamptz` | Hint to use `timestamp` | `DateTime.t()` |
 | Database driver | `pog` | `Postgrex` |
 

@@ -387,7 +387,8 @@ defmodule Squirrelix.Postgres do
 
   defp warn_explain_unavailable(file) do
     Logger.warning(
-      "Squirrelix: EXPLAIN nullability unavailable for #{file}; treating unknown columns as nullable"
+      "Squirrelix: EXPLAIN nullability unavailable for #{file}; " <>
+        "treating unknown columns as nullable (override with \"name!\" / \"name?\" aliases if needed)"
     )
   end
 
