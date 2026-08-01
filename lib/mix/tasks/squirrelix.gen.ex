@@ -26,9 +26,9 @@ defmodule Mix.Tasks.Squirrelix.Gen do
     * `--write-metadata PATH` — after a successful `--infer` pass, write inferred
       types to a metadata file for offline `gen` / `check` (requires `--infer`)
     * `--watch` — after the initial generate, watch `{lib,test,dev}/**/sql/*.sql` and
-      regenerate when those files change. Press Ctrl-C to stop. Uses the same query
-      source / connection options as a one-shot generate; regenerate failures are
-      logged and watching continues.
+      regenerate when those files change. Press Ctrl-C to stop. Requires the optional
+      `:file_system` dependency. Uses the same query source / connection options as a
+      one-shot generate; regenerate failures are logged and watching continues.
     * `--url URL` — Postgres connection URL (also reads `DATABASE_URL` and `PG*`
       environment variables)
     * `--database NAME` — database name when inferring

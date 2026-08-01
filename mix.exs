@@ -55,7 +55,7 @@ defmodule Squirrelix.MixProject do
       {:ex_doc, "~> 0.37", only: :dev, runtime: false},
       {:ex_slop, "~> 0.4", only: [:dev, :test], runtime: false},
       {:excoveralls, "~> 0.18", only: :test},
-      {:file_system, "~> 1.0"},
+      {:file_system, "~> 1.0", optional: true},
       {:postgrex, "~> 0.22"},
       {:reach, "~> 2.8", only: [:dev, :test], runtime: false}
     ]

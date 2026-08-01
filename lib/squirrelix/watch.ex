@@ -42,6 +42,8 @@ defmodule Squirrelix.Watch do
         :ok
 
       dirs ->
+        ensure_file_system!()
+
         filesystem_opts =
           [dirs: dirs]
           |> Keyword.merge(Application.get_env(:squirr_elix, :watch_filesystem_opts, []))
@@ -60,6 +62,31 @@ defmodule Squirrelix.Watch do
           timer: nil,
           on_change: on_change
         })
+    end
+  end
+
+  defp ensure_file_system! do
+    if file_system_available?() do
+      :ok
+    else
+      Mix.raise("""
+      mix squirrelix.gen --watch requires the optional `:file_system` dependency.
+
+      Add it to your Mix project and fetch deps:
+
+          {:file_system, "~> 1.0"}
+
+          mix deps.get
+
+      One-shot `mix squirrelix.gen` / `mix squirrelix.check` do not need it.
+      """)
+    end
+  end
+
+  defp file_system_available? do
+    case Application.get_env(:squirr_elix, :file_system_available) do
+      nil -> match?({:module, _}, Code.ensure_loaded(FileSystem))
+      available when is_boolean(available) -> available
     end
   end
 
