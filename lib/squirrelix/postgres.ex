@@ -20,11 +20,15 @@ defmodule Squirrelix.Postgres do
   alias Squirrelix.Error.PostgresInferenceError
   alias Squirrelix.Error.PostgresSyntaxError
   alias Squirrelix.Error.QueryHasInvalidEnum
+  alias Squirrelix.Error.UnsupportedPostgresVersion
   alias Squirrelix.Query
   alias Squirrelix.SQL
   alias Squirrelix.TypeMapper
 
   require Logger
+
+  # `EXPLAIN … generic_plan` (nullability) requires Postgres 16+.
+  @minimum_server_version_num 160_000
 
   # $1 = relation name, $2 = column name, $3 = schema (NULL = search_path / temp).
   @column_nullability_query """
@@ -92,6 +96,29 @@ defmodule Squirrelix.Postgres do
   """
 
   @doc false
+  @spec minimum_server_version_num() :: pos_integer()
+  def minimum_server_version_num, do: @minimum_server_version_num
+
+  @doc false
+  @spec server_version_supported?(non_neg_integer()) :: boolean()
+  def server_version_supported?(version_num) when is_integer(version_num) and version_num >= 0 do
+    version_num >= @minimum_server_version_num
+  end
+
+  @doc false
+  @spec unsupported_server_version_error(ConnectionOptions.t(), non_neg_integer()) ::
+          UnsupportedPostgresVersion.t()
+  def unsupported_server_version_error(%ConnectionOptions{} = opts, version_num)
+      when is_integer(version_num) and version_num >= 0 do
+    %UnsupportedPostgresVersion{
+      host: opts.host,
+      port: opts.port,
+      version_num: version_num,
+      minimum_version_num: @minimum_server_version_num
+    }
+  end
+
+  @doc false
   @spec connect(ConnectionOptions.t()) :: {:ok, pid()} | {:error, struct()}
   def connect(%ConnectionOptions{} = connection_options) do
     postgrex_opts = postgrex_opts(connection_options)
@@ -100,7 +127,7 @@ defmodule Squirrelix.Postgres do
       :ok ->
         case Postgrex.start_link(postgrex_opts) do
           {:ok, conn} ->
-            {:ok, conn}
+            ensure_supported_server_version(conn, connection_options)
 
           {:error, reason} ->
             {:error, Error.connection_error(reason, connection_options)}
@@ -108,6 +135,38 @@ defmodule Squirrelix.Postgres do
 
       {:error, reason} ->
         {:error, Error.connection_error(reason, connection_options)}
+    end
+  end
+
+  defp ensure_supported_server_version(conn, %ConnectionOptions{} = connection_options) do
+    case fetch_server_version_num(conn) do
+      {:ok, version_num} ->
+        if server_version_supported?(version_num) do
+          {:ok, conn}
+        else
+          _ = GenServer.stop(conn)
+          {:error, unsupported_server_version_error(connection_options, version_num)}
+        end
+
+      {:error, reason} ->
+        _ = GenServer.stop(conn)
+        {:error, Error.connection_error(reason, connection_options)}
+    end
+  end
+
+  defp fetch_server_version_num(conn) do
+    case Postgrex.query(conn, "select current_setting('server_version_num')", []) do
+      {:ok, %Postgrex.Result{rows: [[version]]}} when is_binary(version) ->
+        case Integer.parse(version) do
+          {version_num, ""} -> {:ok, version_num}
+          _invalid -> {:error, {:invalid_server_version_num, version}}
+        end
+
+      {:ok, other} ->
+        {:error, {:unexpected_server_version_result, other}}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 

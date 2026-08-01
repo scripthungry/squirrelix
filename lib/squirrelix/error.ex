@@ -267,6 +267,7 @@ defmodule Squirrelix.Error.CannotConnectToPostgres do
 
   Covers TCP failures (refused, unreachable, closed) and authorization / catalog
   problems. Connection timeouts use `Squirrelix.Error.PostgresConnectionTimeout`.
+  Unsupported server versions use `Squirrelix.Error.UnsupportedPostgresVersion`.
   """
 
   @enforce_keys [:host, :port, :reason]
@@ -293,6 +294,25 @@ defmodule Squirrelix.Error.CannotConnectToPostgres do
         }
 end
 
+defmodule Squirrelix.Error.UnsupportedPostgresVersion do
+  @moduledoc """
+  Error returned when `--infer` connects to a Postgres server older than 16.
+
+  SquirrElix needs Postgres ≥ 16 for `EXPLAIN … generic_plan` nullability
+  inference. Use a metadata file instead of `--infer` on older servers.
+  """
+
+  @enforce_keys [:host, :port, :version_num, :minimum_version_num]
+  defstruct [:host, :port, :version_num, :minimum_version_num]
+
+  @type t :: %__MODULE__{
+          host: String.t(),
+          port: non_neg_integer(),
+          version_num: non_neg_integer(),
+          minimum_version_num: pos_integer()
+        }
+end
+
 defmodule Squirrelix.Error do
   @moduledoc """
   Formatting helpers for structured SquirrElix errors.
@@ -305,7 +325,8 @@ defmodule Squirrelix.Error do
   User-facing failures (codegen, check, metadata, connection) format through
   `format/1` with titles and actionable hints where possible. Connection failures
   and timeouts during `--infer` are classified with `connection_error/2` into
-  `CannotConnectToPostgres` or `PostgresConnectionTimeout`.
+  `CannotConnectToPostgres` or `PostgresConnectionTimeout`. Unsupported server
+  versions surface as `UnsupportedPostgresVersion`.
   """
 
   alias Squirrelix.ConnectionOptions
@@ -328,6 +349,7 @@ defmodule Squirrelix.Error do
   alias Squirrelix.Error.QueryHasInvalidColumn
   alias Squirrelix.Error.QueryHasInvalidEnum
   alias Squirrelix.Error.UnsupportedPostgresType
+  alias Squirrelix.Error.UnsupportedPostgresVersion
   alias Squirrelix.Query
 
   @doc false
@@ -486,6 +508,9 @@ defmodule Squirrelix.Error do
 
   defp do_format(%PostgresConnectionTimeout{} = error), do: format_connection_timeout_error(error)
   defp do_format(%CannotConnectToPostgres{} = error), do: format_cannot_connect_error(error)
+
+  defp do_format(%UnsupportedPostgresVersion{} = error),
+    do: format_unsupported_postgres_version_error(error)
 
   defp do_format(error) do
     if postgres_query_error?(error) do
@@ -688,6 +713,26 @@ defmodule Squirrelix.Error do
       "Hint: Increase `PGCONNECT_TIMEOUT` or the URL `connect_timeout` parameter, check that `#{error.host}:#{error.port}` is reachable, or use a metadata file (`squirr_elix.exs`) instead of `--infer`."
     ]
     |> Enum.join("\n")
+  end
+
+  defp format_unsupported_postgres_version_error(%UnsupportedPostgresVersion{} = error) do
+    [
+      "Error: Unsupported Postgres version",
+      "",
+      "I connected to Postgres #{format_server_version_num(error.version_num)} " <>
+        "(server_version_num #{error.version_num}) at `#{error.host}` port #{error.port}, " <>
+        "but SquirrElix requires Postgres #{format_server_version_num(error.minimum_version_num)} or newer " <>
+        "because nullability inference uses `EXPLAIN … generic_plan`.",
+      "Hint: Upgrade Postgres, or use a metadata file (`squirr_elix.exs`) instead of `--infer`."
+    ]
+    |> Enum.join("\n")
+  end
+
+  defp format_server_version_num(version_num) when is_integer(version_num) and version_num >= 0 do
+    major = div(version_num, 10_000)
+    minor = div(rem(version_num, 10_000), 100)
+    patch = rem(version_num, 100)
+    "#{major}.#{minor}.#{patch}"
   end
 
   defp format_cannot_connect_error(%CannotConnectToPostgres{reason: reason} = error)
