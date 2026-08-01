@@ -11,12 +11,11 @@ defmodule SquirrelixConnectionOptionsTest do
                CLI.parse_connection_url("postgres://u@h/db?sslmode=disable")
     end
 
-    test "parses sslmode=require into encrypting Postgrex ssl opts" do
-      assert {:ok, %ConnectionOptions{ssl: ssl}} =
+    test "parses sslmode=require as encrypt-without-CA-verify (libpq require)" do
+      # Intentionally NOT ssl: true — libpq `require` encrypts but does not verify
+      # the server certificate. Prefer sslmode=verify-full for CA + hostname checks.
+      assert {:ok, %ConnectionOptions{ssl: [verify: :verify_none]}} =
                CLI.parse_connection_url("postgres://u@h/db?sslmode=require")
-
-      assert ssl in [true, [verify: :verify_none]] or
-               (is_list(ssl) and Keyword.get(ssl, :verify) == :verify_none)
     end
 
     test "parses sslmode=verify-full as ssl: true (secure defaults)" do
@@ -29,12 +28,9 @@ defmodule SquirrelixConnectionOptionsTest do
                CLI.parse_connection_url("postgres://u@h/db?sslmode=verify-ca")
     end
 
-    test "parses ssl=true like require" do
-      assert {:ok, %ConnectionOptions{ssl: ssl}} =
+    test "parses ssl=true like require (encrypt without CA verify)" do
+      assert {:ok, %ConnectionOptions{ssl: [verify: :verify_none]}} =
                CLI.parse_connection_url("postgres://u@h/db?ssl=true")
-
-      assert ssl in [true, [verify: :verify_none]] or
-               (is_list(ssl) and Keyword.get(ssl, :verify) == :verify_none)
     end
 
     test "parses ssl=false as ssl: false" do
@@ -154,10 +150,8 @@ defmodule SquirrelixConnectionOptionsTest do
         "PGSSLMODE" => "require"
       }
 
-      assert {:ok, %ConnectionOptions{ssl: ssl}} = CLI.resolve_connection_options(env, [])
-
-      assert ssl in [true, [verify: :verify_none]] or
-               (is_list(ssl) and Keyword.get(ssl, :verify) == :verify_none)
+      assert {:ok, %ConnectionOptions{ssl: [verify: :verify_none]}} =
+               CLI.resolve_connection_options(env, [])
     end
 
     test "URL sslmode overrides PGSSLMODE" do

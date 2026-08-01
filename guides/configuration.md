@@ -98,6 +98,13 @@ SSL query parameters:
 | `sslmode=verify-ca` / `verify-full` | `true` (Postgrex secure defaults) |
 | `ssl=false` | `false` |
 
+**Decision (libpq-aligned):** `sslmode=require` maps to encrypt-without-certificate-verification
+(`[verify: :verify_none]`). That matches [libpq `sslmode`](https://www.postgresql.org/docs/current/libpq-ssl.html#LIBPQ-SSL-SSLMODE-STATEMENTS)
+and common hosted `DATABASE_URL` shapes (including many Phoenix examples). SquirrElix will
+**not** silently upgrade `require` to peer verification — that would break documented adopter
+paths. For CA (and hostname) verification, use `sslmode=verify-ca` or `sslmode=verify-full`
+instead of relying on `require`.
+
 Unix sockets are not supported.
 
 `--infer` runs your `.sql` files against a real database (prepare + EXPLAIN). Only

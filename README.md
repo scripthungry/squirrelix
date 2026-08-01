@@ -373,7 +373,9 @@ mix squirrelix.gen --infer --url postgres://user@host:5432/database?connect_time
 ```
 
 URL `sslmode` / `ssl` query parameters map into Postgrex `:ssl` options (see the
-[Configuration](guides/configuration.md) guide). Unix sockets are not supported.
+[Configuration](guides/configuration.md) guide). `sslmode=require` encrypts without
+CA verification (libpq-aligned); use `verify-ca` / `verify-full` when you need peer
+checks. Unix sockets are not supported.
 
 Or set [Postgres environment variables](https://www.postgresql.org/docs/current/libpq-envars.html).
 When a value is not set, SquirrElix uses these defaults:

@@ -41,8 +41,9 @@ defmodule Mix.Tasks.Squirrelix.Gen do
   Connection precedence (highest first): flags → `--url` → `DATABASE_URL` → `PG*` → defaults.
 
   URLs may include `sslmode` (`disable`, `allow`, `prefer`, `require`, `verify-ca`,
-  `verify-full`) or `ssl=true`/`ssl=false`. See the Configuration guide for how those
-  map to Postgrex `:ssl` options. Unix sockets are not supported.
+  `verify-full`) or `ssl=true`/`ssl=false`. `require` encrypts without CA verification
+  (libpq-aligned); use `verify-ca` / `verify-full` for peer checks. See the Configuration
+  guide. Unix sockets are not supported.
 
   Generated query functions call `Postgrex.query!/3` and raise on database errors.
   Soft companions named `<name>_ok/arity` call `Postgrex.query/3` and return
