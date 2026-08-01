@@ -13,6 +13,7 @@ defmodule SquirrelixErrorFormatTest do
   alias Squirrelix.Error.QueryFileHasInvalidName
   alias Squirrelix.Error.QueryHasInvalidColumn
   alias Squirrelix.Error.QueryHasInvalidEnum
+  alias Squirrelix.Error.QueryHasMultipleStatements
   alias Squirrelix.Error.UnsupportedPostgresType
 
   test "format_outdated_file_error matches upstream Squirrel wording" do
@@ -217,6 +218,19 @@ defmodule SquirrelixErrorFormatTest do
     assert plural =~ "same names:"
     assert plural =~ "`a`"
     assert plural =~ "`b`"
+  end
+
+  test "format_multiple_statements_error explains one query per file" do
+    formatted =
+      Error.format(%QueryHasMultipleStatements{
+        file: "batch.sql",
+        starting_line: 1,
+        content: "select 1; select 2"
+      })
+
+    assert formatted =~ "Error: Multiple SQL statements"
+    assert formatted =~ "batch.sql"
+    assert formatted =~ "one query per file"
   end
 
   test "format_invalid_column_error omits suggestion when suggested_name is nil" do
