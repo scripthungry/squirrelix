@@ -95,6 +95,16 @@ defmodule SquirrelixTypeMapperTest do
     assert TypeMapper.return_typespec(columns) == "[#{TypeMapper.row_typespec(columns)}]"
   end
 
+  test "row_typespec accepts string column names without creating Mix VM atoms" do
+    columns = [{"name", :string, true}, {"age", :integer, false}]
+
+    assert TypeMapper.row_typespec(columns) ==
+             "%{required(:name) => String.t() | nil, required(:age) => integer()}"
+
+    assert TypeMapper.column_typespec("uuid", :uuid, false) ==
+             "required(:uuid) => String.t()"
+  end
+
   test "normalize_type accepts Elixir atoms and Postgres descriptors" do
     assert TypeMapper.normalize_type(:integer) == {:ok, :integer}
     assert TypeMapper.normalize_type({:postgres, "int4"}) == {:ok, :integer}

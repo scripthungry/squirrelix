@@ -4,6 +4,7 @@ defmodule Squirrelix.MixTask do
   alias Squirrelix.CLI
   alias Squirrelix.CodegenCheckSummary
   alias Squirrelix.CodegenSummary
+  alias Squirrelix.Discover
   alias Squirrelix.Error
   alias Squirrelix.Inference
   alias Squirrelix.Metadata
@@ -128,7 +129,7 @@ defmodule Squirrelix.MixTask do
   end
 
   defp exportable_metadata(root, inferrer) do
-    case CLI.query_directories(root) do
+    case Discover.query_directories(root) do
       {:error, error} ->
         Mix.raise("Could not discover SQL directories:\n\n#{Error.format(error)}")
 

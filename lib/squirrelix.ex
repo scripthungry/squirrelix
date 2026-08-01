@@ -231,7 +231,7 @@ defmodule Squirrelix do
   end
 
   defp typed_query_directories(root, metadata) when is_map(metadata) do
-    case Squirrelix.CLI.query_directories(root) do
+    case Squirrelix.Discover.query_directories(root) do
       {:ok, directories} ->
         directories
         |> Enum.map(&Squirrelix.TypedQueryDirectory.from_query_directory(&1, metadata))
@@ -244,7 +244,7 @@ defmodule Squirrelix do
 
   defp typed_query_directories(root, inferrer)
        when is_function(inferrer, 1) or is_atom(inferrer) do
-    case Squirrelix.CLI.query_directories(root) do
+    case Squirrelix.Discover.query_directories(root) do
       {:ok, directories} ->
         Squirrelix.Inference.from_query_directories(directories, inferrer)
 
