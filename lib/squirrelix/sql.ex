@@ -470,8 +470,11 @@ defmodule Squirrelix.SQL do
   # Postgres dollar-quotes: `$tag$…$tag$` / `$$…$$` (tag is optional identifier).
   defp take_dollar_quote_tag([?$ | rest]), do: {:ok, [], rest}
 
-  defp take_dollar_quote_tag([char | _] = chars)
-       when char in ?A..?Z or char in ?a..?z or char == ?_ do
+  defp take_dollar_quote_tag([?_ | _] = chars) do
+    take_dollar_quote_tag_chars(chars, [])
+  end
+
+  defp take_dollar_quote_tag([char | _] = chars) when char in ?A..?Z or char in ?a..?z do
     take_dollar_quote_tag_chars(chars, [])
   end
 
@@ -479,8 +482,12 @@ defmodule Squirrelix.SQL do
 
   defp take_dollar_quote_tag_chars([?$ | rest], tag), do: {:ok, Enum.reverse(tag), rest}
 
+  defp take_dollar_quote_tag_chars([?_ | rest], tag) do
+    take_dollar_quote_tag_chars(rest, [?_ | tag])
+  end
+
   defp take_dollar_quote_tag_chars([char | rest], tag)
-       when char in ?A..?Z or char in ?a..?z or char in ?0..?9 or char == ?_ do
+       when char in ?A..?Z or char in ?a..?z or char in ?0..?9 do
     take_dollar_quote_tag_chars(rest, [char | tag])
   end
 
