@@ -16,6 +16,10 @@
 # Local editor settings.
 .vscode/
 
+# Local mise overrides (not committed).
+mise.local.toml
+mise.*.local.toml
+
 # If the VM crashes, it generates a dump, let's ignore it too.
 erl_crash.dump
 

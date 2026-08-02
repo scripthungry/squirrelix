@@ -572,6 +572,10 @@ and [sqlx](https://github.com/launchbadge/sqlx).
 
 ## Development
 
+Tool versions for local development are pinned in [`mise.toml`](mise.toml)
+(Elixir **1.20.0** on OTP **28.0**, matching the CI quality cell). With
+[mise](https://mise.jdx.dev) installed: `mise install`.
+
 Clone the repository and run the local validation suite before committing:
 
 ```sh
