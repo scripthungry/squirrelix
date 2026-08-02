@@ -91,6 +91,24 @@ defmodule Squirrelix.TestSupport do
     |> Keyword.merge(extra)
   end
 
+  @doc """
+  Stop a Postgrex connection started outside ExUnit supervision.
+
+  Elixir 1.18 can raise `{:EXIT, :normal}` from `GenServer.stop/1` in `on_exit`
+  when the connection has already shut down cleanly; ignore those exits.
+  """
+  def stop_postgres(conn) when is_pid(conn) do
+    if Process.alive?(conn) do
+      try do
+        GenServer.stop(conn)
+      catch
+        :exit, _ -> :ok
+      end
+    end
+
+    :ok
+  end
+
   def postgres_url do
     opts = postgres_opts()
     user = Keyword.fetch!(opts, :username)

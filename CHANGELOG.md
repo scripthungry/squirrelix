@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cell is a hard gate); Dialyzer / Reach / ExDNA / format / Credo stay on 1.20.
   Hex publish remains on Elixir 1.20 (#85).
 
+### Fixed
+
+- Supervise Postgrex connections in ExUnit setup so Elixir 1.18 does not fail
+  `on_exit` cleanup with `GenServer.stop` `{:EXIT, :normal}` (#85).
+
 ## [0.5.9] — 2026-08-02
 
 ### Changed

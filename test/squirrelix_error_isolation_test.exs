@@ -13,20 +13,18 @@ defmodule SquirrelixErrorIsolationTest do
   alias Squirrelix.TypedQueryDirectory
 
   setup_all do
-    case Postgrex.start_link(Squirrelix.TestSupport.postgres_opts()) do
-      {:ok, conn} ->
-        Postgrex.query!(
-          conn,
-          "create temporary table if not exists squirrel (name text primary key, acorns int)",
-          []
-        )
+    conn = start_supervised!({Postgrex, Squirrelix.TestSupport.postgres_opts()})
 
-        on_exit(fn -> GenServer.stop(conn) end)
-        {:ok, conn: conn}
+    Postgrex.query!(
+      conn,
+      "create temporary table if not exists squirrel (name text primary key, acorns int)",
+      []
+    )
 
-      {:error, reason} ->
-        flunk("local Postgres is required for this test: #{inspect(reason)}")
-    end
+    {:ok, conn: conn}
+  rescue
+    error ->
+      flunk("local Postgres is required for this test: #{Exception.message(error)}")
   end
 
   describe "query inference errors" do

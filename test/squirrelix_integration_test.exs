@@ -149,24 +149,14 @@ defmodule SquirrelixIntegrationTest do
 
   setup tags do
     if tags[:postgres] do
-      case Postgrex.start_link(Squirrelix.TestSupport.postgres_opts()) do
-        {:ok, conn} ->
-          on_exit(fn ->
-            try do
-              GenServer.stop(conn)
-            catch
-              :exit, _ -> :ok
-            end
-          end)
-
-          {:ok, conn: conn}
-
-        {:error, reason} ->
-          {:ok, skip: "local Postgres unavailable: #{inspect(reason)}"}
-      end
+      conn = start_supervised!({Postgrex, Squirrelix.TestSupport.postgres_opts()})
+      {:ok, conn: conn}
     else
       :ok
     end
+  rescue
+    error ->
+      {:ok, skip: "local Postgres unavailable: #{Exception.message(error)}"}
   end
 end
 

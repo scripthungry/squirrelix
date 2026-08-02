@@ -15,14 +15,11 @@ defmodule SquirrelixPostgresTest do
   alias Squirrelix.Query
 
   setup_all do
-    case Postgrex.start_link(Squirrelix.TestSupport.postgres_opts()) do
-      {:ok, conn} ->
-        on_exit(fn -> GenServer.stop(conn) end)
-        {:ok, conn: conn}
-
-      {:error, reason} ->
-        flunk("local Postgres is required for this test: #{inspect(reason)}")
-    end
+    conn = start_supervised!({Postgrex, Squirrelix.TestSupport.postgres_opts()})
+    {:ok, conn: conn}
+  rescue
+    error ->
+      flunk("local Postgres is required for this test: #{Exception.message(error)}")
   end
 
   test "connect accepts Postgres 16+ servers used for --infer" do
@@ -46,7 +43,7 @@ defmodule SquirrelixPostgresTest do
       {version_num, ""} = Integer.parse(version)
       assert Postgres.server_version_supported?(version_num)
     after
-      GenServer.stop(conn)
+      Squirrelix.TestSupport.stop_postgres(conn)
     end
   end
 
