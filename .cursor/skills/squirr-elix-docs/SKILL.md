@@ -2,7 +2,7 @@
 name: squirr-elix-docs
 description: >-
   Applies SquirrElix documentation branding and British English conventions for
-  README, guides, CHANGELOG, ROADMAP, NOTICE, and moduledocs. Use when editing
+  README, guides, CHANGELOG, docs/ROADMAP, NOTICE, and moduledocs. Use when editing
   docs or guides, renaming the library in prose, fixing capitalisation, or when
   the user mentions SquirrElix branding, British English, or documentation style.
 ---
@@ -40,7 +40,8 @@ Prefer British spelling in docs/guides/README/moduledocs where natural:
 
 ## Scope
 
-Apply when editing: `README.md`, `guides/**`, `docs/**`, `CHANGELOG.md`, `ROADMAP.md`, `NOTICE`, `@moduledoc` / `@doc` strings.
+Apply when editing: `README.md`, `guides/**`, `docs/**` (including `ROADMAP.md`),
+`CHANGELOG.md`, `NOTICE`, `@moduledoc` / `@doc` strings.
 
 Do not rename Elixir source modules or Mix task atoms for branding alone.
 

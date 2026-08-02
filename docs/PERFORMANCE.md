@@ -1,10 +1,9 @@
 # SquirrElix performance
 
-This document is the source of truth for how we measure codegen and runtime
-cost, how we avoid silent regressions, and what to record after an
-implementation round. It lives under hand-written [`docs/`](README.md)
-(alongside the release checklist); user guides stay in `guides/`, and
-generated ExDoc output goes to gitignored `doc/`.
+Maintainer source of truth for measuring codegen and runtime cost, avoiding silent
+regressions, and recording meaningful before→after results. Lives under
+[`docs/`](README.md) (not HexDocs). User guides stay in `guides/`; generated ExDoc
+output goes to gitignored `doc/`.
 
 SquirrElix has **two** performance surfaces:
 
