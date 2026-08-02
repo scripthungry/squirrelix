@@ -7,11 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.13] — 2026-08-02
+
 ### Docs
 
 - Trim README to end-user orientation; move roadmap / contributing / performance /
   release notes under `docs/` (off HexDocs). HexDocs extras are README, CHANGELOG,
-  and `guides/` only.
+  and `guides/` only (#93).
+- Point issue #24 readiness at `docs/ROADMAP.md` as the canonical non-goals freeze
+  (verification, not a product-boundary laundry list).
 
 ## [0.5.12] — 2026-08-02
 
