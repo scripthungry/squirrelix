@@ -202,7 +202,7 @@ Example GitHub Actions job fragment (Postgres service + Mix):
 ```yaml
 services:
   postgres:
-    image: postgres:16
+    image: postgres:17
     env:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -220,7 +220,7 @@ env:
   DATABASE_URL: postgres://postgres:postgres@localhost:5432/my_app_test
 
 steps:
-  - uses: actions/checkout@v4
+  - uses: actions/checkout@v7
   # setup-beam, mix deps.get, compile, … as usual
 
   - name: Create and migrate database
