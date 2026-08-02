@@ -406,7 +406,8 @@ During check, an outdated generated file produces `OutdatedFile`.
 
 ## Atomic generate and check
 
-Code generation is **project-wide atomic** (Gleam squirrel 4.5+ parity):
+Code generation is **project-wide atomic** (a failed directory must never leave a
+half-updated tree — the same discipline as Gleam Squirrel 4.5+):
 
 1. **Query-error atomicity** — If any `sql/` directory has query errors (invalid
    file names, missing metadata, inference failures, unsupported types, and so

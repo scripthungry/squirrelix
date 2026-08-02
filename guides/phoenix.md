@@ -1,78 +1,44 @@
 # Phoenix + CI Cookbook
 
-0.3 made `--infer` Phoenix-ready (`DATABASE_URL` / SSL). This cookbook covers the
-day-to-day Mix workflow: migrate before generate/check, recommended aliases, CI
-with `mix squirrelix.check`, and intentional coexistence with Ecto.
+Day-to-day Mix workflow for Phoenix apps: migrate before generate/check, recommended
+aliases, CI with `mix squirrelix.check`, and intentional coexistence with Ecto.
 
 SquirrElix is **not** an Ecto `Repo` wrapper. Use Ecto for schemas and migrations;
 put typed queries in `sql/` and call the generated modules with a `Postgrex.conn()`.
 
 ## Dependencies
 
-Keep SquirrElix as a **dev/test** Mix tool and Postgrex as a **runtime** dependency
-(Phoenix apps already depend on Postgrex via Ecto SQL):
+Keep SquirrElix as a **dev/test** Mix tool (include `:test` for CI under
+`MIX_ENV=test`). Phoenix apps already depend on Postgrex via Ecto SQL:
 
 ```elixir
-def deps do
-  [
-    {:squirr_elix, "~> 0.5.0", only: [:dev, :test], runtime: false},
-    {:postgrex, "~> 0.22"}
-  ]
-end
+{:squirr_elix, "~> 0.5.0", only: [:dev, :test], runtime: false}
 ```
-
-Include `:test` so `mix squirrelix.check` works under `MIX_ENV=test` in CI.
 
 ## Layout in a Phoenix app
 
-Place `sql/` directories next to the contexts that own the queries — the same
-convention as [Getting Started](getting_started.md):
+Place `sql/` directories next to the contexts that own the queries — same convention
+as [Getting Started](getting_started.md):
 
 ```txt
-lib/
-└── my_app/
-    └── accounts/
-        ├── sql/
-        │   ├── find_user.sql
-        │   └── list_users.sql
-        └── sql.ex              # generated: MyApp.Accounts.SQL
+lib/my_app/accounts/sql/*.sql  →  lib/my_app/accounts/sql.ex  (MyApp.Accounts.SQL)
 ```
 
-Ecto schemas and migrations stay where Phoenix puts them (`lib/my_app/accounts/user.ex`,
-`priv/repo/migrations/`). SquirrElix never reads those modules; it only needs the
-**database schema** to exist when you run `--infer`.
+Ecto schemas and migrations stay where Phoenix puts them. SquirrElix never reads
+those modules; it only needs the **database schema** when you run `--infer`.
 
 ## `DATABASE_URL` and connection config
 
 SquirrElix does **not** read `config/*.exs` or your `Ecto.Repo` settings. Point it
-at the same database Ecto uses via `DATABASE_URL`, `PG*` variables, or Mix flags.
-
-Precedence (highest first): flags → `--url` → `DATABASE_URL` → `PG*` → defaults.
-
-Phoenix-style local / CI usage:
+at the same database Ecto uses via `DATABASE_URL`, `PG*` variables, or Mix flags
+(precedence and SSL: [Configuration](configuration.md)).
 
 ```sh
 export DATABASE_URL=postgres://postgres:postgres@localhost:5432/my_app_dev
 mix squirrelix.gen --infer
 ```
 
-Hosted or SSL databases:
-
-```sh
-export DATABASE_URL=postgres://user:pass@host:5432/database?sslmode=require
-mix squirrelix.gen --infer
-```
-
-`sslmode=require` encrypts without CA verification (libpq-aligned, common for hosted
-`DATABASE_URL`s). Prefer `sslmode=verify-full` when you need certificate and hostname
-checks — see [Configuration](configuration.md).
-
-If your `dev.exs` hardcodes Repo hostname and database without `DATABASE_URL`,
-export matching `PG*` variables (or a URL) before generating — see
-[Configuration](configuration.md#environment-variables).
-
-Prefer secrets in the environment (`DATABASE_URL` / `PGPASSWORD`) over `--password`
-or passwords embedded in shell history.
+Prefer secrets in the environment over `--password` or passwords in shell history.
 
 ## Migrate, then generate or check
 
@@ -162,7 +128,7 @@ This split is intentional:
 - SquirrElix embraces plain `.sql` files and Postgrex — the same model as
   [Gleam Squirrel](https://github.com/giacomocavalieri/squirrel).
 - First-class Ecto `Repo` integration / query macros are an **explicit non-goal**
-  (see [ROADMAP](../ROADMAP.md#explicit-non-goals-not-on-the-10-path)).
+  (see [ROADMAP](https://github.com/scripthungry/squirrelix/blob/main/docs/ROADMAP.md#explicit-non-goals-not-on-the-10-path)).
 - You can use both in one app: Ecto for writes and schema evolution, SquirrElix for
   read-heavy or carefully reviewed SQL that benefits from typed codegen.
 

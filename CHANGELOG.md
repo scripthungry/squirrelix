@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Docs
+
+- Trim README to end-user orientation; move roadmap / contributing / performance /
+  release notes under `docs/` (off HexDocs). HexDocs extras are README, CHANGELOG,
+  and `guides/` only.
+
 ## [0.5.12] — 2026-08-02
 
 ### Changed
