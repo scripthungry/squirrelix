@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.10] — 2026-08-02
+
 ### Changed
 
 - Lower the Elixir requirement to `~> 1.18` (stdlib `JSON` floor). Recommend
