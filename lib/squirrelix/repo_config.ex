@@ -9,6 +9,15 @@ defmodule Squirrelix.RepoConfig do
   alias Squirrelix.ConnectionOptions
 
   @type repo_ref :: module() | String.t()
+  @type partial :: %{
+          host: String.t() | nil,
+          port: pos_integer() | nil,
+          user: String.t() | nil,
+          password: String.t() | nil,
+          database: String.t() | nil,
+          timeout_seconds: non_neg_integer() | nil,
+          ssl: ConnectionOptions.ssl()
+        }
 
   @spec connection_options(repo_ref()) ::
           {:ok, ConnectionOptions.t()}
@@ -31,7 +40,7 @@ defmodule Squirrelix.RepoConfig do
           {:ok, ConnectionOptions.t()} | {:error, :invalid_url}
   def from_config(config) when is_list(config) do
     with {:ok, from_url} <- url_from_config(config) do
-      base = %ConnectionOptions{
+      base = %{
         host: config_string(config, [:hostname, :host]),
         port: config_port(config),
         user: config_string(config, [:username, :user]),
@@ -41,7 +50,7 @@ defmodule Squirrelix.RepoConfig do
         ssl: config_ssl(config)
       }
 
-      {:ok, merge_url(base, from_url)}
+      {:ok, struct!(ConnectionOptions, merge_partial(base, from_url))}
     end
   end
 
@@ -76,27 +85,32 @@ defmodule Squirrelix.RepoConfig do
 
   defp url_from_config(config) do
     case first_present(config, [:url, :database_url]) do
-      url when is_binary(url) and url != "" -> CLI.parse_connection_url(url)
-      _ -> {:ok, nil}
+      url when is_binary(url) and url != "" ->
+        case CLI.parse_connection_url(url) do
+          {:ok, %ConnectionOptions{} = opts} -> {:ok, Map.from_struct(opts)}
+          {:error, _} = error -> error
+        end
+
+      _ ->
+        {:ok, nil}
     end
   end
 
-  defp merge_url(base, nil), do: base
+  defp merge_partial(base, nil), do: base
 
-  defp merge_url(%ConnectionOptions{} = base, %ConnectionOptions{} = from_url) do
-    %ConnectionOptions{
-      host: from_url.host || base.host,
-      port: from_url.port || base.port,
-      user: from_url.user || base.user,
-      password: prefer_password(from_url.password, base.password),
-      database: from_url.database || base.database,
-      timeout_seconds: from_url.timeout_seconds || base.timeout_seconds,
-      ssl: prefer_ssl(from_url.ssl, base.ssl)
+  defp merge_partial(base, override) when is_map(override) do
+    %{
+      host: Map.get(override, :host) || base.host,
+      port: Map.get(override, :port) || base.port,
+      user: Map.get(override, :user) || base.user,
+      password: prefer_password(Map.get(override, :password), base.password),
+      database: Map.get(override, :database) || base.database,
+      timeout_seconds: Map.get(override, :timeout_seconds) || base.timeout_seconds,
+      ssl: prefer_ssl(Map.get(override, :ssl), base.ssl)
     }
   end
 
-  defp prefer_password(nil, base), do: base
-  defp prefer_password("", base), do: base
+  defp prefer_password(password, base) when password in [nil, ""], do: base
   defp prefer_password(password, _base), do: password
 
   defp prefer_ssl(nil, base), do: base
