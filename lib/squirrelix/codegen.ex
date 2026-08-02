@@ -48,9 +48,13 @@ defmodule Squirrelix.Codegen do
   @spec generate_module(module(), [TypedQuery.t()], keyword()) :: String.t()
   def generate_module(module, queries, opts \\ []) when is_atom(module) and is_list(queries) do
     version = Keyword.fetch!(opts, :version)
+    runner = Keyword.get(opts, :runner, :postgrex)
     postgrex_module = Keyword.get(opts, :postgrex, Postgrex)
+    # Do not hard-require ecto_sql in this library; adopters supply it at runtime.
+    ecto_sql_module = Keyword.get(opts, :ecto_sql, Module.concat([Ecto, Adapters, SQL]))
 
     sorted_queries = Enum.sort_by(queries, & &1.file)
+    exec = execution_context(runner, postgrex_module, ecto_sql_module)
 
     # Scaffold only: embeds the generated `@moduledoc` and splices query/helper
     # source. Per-query names stay textual so codegen does not create Mix VM atoms.
@@ -66,10 +70,7 @@ defmodule Squirrelix.Codegen do
       where `type` is an atom such as `:string` or a list wrapper such as
       `{:list, :integer}`.
 
-      Each query has a raising function (via `Postgrex.query!/3`) and an additive
-      soft companion named `<name>_ok/arity` (via `Postgrex.query/3`) that returns
-      `{:ok, result} | {:error, Exception.t()}`. Soft command companions return
-      `{:ok, num_rows}` where `num_rows` is the affected-row count.
+      #{moduledoc_execution(exec)}
 
       Public `@spec`s are Dialyzer-oriented for call sites under typical flags
       (`:underspecs`, `:error_handling`, `:unknown`, `:unmatched_returns`). Enabling
@@ -80,7 +81,7 @@ defmodule Squirrelix.Codegen do
       @type elixir_type :: atom() | {:list, elixir_type()}
       @type column_spec :: {atom(), elixir_type(), boolean()}
 
-    #{sorted_queries |> function_sources(postgrex_module) |> join_function_sources()}#{Runtime.section(queries)}
+    #{sorted_queries |> function_sources(exec) |> join_function_sources()}#{Runtime.section(queries)}
     end
     """
 
@@ -88,6 +89,61 @@ defmodule Squirrelix.Codegen do
     |> Code.format_string!()
     |> IO.iodata_to_binary()
     |> Kernel.<>("\n")
+  end
+
+  defp execution_context(:postgrex, postgrex_module, _ecto_sql_module) do
+    %{
+      runner: :postgrex,
+      first_arg: "conn",
+      first_arg_type: "Postgrex.conn()",
+      query_bang: fn sql, params ->
+        "conn\n    |> #{inspect(postgrex_module)}.query!(#{sql}, #{params})"
+      end,
+      query_soft: fn sql, params ->
+        "#{inspect(postgrex_module)}.query(conn, #{sql}, #{params})"
+      end
+    }
+  end
+
+  defp execution_context(:ecto, _postgrex_module, ecto_sql_module) do
+    %{
+      runner: :ecto,
+      first_arg: "repo",
+      first_arg_type: "module()",
+      query_bang: fn sql, params ->
+        "repo\n    |> #{inspect(ecto_sql_module)}.query!(#{sql}, #{params})"
+      end,
+      query_soft: fn sql, params ->
+        "#{inspect(ecto_sql_module)}.query(repo, #{sql}, #{params})"
+      end
+    }
+  end
+
+  defp execution_context(other, _postgrex_module, _ecto_sql_module) do
+    raise ArgumentError,
+          "unknown codegen runner #{inspect(other)}; expected :postgrex or :ecto"
+  end
+
+  defp moduledoc_execution(%{runner: :postgrex}) do
+    """
+    Each query has a raising function (via `Postgrex.query!/3`) and an additive
+    soft companion named `<name>_ok/arity` (via `Postgrex.query/3`) that returns
+    `{:ok, result} | {:error, Exception.t()}`. Soft command companions return
+    `{:ok, num_rows}` where `num_rows` is the affected-row count.
+    """
+    |> String.trim()
+  end
+
+  defp moduledoc_execution(%{runner: :ecto}) do
+    """
+    Generated with the optional Ecto runner: the first argument is an Ecto Repo
+    module. Raising functions call `Ecto.Adapters.SQL.query!/3`; soft companions
+    named `<name>_ok/arity` call `Ecto.Adapters.SQL.query/3` and return
+    `{:ok, result} | {:error, Exception.t()}`. Soft command companions return
+    `{:ok, num_rows}` where `num_rows` is the affected-row count. This uses Repo
+    checkout / transactions / Sandbox — it is not schema or changeset integration.
+    """
+    |> String.trim()
   end
 
   @spec write_directory(Path.t(), Path.t(), [TypedQuery.t()], keyword()) ::
@@ -169,25 +225,25 @@ defmodule Squirrelix.Codegen do
     {count, Enum.reverse(errors)}
   end
 
-  defp function_sources(queries, postgrex_module) do
+  defp function_sources(queries, exec) do
     taken_names = MapSet.new(queries, & &1.name)
     _ = validate_row_type_names!(queries)
 
     queries
     |> Enum.reduce({[], taken_names}, fn query, {sources, claimed} ->
-      {source, claimed} = function_source(query, postgrex_module, claimed)
+      {source, claimed} = function_source(query, exec, claimed)
       {[source | sources], claimed}
     end)
     |> elem(0)
     |> Enum.reverse()
   end
 
-  defp function_source(%TypedQuery{} = query, postgrex_module, claimed_names) do
-    raising = raising_function_source(query, postgrex_module)
+  defp function_source(%TypedQuery{} = query, exec, claimed_names) do
+    raising = raising_function_source(query, exec)
 
     case soft_companion_name(query.name, claimed_names) do
       {:ok, soft_name} ->
-        source = raising <> "\n\n" <> soft_function_source(query, postgrex_module, soft_name)
+        source = raising <> "\n\n" <> soft_function_source(query, exec, soft_name)
         {source, MapSet.put(claimed_names, soft_name)}
 
       :skipped ->
@@ -195,35 +251,36 @@ defmodule Squirrelix.Codegen do
     end
   end
 
-  defp raising_function_source(%TypedQuery{} = query, postgrex_module) do
+  defp raising_function_source(%TypedQuery{} = query, exec) do
     args = TypedQuery.resolve_parameter_names(query.params)
-    all_args = ["conn" | args]
+    all_args = [exec.first_arg | args]
     encoded_params = encode_params_call(args, query.params)
+    sql = sql_string_literal(query.content)
 
     [
       doc_source(query),
       row_type_source(query),
-      "  @spec #{query.name}(Postgrex.conn()#{spec_args(query.params)}) :: #{function_return_typespec(query)}\n",
+      "  @spec #{query.name}(#{exec.first_arg_type}#{spec_args(query.params)}) :: #{function_return_typespec(query)}\n",
       "  def #{query.name}(#{Enum.join(all_args, ", ")}) do\n",
-      "    conn\n",
-      "    |> #{inspect(postgrex_module)}.query!(#{sql_string_literal(query.content)}, #{encoded_params})\n",
+      "    #{exec.query_bang.(sql, encoded_params)}\n",
       "    |> #{decode_call(query.returns)}\n",
       "  end\n"
     ]
     |> Enum.join()
   end
 
-  defp soft_function_source(%TypedQuery{} = query, postgrex_module, soft_name) do
+  defp soft_function_source(%TypedQuery{} = query, exec, soft_name) do
     args = TypedQuery.resolve_parameter_names(query.params)
-    all_args = ["conn" | args]
+    all_args = [exec.first_arg | args]
     encoded_params = encode_params_call(args, query.params)
     arity = length(all_args)
+    sql = sql_string_literal(query.content)
 
     [
       soft_doc_source(query, arity),
-      "  @spec #{soft_name}(Postgrex.conn()#{spec_args(query.params)}) :: #{soft_function_return_typespec(query)}\n",
+      "  @spec #{soft_name}(#{exec.first_arg_type}#{spec_args(query.params)}) :: #{soft_function_return_typespec(query)}\n",
       "  def #{soft_name}(#{Enum.join(all_args, ", ")}) do\n",
-      "    case #{inspect(postgrex_module)}.query(conn, #{sql_string_literal(query.content)}, #{encoded_params}) do\n",
+      "    case #{exec.query_soft.(sql, encoded_params)} do\n",
       "      {:ok, result} -> {:ok, result |> #{soft_decode_call(query.returns)}}\n",
       "      {:error, reason} -> {:error, reason}\n",
       "    end\n",

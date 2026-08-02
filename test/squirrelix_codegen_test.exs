@@ -1047,6 +1047,50 @@ defmodule SquirrelixCodegenTest do
     String.trim(row_type)
   end
 
+  test "ecto runner emits Repo-first functions via Ecto.Adapters.SQL" do
+    query =
+      typed_query(
+        "find_user.sql",
+        "find_user",
+        "select name from users where id = $1",
+        [%Parameter{index: 1, name: "id", type: :integer}],
+        [%Column{name: "name", type: :string, nullable?: false}]
+      )
+
+    code =
+      Codegen.generate_module(Squirrelix.GeneratedEctoRunnerTest.SQL, [query],
+        version: "v-test",
+        runner: :ecto,
+        ecto_sql: PostgrexMock
+      )
+
+    assert code =~ "@spec find_user(module(), integer()) :: [find_user_row()]"
+    assert code =~ "def find_user(repo, id)"
+    assert code =~ "PostgrexMock.query!"
+    assert code =~ "def find_user_ok(repo, id)"
+    assert code =~ "optional Ecto runner"
+    refute code =~ "def find_user(conn,"
+
+    [{module, _bytecode}] = Squirrelix.TestSupport.compile_string(code)
+
+    assert module.find_user({PostgrexMock, self()}, 123) == [%{name: "Ada"}]
+    assert_received {:query!, "select name from users where id = $1", [123]}
+
+    assert module.find_user_ok({PostgrexMock, self()}, 123) == {:ok, [%{name: "Ada"}]}
+    assert_received {:query, "select name from users where id = $1", [123]}
+  end
+
+  test "ecto runner rejects unknown runner atoms" do
+    query = typed_query("q.sql", "q", "select 1 as id", [])
+
+    assert_raise ArgumentError, ~r/unknown codegen runner/, fn ->
+      Codegen.generate_module(Squirrelix.GeneratedBadRunner.SQL, [query],
+        version: "v-test",
+        runner: :mongo
+      )
+    end
+  end
+
   defp field_order(spec, field) do
     spec |> :binary.match("required(:#{field})") |> elem(0)
   end
