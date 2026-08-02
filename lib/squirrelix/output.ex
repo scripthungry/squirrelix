@@ -11,29 +11,36 @@ defmodule Squirrelix.Output do
 
   @type prepared_write :: %{file: Path.t(), content: String.t()}
 
-  @spec safe_write(Path.t(), String.t()) ::
+  @spec safe_write(Path.t(), String.t(), keyword()) ::
           :ok | {:error, CannotOverwriteFile.t() | CannotWriteFile.t()}
-  def safe_write(file, content) when is_binary(file) and is_binary(content) do
-    with {:ok, prepared} <- prepare_write(file, content) do
+  def safe_write(file, content, opts \\ [])
+      when is_binary(file) and is_binary(content) and is_list(opts) do
+    with {:ok, prepared} <- prepare_write(file, content, opts) do
       commit_writes([prepared])
     end
   end
 
-  @spec prepare_write(Path.t(), String.t()) ::
+  @doc """
+  Prepares a write, optionally formatting Elixir sources.
+
+  Pass `format: false` when `content` is already formatted (e.g. from
+  `Squirrelix.Codegen.generate_module/3`) to avoid a second `Code.format_string!/1`.
+  """
+  @spec prepare_write(Path.t(), String.t(), keyword()) ::
           {:ok, prepared_write()} | {:error, CannotOverwriteFile.t() | CannotWriteFile.t()}
-  def prepare_write(file, content) when is_binary(file) and is_binary(content) do
+  def prepare_write(file, content, opts \\ [])
+      when is_binary(file) and is_binary(content) and is_list(opts) do
+    format? = Keyword.get(opts, :format, true)
+
     case existing_file_origin(file) do
       {:ok, :not_generated} ->
         {:error, %CannotOverwriteFile{file: file}}
 
-      {:ok, :likely_generated} ->
-        {:ok, %{file: file, content: format_content(file, content)}}
-
-      {:ok, :empty} ->
-        {:ok, %{file: file, content: format_content(file, content)}}
+      {:ok, origin} when origin in [:likely_generated, :empty] ->
+        {:ok, %{file: file, content: maybe_format_content(file, content, format?)}}
 
       {:error, :enoent} ->
-        {:ok, %{file: file, content: format_content(file, content)}}
+        {:ok, %{file: file, content: maybe_format_content(file, content, format?)}}
 
       {:error, reason} ->
         {:error, %CannotWriteFile{file: file, reason: reason}}
@@ -201,6 +208,9 @@ defmodule Squirrelix.Output do
       {:error, reason} -> {:error, reason}
     end
   end
+
+  defp maybe_format_content(file, content, true), do: format_content(file, content)
+  defp maybe_format_content(_file, content, false), do: content
 
   defp format_content(file, content) do
     if Path.extname(file) in [".ex", ".exs"] do

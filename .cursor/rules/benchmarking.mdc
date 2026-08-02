@@ -1,0 +1,25 @@
+---
+description: Require before/after mix bench for hot-path changes; record only meaningful results in docs/PERFORMANCE.md
+alwaysApply: true
+---
+
+# SquirrElix benchmarking (agents)
+
+When an implementation round can affect performance — codegen, SQL parsing,
+Postgres infer, output write path, drift check, or generated runtime
+encode/decode — follow the process in [`docs/PERFORMANCE.md`](../../docs/PERFORMANCE.md).
+That file is the source of truth; do not invent absolute CI timing gates.
+
+## Required loop
+
+1. Run `mix bench` **before** hot-path edits when a baseline is needed.
+2. Implement (and prefer `mix precommit` for correctness).
+3. Re-run the **same** bench after under comparable conditions.
+4. Record meaningful before→after in `docs/PERFORMANCE.md` (and `CHANGELOG.md`
+   when appropriate).
+5. Do **not** document noise or insignificant jitter.
+6. Avoid performance regressions; call out real improvements.
+7. Soft CI only — never add hard absolute µs/ms fail gates.
+
+Skip the bench loop only for docs-only, pure test fixtures, or changes clearly
+off the hot path.

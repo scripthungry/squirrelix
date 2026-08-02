@@ -163,6 +163,22 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+      # Soft only: never fail CI on timings (see docs/PERFORMANCE.md).
+      - name: Microbench (soft)
+        if: matrix.quality
+        run: |
+          set -euo pipefail
+          mix bench 2>&1 | tee bench-output.txt
+          {
+            echo "## Microbench (soft)"
+            echo
+            echo "Local hot-path PRs should compare \`mix bench\` before/after; CI does not gate on absolute µs."
+            echo
+            echo '```'
+            cat bench-output.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
   # Single required check: fails if any matrix cell failed/cancelled.
   # Branch protection can watch this job name instead of one Elixir cell.
   ci-success:

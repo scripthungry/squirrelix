@@ -1,9 +1,11 @@
 # SquirrElix Roadmap
 
-SquirrElix reimplements [Gleam Squirrel](https://github.com/giacomocavalieri/squirrel)'s core
-SQL discovery, inference, and codegen behaviour with an idiomatic **Elixir-native** public API.
-Upstream Squirrel remains the compatibility reference for query conventions and edge-case tests;
-Elixir conventions take precedence for API shape, `@spec` output, and runtime return values.
+SquirrElix is an independent project that reimplements
+[Gleam Squirrel](https://github.com/giacomocavalieri/squirrel)'s core SQL discovery,
+inference, and codegen behaviour with an idiomatic **Elixir-native** public API. It is not
+affiliated with the Gleam Squirrel project. Upstream Squirrel remains the compatibility
+reference for query conventions and edge-case tests; Elixir conventions take precedence for
+API shape, `@spec` output, and runtime return values.
 
 **Elixir-native direction:** generated modules use stdlib typespecs (`String.t()`, `integer()`,
 `map()` with `required/1`, `term()` for JSON, and so on). SquirrElix does **not** generate
@@ -146,5 +148,10 @@ For the full CI quality gate (Dialyzer, ExDNA, Reach, ExSlop):
 ```sh
 mix ci
 ```
+
+When a change touches codegen, inference, or generated runtime helpers, run
+`mix bench` before and after and note only meaningful wins or trade-offs in
+`CHANGELOG.md` and `docs/PERFORMANCE.md` (skip noise). Do not hard-fail PR CI
+on absolute timings; see that document for the soft-gate / nightly policy.
 
 Commit only after validation passes.

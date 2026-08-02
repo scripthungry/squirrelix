@@ -1,8 +1,10 @@
 SquirrElix
 Copyright 2026 Michael Ward
 
-This product is a port of Gleam Squirrel and follows its SQL discovery,
-inference, and query conventions.
+This product is an independent Elixir library inspired by Gleam Squirrel.
+It reimplements similar SQL discovery, inference, and query conventions.
+It is not affiliated with, endorsed by, or maintained by the Gleam Squirrel
+project.
 
 Gleam Squirrel
 Copyright 2024 Giacomo Cavalieri

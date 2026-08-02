@@ -1,6 +1,6 @@
 # Writing Queries
 
-SquirrElix follows a small set of conventions inherited from
+SquirrElix follows a small set of query conventions inspired by
 [Gleam Squirrel](https://github.com/giacomocavalieri/squirrel). This guide covers
 where to put queries, how files map to functions, and practical tips for edge cases.
 

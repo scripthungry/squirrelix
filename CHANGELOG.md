@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.11] — 2026-08-02
+
+### Changed
+
+- Format generated modules once on the write path: `Codegen.prepare_directory/4`
+  passes `format: false` to `Output.prepare_write/3` after
+  `generate_module/3` has already formatted (avoids a second
+  `Code.format_string!/1`) (#88).
+- Memoises Postgres OID→type and column-nullability catalog lookups inside
+  `Postgres.inferrer/1` for the lifetime of a generate/check pass; plan column
+  sources use tuple indexing instead of `Enum.at/2` (#88).
+
+### Docs
+
+- Clarify independence from Gleam Squirrel (not affiliated / endorsed) (#88).
+- Add `docs/PERFORMANCE.md`, `mix bench` (`bench/micro.exs`), and soft CI
+  microbench reporting on the quality matrix cell (summary only; no absolute
+  timing gates) (#88).
+- Add `docs/README.md` clarifying `docs/` (hand-written) vs `guides/` (ExDoc
+  guides) vs `doc/` (generated, gitignored); split README Guides / Project
+  documentation sections (#88).
+
 ## [0.5.10] — 2026-08-02
 
 ### Changed

@@ -64,6 +64,14 @@ defmodule SquirrelixOutputTest do
            """
   end
 
+  test "prepare_write format: false leaves Elixir content unchanged" do
+    path = Path.join(tmp_dir(), "sql.ex")
+    content = "defmodule Sql do\ndef all do\n:ok\nend\nend\n"
+
+    assert {:ok, prepared} = Output.prepare_write(path, content, format: false)
+    assert prepared.content == content
+  end
+
   test "safe_write does not format non-Elixir files" do
     path = Path.join(tmp_dir(), "query.sql")
     content = "select   *\nfrom users"

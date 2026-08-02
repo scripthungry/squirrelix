@@ -108,7 +108,8 @@ defmodule Squirrelix.Codegen do
       {:ok, module} ->
         content = generate_module(module, queries, opts)
         output_file = Discover.directory_to_output_file(sql_directory)
-        Output.prepare_write(output_file, content)
+        # generate_module/3 already runs Code.format_string!/1.
+        Output.prepare_write(output_file, content, format: false)
 
       {:error, :invalid_sql_directory} ->
         {:error, :invalid_sql_directory}

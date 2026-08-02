@@ -176,21 +176,50 @@ defmodule Squirrelix.Postgres do
 
   The returned function takes a `Squirrelix.Query` and returns
   `{:ok, [params: ..., returns: ...]}` or `{:error, structured_error}`.
+
+  OID→type and column-nullability catalog lookups are memoised for the lifetime
+  of the returned function so a generate/check pass does not re-query the same
+  catalog rows for every parameter and column.
   """
   @spec inferrer(Postgrex.conn()) :: Squirrelix.Inference.inferrer()
   def inferrer(conn) do
-    &infer(conn, &1)
+    cache_key = {__MODULE__, :catalog_cache, make_ref()}
+
+    fn query ->
+      cache = Process.get(cache_key) || new_catalog_cache()
+
+      case infer(conn, query, cache) do
+        {:ok, result, cache} ->
+          Process.put(cache_key, cache)
+          {:ok, result}
+
+        {:error, error} ->
+          {:error, error}
+      end
+    end
   end
 
   @doc false
   @spec infer(Postgrex.conn(), Query.t()) :: {:ok, keyword()} | {:error, struct()}
   def infer(conn, %Query{} = query) do
+    case infer(conn, query, new_catalog_cache()) do
+      {:ok, result, _cache} -> {:ok, result}
+      {:error, error} -> {:error, error}
+    end
+  end
+
+  defp infer(conn, %Query{} = query, cache) do
     with :ok <- ensure_single_statement(query),
          {:ok, prepared_query} <- prepare(conn, query),
-         {:ok, params} <- describe_oids(conn, prepared_query.param_oids || [], query),
-         {:ok, returns} <- describe_returns(conn, prepared_query, query) do
-      {:ok, [params: params, returns: returns]}
+         {:ok, params, cache} <-
+           describe_oids(conn, prepared_query.param_oids || [], query, cache),
+         {:ok, returns, cache} <- describe_returns(conn, prepared_query, query, cache) do
+      {:ok, [params: params, returns: returns], cache}
     end
+  end
+
+  defp new_catalog_cache do
+    %{oids: %{}, columns: %{}}
   end
 
   defp ensure_single_statement(%Query{} = query) do
@@ -307,37 +336,41 @@ defmodule Squirrelix.Postgres do
 
   defp quoted_identifier(_message), do: nil
 
-  defp describe_returns(conn, prepared_query, query) do
+  defp describe_returns(conn, prepared_query, query, cache) do
     columns = prepared_query.columns || []
     result_oids = prepared_query.result_oids || []
 
     {plan_available?, plan_nullables, column_sources} =
       infer_nullability(conn, query, prepared_query)
 
-    with {:ok, types} <- describe_oids(conn, result_oids, query) do
-      returns =
+    # Tuple index is O(1); the former Enum.at/2 on the list was O(C) per column.
+    column_sources = List.to_tuple(column_sources)
+
+    with {:ok, types, cache} <- describe_oids(conn, result_oids, query, cache) do
+      {returns, cache} =
         columns
         |> Enum.zip(types)
         |> Enum.with_index()
-        |> Enum.map(fn {{name, type}, index} ->
-          nullable? =
+        |> Enum.map_reduce(cache, fn {{name, type}, index}, cache ->
+          {nullable?, cache} =
             column_nullable?(
               conn,
               name,
               index,
               plan_nullables,
               column_sources,
-              plan_available?
+              plan_available?,
+              cache
             )
 
-          %Column{
-            name: strip_nullability_override(name),
-            type: type,
-            nullable?: nullable?
-          }
+          {%Column{
+             name: strip_nullability_override(name),
+             type: type,
+             nullable?: nullable?
+           }, cache}
         end)
 
-      {:ok, returns}
+      {:ok, returns, cache}
     end
   end
 
@@ -548,20 +581,33 @@ defmodule Squirrelix.Postgres do
 
   defp unquote_ident(ident), do: ident
 
-  defp column_nullable?(conn, name, index, plan_nullables, column_sources, plan_available?) do
+  defp column_nullable?(
+         conn,
+         name,
+         index,
+         plan_nullables,
+         column_sources,
+         plan_available?,
+         cache
+       ) do
     cond do
       String.ends_with?(name, "!") ->
-        false
+        {false, cache}
 
       String.ends_with?(name, "?") ->
-        true
+        {true, cache}
 
       MapSet.member?(plan_nullables, index) ->
-        true
+        {true, cache}
 
       true ->
-        source_nullable?(conn, Enum.at(column_sources, index), plan_available?)
+        source_nullable?(conn, column_source_at(column_sources, index), plan_available?, cache)
     end
+  end
+
+  defp column_source_at(sources, index)
+       when is_tuple(sources) and is_integer(index) and index >= 0 do
+    if index < tuple_size(sources), do: elem(sources, index), else: nil
   end
 
   # Trailing `!` / `?` aliases force nullability (above); strip before TypedQuery
@@ -574,41 +620,61 @@ defmodule Squirrelix.Postgres do
     end
   end
 
-  defp source_nullable?(_conn, :subquery, _plan_available?), do: true
-  defp source_nullable?(_conn, :expression, _plan_available?), do: false
+  defp source_nullable?(_conn, :subquery, _plan_available?, cache), do: {true, cache}
+  defp source_nullable?(_conn, :expression, _plan_available?, cache), do: {false, cache}
 
-  defp source_nullable?(conn, {:table_column, schema, table, column}, _plan_available?)
+  defp source_nullable?(conn, {:table_column, schema, table, column}, _plan_available?, cache)
        when is_binary(table) and is_binary(column) do
-    !column_has_not_null_constraint?(conn, schema, table, column)
+    {not_null?, cache} = column_has_not_null_constraint?(conn, schema, table, column, cache)
+    {!not_null?, cache}
   end
 
-  defp source_nullable?(_conn, _other, plan_available?), do: !plan_available?
+  defp source_nullable?(_conn, _other, plan_available?, cache), do: {!plan_available?, cache}
 
-  defp column_has_not_null_constraint?(conn, schema, table, column) do
-    case Postgrex.query(conn, @column_nullability_query, [table, column, schema]) do
-      {:ok, %Postgrex.Result{rows: [[true]]}} -> true
-      {:ok, %Postgrex.Result{rows: [[false]]}} -> false
-      _ -> false
+  defp column_has_not_null_constraint?(conn, schema, table, column, cache) do
+    key = {schema, table, column}
+
+    case Map.fetch(cache.columns, key) do
+      {:ok, value} ->
+        {value, cache}
+
+      :error ->
+        value =
+          case Postgrex.query(conn, @column_nullability_query, [table, column, schema]) do
+            {:ok, %Postgrex.Result{rows: [[true]]}} -> true
+            {:ok, %Postgrex.Result{rows: [[false]]}} -> false
+            _ -> false
+          end
+
+        {value, %{cache | columns: Map.put(cache.columns, key, value)}}
     end
   end
 
-  defp describe_oids(conn, oids, query) do
-    Enum.reduce_while(oids, {:ok, []}, fn oid, {:ok, types} ->
-      case describe_oid(conn, oid, query) do
-        {:ok, type} -> {:cont, {:ok, [type | types]}}
+  defp describe_oids(conn, oids, query, cache) do
+    Enum.reduce_while(oids, {:ok, [], cache}, fn oid, {:ok, types, cache} ->
+      case describe_oid(conn, oid, query, cache) do
+        {:ok, type, cache} -> {:cont, {:ok, [type | types], cache}}
         {:error, error} -> {:halt, {:error, error}}
       end
     end)
     |> case do
-      {:ok, types} -> {:ok, Enum.reverse(types)}
+      {:ok, types, cache} -> {:ok, Enum.reverse(types), cache}
       {:error, error} -> {:error, error}
     end
   end
 
-  defp describe_oid(conn, oid, query) do
-    with {:ok, %Postgrex.Result{rows: [[name, kind, array_dimensions, type_oid]]}} <-
-           Postgrex.query(conn, @type_lookup_query, [oid]) do
-      resolve_postgres_type(conn, type_oid, name, kind, array_dimensions, query)
+  defp describe_oid(conn, oid, query, cache) do
+    case Map.fetch(cache.oids, oid) do
+      {:ok, type} ->
+        {:ok, type, cache}
+
+      :error ->
+        with {:ok, %Postgrex.Result{rows: [[name, kind, array_dimensions, type_oid]]}} <-
+               Postgrex.query(conn, @type_lookup_query, [oid]),
+             {:ok, type} <-
+               resolve_postgres_type(conn, type_oid, name, kind, array_dimensions, query) do
+          {:ok, type, %{cache | oids: Map.put(cache.oids, oid, type)}}
+        end
     end
   end
 
