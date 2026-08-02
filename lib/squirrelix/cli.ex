@@ -5,6 +5,7 @@ defmodule Squirrelix.CLI do
   # SQL directory discovery lives in `Squirrelix.Discover`.
 
   alias Squirrelix.ConnectionOptions
+  alias Squirrelix.RepoConfig
 
   @default_host "localhost"
   @default_user "postgres"
@@ -16,23 +17,34 @@ defmodule Squirrelix.CLI do
   @doc """
   Resolves connection options from environment and Mix/CLI opts.
 
-  Precedence (highest first): flag overrides → `:url` → `DATABASE_URL` → `PG*` →
-  defaults.
+  Precedence (highest first): flag overrides → `:url` → `DATABASE_URL` →
+  `:repo` config → `PG*` → defaults.
   """
   @spec resolve_connection_options(map(), keyword()) ::
-          {:ok, ConnectionOptions.t()} | {:error, :invalid_url}
+          {:ok, ConnectionOptions.t()}
+          | {:error, :invalid_url | :invalid_repo | :repo_config_unavailable}
   def resolve_connection_options(env, opts \\ []) when is_map(env) and is_list(opts) do
     project_name = Keyword.get(opts, :project_name, "postgres")
 
-    with {:ok, from_url} <- url_override(env, opts) do
+    with {:ok, from_url} <- url_override(env, opts),
+         {:ok, from_repo} <- repo_override(opts) do
       base =
         env
         |> connection_options_from_variables(project_name)
+        |> merge_connection_options(from_repo)
         |> merge_connection_options(from_url)
         |> merge_flag_overrides(opts)
         |> apply_connection_defaults()
 
       {:ok, base}
+    end
+  end
+
+  defp repo_override(opts) do
+    case Keyword.get(opts, :repo) do
+      nil -> {:ok, nil}
+      "" -> {:ok, nil}
+      repo -> RepoConfig.connection_options(repo)
     end
   end
 

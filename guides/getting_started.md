@@ -147,7 +147,8 @@ It needs the optional `file_system` dependency (see
 
 ## Use the generated module
 
-After generation, call functions from the generated module with a Postgrex connection:
+After generation, call functions from the generated module. By default the first
+argument is a Postgrex connection:
 
 ```elixir
 alias MyApp.Accounts.SQL
@@ -179,6 +180,11 @@ affected-row count:
 {:ok, 1} = SQL.delete_user_ok(conn, 1)
 {:error, %Postgrex.Error{}} = SQL.find_user_ok(conn, -1)
 ```
+
+Phoenix / Ecto apps can instead generate a **Repo runner** (`--runner ecto`) so
+call sites pass `MyApp.Repo` and share transactions / Sandbox — that path is for
+**connection ownership**, not schemas. See
+[Phoenix + CI Cookbook](phoenix.md#what-the-optional-repo-integration-is-for).
 
 ## Keep generated code in sync
 

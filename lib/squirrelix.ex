@@ -109,6 +109,11 @@ defmodule Squirrelix do
 
     * `:version` (required) — generator version string written into file headers
     * `:postgrex` — module passed to generated code (defaults to `Postgrex`)
+    * `:runner` — `:postgrex` (default) or `:ecto`. The Ecto runner generates
+      Repo-first functions that call `Ecto.Adapters.SQL.query!/3` / `query/3`
+      (connection ownership / Sandbox / transactions only — not schemas)
+    * `:ecto_sql` — module used when `:runner` is `:ecto` (defaults to
+      `Ecto.Adapters.SQL`; injectable in tests)
 
   Returns a `Squirrelix.CodegenSummary` struct summarizing writes and errors.
   """

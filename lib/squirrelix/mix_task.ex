@@ -21,7 +21,9 @@ defmodule Squirrelix.MixTask do
     hostname: :string,
     username: :string,
     password: :string,
-    port: :integer
+    port: :integer,
+    repo: :string,
+    runner: :string
   ]
 
   @spec generate([String.t()]) :: :ok
@@ -47,7 +49,7 @@ defmodule Squirrelix.MixTask do
 
     with_query_source!(opts, root, fn query_source ->
       root
-      |> Squirrelix.check(query_source, version: version())
+      |> Squirrelix.check(query_source, generate_opts(opts))
       |> report_check_summary()
     end)
   end
@@ -81,7 +83,7 @@ defmodule Squirrelix.MixTask do
   defp generate_once!(root, opts) do
     with_query_source!(opts, root, fn query_source ->
       root
-      |> Squirrelix.generate(query_source, version: version())
+      |> Squirrelix.generate(query_source, generate_opts(opts))
       |> report_generate_summary()
     end)
   end
@@ -97,11 +99,11 @@ defmodule Squirrelix.MixTask do
   defp with_query_source!(opts, root, callback) do
     write_metadata? = is_binary(opts[:write_metadata])
     infer? = opts[:infer] == true
+    repo? = is_binary(opts[:repo]) and opts[:repo] != ""
+
+    validate_infer_flags!(write_metadata?, repo?, infer?)
 
     cond do
-      write_metadata? and not infer? ->
-        Mix.raise("--write-metadata requires --infer")
-
       infer? and write_metadata? ->
         with_infer_and_optional_export!(opts, root, callback)
 
@@ -110,6 +112,19 @@ defmodule Squirrelix.MixTask do
 
       true ->
         callback.(load_metadata!(opts, root))
+    end
+  end
+
+  defp validate_infer_flags!(write_metadata?, repo?, infer?) do
+    cond do
+      write_metadata? and not infer? ->
+        Mix.raise("--write-metadata requires --infer")
+
+      repo? and not infer? ->
+        Mix.raise("--repo requires --infer")
+
+      true ->
+        :ok
     end
   end
 
@@ -159,6 +174,7 @@ defmodule Squirrelix.MixTask do
   end
 
   defp with_postgres_inferrer!(opts, callback) do
+    maybe_load_app_config!(opts)
     {:ok, _} = Application.ensure_all_started(:postgrex)
     connection_options = build_connection_options(opts)
 
@@ -175,7 +191,16 @@ defmodule Squirrelix.MixTask do
     end
   end
 
-  # Precedence (highest first): flags → --url → DATABASE_URL → PG* → defaults.
+  defp maybe_load_app_config!(opts) do
+    if is_binary(opts[:repo]) and opts[:repo] != "" do
+      # Load host-app config so `Repo.config/0` sees `config/*.exs` values.
+      _ = Mix.Task.run("app.config")
+    end
+
+    :ok
+  end
+
+  # Precedence (highest first): flags → --url → DATABASE_URL → --repo → PG* → defaults.
   defp build_connection_options(opts) do
     case CLI.resolve_connection_options(System.get_env(), opts) do
       {:ok, connection_options} ->
@@ -187,7 +212,39 @@ defmodule Squirrelix.MixTask do
 
         Hint: Use a Postgres URL such as `postgres://username:password@host:port/database_name` (or `postgresql://...`).
         """)
+
+      {:error, :invalid_repo} ->
+        Mix.raise("""
+        Invalid --repo value
+
+        Hint: Pass a compiled Ecto Repo module such as `MyApp.Repo`.
+        """)
+
+      {:error, :repo_config_unavailable} ->
+        Mix.raise("""
+        Could not read Repo config
+
+        Hint: Ensure the module exports `config/0` (as Ecto.Repo does) and that
+        `mix app.config` can load your application configuration.
+        """)
     end
+  end
+
+  defp generate_opts(opts) do
+    [version: version(), runner: parse_runner!(opts[:runner])]
+  end
+
+  defp parse_runner!(nil), do: :postgrex
+  defp parse_runner!(""), do: :postgrex
+  defp parse_runner!("postgrex"), do: :postgrex
+  defp parse_runner!("ecto"), do: :ecto
+
+  defp parse_runner!(other) do
+    Mix.raise("""
+    Invalid --runner value: #{inspect(other)}
+
+    Hint: Use `--runner postgrex` (default) or `--runner ecto`.
+    """)
   end
 
   defp load_metadata!(opts, root) do

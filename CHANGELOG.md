@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Optional Ecto Repo runner: `mix squirrelix.gen --runner ecto` (and `check`)
+  generates Repo-first functions via `Ecto.Adapters.SQL.query!/3` / `query/3`
+  for connection checkout, Sandbox, and transactions — not schemas or changesets.
+  Default remains `--runner postgrex`.
+- Mix `--repo MODULE` with `--infer` reads connection settings from an Ecto
+  Repo `config/0` (precedence: flags → `--url` → `DATABASE_URL` → `--repo` →
+  `PG*` → defaults).
+
+### Changed
+
+- ROADMAP non-goals: freeze “first-class Ecto ORM integration”; allow the
+  optional Repo runner / `--repo` infer path above.
+
+### Docs
+
+- Document optional Repo integration purpose (connection ownership / Sandbox /
+  transactions — not schemas) in the Phoenix cookbook, Configuration (`--repo`,
+  `--runner`), Getting Started, and README FAQ.
+
 ## [0.5.13] — 2026-08-02
 
 ### Docs

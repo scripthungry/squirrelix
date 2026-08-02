@@ -62,7 +62,10 @@ boundaries (not “not yet”):
 - Unix sockets
 - PostGIS
 - ULID
-- First-class Ecto `Repo` integration
+- First-class Ecto ORM integration (schemas, changesets, `Ecto.Multi`, associations).
+  Optional Repo-as-connection-owner is supported separately: Mix `--repo` for
+  infer config and `--runner ecto` for Repo-first `Ecto.Adapters.SQL` codegen —
+  not a competing persistence layer
 - Built-in SQL formatter
 
 Guides may link here for scope (FAQ, Types reject-with-hints, Phoenix + Ecto) without

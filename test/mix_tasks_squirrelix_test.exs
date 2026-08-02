@@ -329,6 +329,48 @@ defmodule MixTasksSquirrelixTest do
     end
   end
 
+  test "mix squirrelix.gen rejects --repo without --infer" do
+    root = tmp_project(:acorn_counter)
+    query_file = write_query(root)
+    write_metadata(root, query_file)
+
+    assert_raise Mix.Error, ~r/--repo requires --infer/, fn ->
+      File.cd!(root, fn ->
+        Mix.Task.run("squirrelix.gen", ["--repo", "MyApp.Repo"])
+      end)
+    end
+  end
+
+  test "mix squirrelix.gen rejects invalid --runner values" do
+    root = tmp_project(:acorn_counter)
+    query_file = write_query(root)
+    write_metadata(root, query_file)
+
+    assert_raise Mix.Error, ~r/Invalid --runner value/, fn ->
+      File.cd!(root, fn ->
+        Mix.Task.run("squirrelix.gen", ["--runner", "mongo"])
+      end)
+    end
+  end
+
+  test "mix squirrelix.gen --runner ecto writes Repo-first modules from metadata" do
+    root = tmp_project(:acorn_counter)
+    query_file = write_query(root)
+    write_metadata(root, query_file)
+
+    output =
+      File.cd!(root, fn ->
+        capture_io(fn -> Mix.Task.run("squirrelix.gen", ["--runner", "ecto"]) end)
+      end)
+
+    assert output =~ "Generated 1 query."
+
+    generated = File.read!(Path.join(root, "lib/accounts/sql.ex"))
+    assert generated =~ "def find_account(repo,"
+    assert generated =~ "Ecto.Adapters.SQL"
+    refute generated =~ "def find_account(conn,"
+  end
+
   test "mix squirrelix.gen moduledoc documents metadata and infer options" do
     {:docs_v1, _, _, _, module_doc, _, _} = Code.fetch_docs(Mix.Tasks.Squirrelix.Gen)
     moduledoc = module_doc["en"]
@@ -337,10 +379,13 @@ defmodule MixTasksSquirrelixTest do
     assert moduledoc =~ "--infer"
     assert moduledoc =~ "--write-metadata"
     assert moduledoc =~ "--watch"
+    assert moduledoc =~ "--repo"
+    assert moduledoc =~ "--runner"
     assert moduledoc =~ "squirr_elix.exs"
     assert moduledoc =~ "DATABASE_URL"
     assert moduledoc =~ "sslmode"
-    assert moduledoc =~ "flags → `--url` → `DATABASE_URL` → `PG*` → defaults"
+    assert moduledoc =~ "flags → `--url` → `DATABASE_URL` →"
+    assert moduledoc =~ "`--repo` → `PG*` → defaults"
   end
 
   test "mix squirrelix.check moduledoc documents usage" do
@@ -350,6 +395,8 @@ defmodule MixTasksSquirrelixTest do
     assert moduledoc =~ "mix squirrelix.check"
     assert moduledoc =~ "--infer"
     assert moduledoc =~ "--write-metadata"
+    assert moduledoc =~ "--repo"
+    assert moduledoc =~ "--runner"
     assert moduledoc =~ "DATABASE_URL"
   end
 

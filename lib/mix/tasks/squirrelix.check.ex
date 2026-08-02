@@ -27,8 +27,13 @@ defmodule Mix.Tasks.Squirrelix.Check do
     * `--username USER` — database user when inferring
     * `--password PASS` — database password when inferring (prefer `PGPASSWORD`)
     * `--port PORT` — database port when inferring
+    * `--repo MODULE` — with `--infer`, read connection settings from an Ecto
+      Repo module's `config/0` (for example `MyApp.Repo`)
+    * `--runner postgrex|ecto` — code generation runner (default `postgrex`).
+      `ecto` emits Repo-first functions via `Ecto.Adapters.SQL` (not schemas)
 
-  Connection precedence (highest first): flags → `--url` → `DATABASE_URL` → `PG*` → defaults.
+  Connection precedence (highest first): flags → `--url` → `DATABASE_URL` →
+  `--repo` → `PG*` → defaults.
 
   URLs may include `sslmode` / `ssl` query parameters. See the Configuration guide.
   """

@@ -3,8 +3,31 @@
 Day-to-day Mix workflow for Phoenix apps: migrate before generate/check, recommended
 aliases, CI with `mix squirrelix.check`, and intentional coexistence with Ecto.
 
-SquirrElix is **not** an Ecto `Repo` wrapper. Use Ecto for schemas and migrations;
-put typed queries in `sql/` and call the generated modules with a `Postgrex.conn()`.
+SquirrElix is **not** an Ecto ORM. Use Ecto for schemas, changesets, and migrations;
+put typed queries in `sql/` and call the generated modules. By default those modules
+take a `Postgrex.conn()`; optionally generate a **Repo runner** so call sites pass
+`MyApp.Repo` and share checkout / Sandbox / transactions via `Ecto.Adapters.SQL`.
+
+## What the optional Repo integration is for
+
+Phoenix apps already own a database through `Ecto.Repo`. Without help, SquirrElix
+forces a second seam: dual connection config for `--infer`, and call sites that
+pass a raw Postgrex connection even when the rest of the app thinks in Repo terms.
+
+The optional integration closes **only** that seam:
+
+| Capability | Purpose |
+| --- | --- |
+| Mix `--repo MyApp.Repo` (with `--infer`) | Read host/user/database/SSL (and `:url`) from `Repo.config/0` so generate/check use the same DB settings as Ecto — no second copy of credentials |
+| Mix `--runner ecto` | Generate `SQL.find_user(Repo, id)` style functions that call `Ecto.Adapters.SQL.query!/3` / `query/3`, so queries join **Repo checkout**, **`Repo.transaction/2`**, and **`Ecto.Adapters.SQL.Sandbox`** in tests |
+
+**It is not for:** mapping rows to `%Ecto.Schema{}` structs, changesets,
+`Ecto.Multi`, associations, `Ecto.Query`, or replacing Ecto as your persistence
+layer. Those remain explicit non-goals (see
+[ROADMAP](https://github.com/scripthungry/squirrelix/blob/main/docs/ROADMAP.md#explicit-non-goals-not-on-the-10-path)).
+Plain `.sql` files stay the source of truth; SquirrElix still generates typed maps.
+
+Default codegen (`--runner postgrex`) is unchanged for non-Ecto apps.
 
 ## Dependencies
 
@@ -14,6 +37,9 @@ Keep SquirrElix as a **dev/test** Mix tool (include `:test` for CI under
 ```elixir
 {:squirr_elix, "~> 0.5.0", only: [:dev, :test], runtime: false}
 ```
+
+`--runner ecto` needs `ecto_sql` at **runtime in the host app** (Phoenix already
+has it). SquirrElix itself does not add an Ecto dependency.
 
 ## Layout in a Phoenix app
 
@@ -27,18 +53,22 @@ lib/my_app/accounts/sql/*.sql  →  lib/my_app/accounts/sql.ex  (MyApp.Accounts.
 Ecto schemas and migrations stay where Phoenix puts them. SquirrElix never reads
 those modules; it only needs the **database schema** when you run `--infer`.
 
-## `DATABASE_URL` and connection config
+## Connection config (`DATABASE_URL`, `PG*`, or `--repo`)
 
-SquirrElix does **not** read `config/*.exs` or your `Ecto.Repo` settings. Point it
-at the same database Ecto uses via `DATABASE_URL`, `PG*` variables, or Mix flags
-(precedence and SSL: [Configuration](configuration.md)).
+Point SquirrElix at the same database Ecto uses. Any of:
 
 ```sh
+# Environment (common in CI / runtime.exs)
 export DATABASE_URL=postgres://postgres:postgres@localhost:5432/my_app_dev
 mix squirrelix.gen --infer
+
+# Or reuse Repo config from config/*.exs (loads via mix app.config)
+mix squirrelix.gen --infer --repo MyApp.Repo
 ```
 
-Prefer secrets in the environment over `--password` or passwords in shell history.
+Precedence (highest first): flags → `--url` → `DATABASE_URL` → `--repo` → `PG*` →
+defaults. Prefer secrets in the environment over `--password`. Full SSL /
+flag details: [Configuration](configuration.md).
 
 ## Migrate, then generate or check
 
@@ -49,7 +79,9 @@ Recommended local loop:
 
 ```sh
 mix ecto.migrate
-mix squirrelix.gen --infer
+mix squirrelix.gen --infer --repo MyApp.Repo
+# optional Repo call sites:
+# mix squirrelix.gen --infer --repo MyApp.Repo --runner ecto
 ```
 
 Then commit both the `.sql` sources and the generated `sql.ex` files.
@@ -58,7 +90,7 @@ Check without writing:
 
 ```sh
 mix ecto.migrate
-mix squirrelix.check --infer
+mix squirrelix.check --infer --repo MyApp.Repo
 ```
 
 ## Recommended Mix aliases
@@ -72,11 +104,13 @@ defp aliases do
     "ecto.setup": ["ecto.create", "ecto.migrate"],
     "ecto.reset": ["ecto.drop", "ecto.setup"],
     test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
-    "sql.gen": ["ecto.migrate", "squirrelix.gen --infer"],
-    "sql.check": ["ecto.migrate", "squirrelix.check --infer"]
+    "sql.gen": ["ecto.migrate", "squirrelix.gen --infer --repo MyApp.Repo"],
+    "sql.check": ["ecto.migrate", "squirrelix.check --infer --repo MyApp.Repo"]
   ]
 end
 ```
+
+Add `--runner ecto` to those aliases when you want Repo-first generated modules.
 
 Usage:
 
@@ -85,56 +119,68 @@ mix sql.gen      # migrate + regenerate sql.ex
 mix sql.check    # migrate + verify sql.ex is current
 ```
 
-Ensure `DATABASE_URL` or `PG*` is set in the shell (or CI `env:`) so `--infer`
-reaches the same database `ecto.migrate` just updated.
-
 ## Calling generated modules
+
+### Default: Postgrex connection (`--runner postgrex`)
 
 Generated functions take a `Postgrex.conn()` as the first argument — a pool pid,
 named process, or other value accepted by `Postgrex.query!/3` /
-`Postgrex.query/3`. They do **not** take an `Ecto.Repo` module.
+`Postgrex.query/3`.
 
 ```elixir
 alias MyApp.Accounts.SQL
 
-# Raising API
 rows = SQL.find_user(conn, 42)
-# => [%{id: 42, name: "Ada", email: "ada@example.com"}]
-
-# Soft companion — {:ok, result} | {:error, Exception.t()}
 {:ok, rows} = SQL.find_user_ok(conn, 42)
-{:ok, 1} = SQL.delete_user_ok(conn, 42)
 ```
 
-Soft companions (`<name>_ok/arity`) are additive: use them when you want ok/error
-tuples (for example in contexts that pattern-match on failure) without changing
-the raising API.
+### Optional: Ecto Repo (`--runner ecto`)
 
-A common Phoenix setup is a supervised Postgrex pool configured from the same
-URL / credentials as `MyApp.Repo`, then pass that pool into generated functions.
-Sharing one Ecto transaction with SquirrElix queries is **out of scope** — there is
-no first-class `Repo` integration (see below).
+Regenerate with `--runner ecto` so the first argument is a Repo module. Execution
+goes through `Ecto.Adapters.SQL`, which uses the Repo’s checked-out connection
+when one is active (transactions and Sandbox).
+
+```sh
+mix squirrelix.gen --infer --repo MyApp.Repo --runner ecto
+```
+
+```elixir
+alias MyApp.Accounts.SQL
+alias MyApp.Repo
+
+rows = SQL.find_user(Repo, 42)
+{:ok, rows} = SQL.find_user_ok(Repo, 42)
+
+Repo.transaction(fn ->
+  # Shares the transaction connection with Ecto.Adapters.SQL
+  SQL.insert_event(Repo, user_id, "signed_in")
+end)
+```
+
+Soft companions (`<name>_ok/arity`) remain additive for both runners.
+
+Pick **one** runner per project (or regenerate when switching): mixing call-site
+shapes means regenerating `sql.ex` and updating callers.
 
 ## Coexistence with Ecto (intentional)
 
 | Concern | Tool |
 | --- | --- |
-| Migrations, schema modules, changesets | Ecto |
+| Migrations, schema modules, changesets, Multi | Ecto |
 | Typed, file-based SQL queries | SquirrElix (`sql/` → `sql.ex`) |
-| Runtime execution of generated queries | Postgrex (`Postgrex.conn()`) |
+| Runtime execution (default) | Postgrex (`Postgrex.conn()`) |
+| Runtime execution (optional Repo runner) | `Ecto.Adapters.SQL` via your Repo |
 
 This split is intentional:
 
-- SquirrElix embraces plain `.sql` files and Postgrex — the same model as
-  [Gleam Squirrel](https://github.com/giacomocavalieri/squirrel).
-- First-class Ecto `Repo` integration / query macros are an **explicit non-goal**
+- SquirrElix embraces plain `.sql` files — inspired by
+  [Gleam Squirrel](https://github.com/giacomocavalieri/squirrel), with an
+  Elixir-native Mix/Hex API.
+- Optional Repo support is **connection ownership only** (infer config + SQL
+  adapter execution). First-class ORM features remain an **explicit non-goal**
   (see [ROADMAP](https://github.com/scripthungry/squirrelix/blob/main/docs/ROADMAP.md#explicit-non-goals-not-on-the-10-path)).
-- You can use both in one app: Ecto for writes and schema evolution, SquirrElix for
-  read-heavy or carefully reviewed SQL that benefits from typed codegen.
-
-Do not expect generated modules to accept `MyApp.Repo`, participate in
-`Repo.transaction/2` automatically, or replace `Ecto.Query`. If you need that
-integration layer, build a thin wrapper in your app — it is not part of SquirrElix.
+- Use both in one app: Ecto for schema evolution and CRUD; SquirrElix for
+  reviewed SQL that benefits from typed codegen.
 
 ## Dialyzer and generated modules
 
@@ -223,7 +269,8 @@ A shorter variant when aliases are defined:
 | Symptom | Likely cause | Fix |
 | --- | --- | --- |
 | `MissingPostgresTable` / column | Migrations not applied | `mix ecto.migrate` before `--infer` |
-| `CannotConnectToPostgres` | Wrong host/ creds / SSL | Align `DATABASE_URL` / `PG*` with Repo; see [Configuration](configuration.md) |
+| `CannotConnectToPostgres` | Wrong host/ creds / SSL | Align `DATABASE_URL` / `PG*` / `--repo` with Repo; see [Configuration](configuration.md) |
+| `Invalid --repo` / config unavailable | Repo not compiled or no `config/0` | Pass `MyApp.Repo`; ensure `mix app.config` can load the app |
 | `OutdatedFile` in CI | Forgot to regenerate | Run `mix sql.gen` (or `mix squirrelix.gen --infer`) and commit `sql.ex` |
 | Check passes locally, fails in CI | Different database / env | Use the same URL shape; create + migrate in CI before check |
 
