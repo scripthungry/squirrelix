@@ -1,7 +1,8 @@
 # Local Elixir/OTP pins for [mise](https://mise.jdx.dev).
-# Matches the CI quality cell in .github/workflows/ci.yml (Elixir 1.20 / OTP 28.0).
-# Matrix also tests 1.18.4/27.3 and 1.19.4/28.0; mix.exs requires elixir: "~> 1.18".
+# Matches the CI quality cell in .github/workflows/ci.yml (Elixir 1.20 / OTP 28.5).
+# Matrix also tests 1.18.4/27.3 and 1.19.4/28.5; mix.exs requires elixir: "~> 1.18".
 # Use the -otp-28 Elixir build so it pairs with the erlang pin below.
+# OTP 28.1+ avoids runtime regex recompilation (perf warning on 28.0).
 [tools]
 elixir = "1.20.0-otp-28"
-erlang = "28.0"
+erlang = "28.5"

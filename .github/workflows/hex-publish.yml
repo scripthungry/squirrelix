@@ -60,7 +60,7 @@ jobs:
       - uses: erlef/setup-beam@v1
         with:
           elixir-version: "1.20.0"
-          otp-version: "28.1"
+          otp-version: "28.5"
 
       - name: Confirm manual publish
         if: github.event_name == 'workflow_dispatch'
