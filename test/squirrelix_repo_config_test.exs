@@ -5,8 +5,8 @@ defmodule SquirrelixRepoConfigTest do
   alias Squirrelix.ConnectionOptions
   alias Squirrelix.RepoConfig
   alias Squirrelix.TestSupport.RepoWithConfig
-  alias Squirrelix.TestSupport.RepoWithUrl
   alias Squirrelix.TestSupport.RepoWithoutConfig
+  alias Squirrelix.TestSupport.RepoWithUrl
 
   describe "RepoConfig.connection_options/1" do
     test "maps Ecto-style config/0 onto ConnectionOptions" do
