@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.12] — 2026-08-02
+
+### Changed
+
+- Pin local and CI quality cells to Elixir **1.20.2** / OTP **28.5** via
+  `mise.toml`, CI matrix, Hex publish, examples, and README; bump the 1.19
+  matrix cell to **1.19.5** and the 1.18 OTP pin to **27.3.4**.
+- Move GitHub Actions majors to current stables (`actions/checkout@v7`,
+  `actions/cache@v6`, `actions/upload-artifact@v7`) in workflows and examples.
+- Align CI/Hex Postgres service images on **postgres:17**.
+
+### Fixed
+
+- Avoid OTP **28.0** runtime regex recompilation (performance warning) by
+  running on OTP **28.5**.
+
 ## [0.5.11] — 2026-08-02
 
 ### Changed
