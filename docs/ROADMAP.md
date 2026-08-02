@@ -44,7 +44,7 @@ feedback validates the API (maintainer judgement). Completing #23–#26 is neces
 **not sufficient** without that gate (#28).
 
 - [ ] SemVer / stability / deprecation policy (#23) — includes formal deprecation mechanism
-- [ ] Documented non-goals freeze (#24)
+- [ ] Non-goals freeze verified (ROADMAP canonical; #24)
 - [ ] Docs freeze and HexDocs polish (#25)
 - [x] Prune internal APIs before 1.0 (#52)
 - [ ] Adoption / feedback gate: sufficient real-world users (#28)
@@ -52,10 +52,21 @@ feedback validates the API (maintainer judgement). Completing #23–#26 is neces
 
 ### Explicit non-goals (not on the 1.0 path)
 
-Composites as nested modules, first-class ranges/geometric/network/`interval`, Gleam-style
-enum ADTs, catalog-inferred nullable parameters, Unix sockets, PostGIS, ULID, first-class
-Ecto `Repo` integration, and a built-in SQL formatter. See the FAQ / Types guide; freeze
-tracked in #24.
+This section is the **canonical** freeze list for 1.0. These are intentional product
+boundaries (not “not yet”):
+
+- Composites as nested modules
+- First-class ranges / geometric / network / `interval`
+- Gleam-style enum ADTs
+- Catalog-inferred nullable parameters
+- Unix sockets
+- PostGIS
+- ULID
+- First-class Ecto `Repo` integration
+- Built-in SQL formatter
+
+Guides may link here for scope (FAQ, Types reject-with-hints, Phoenix + Ecto) without
+re-listing every item. Freeze verification is tracked in #24.
 
 ## Validation discipline
 

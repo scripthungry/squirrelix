@@ -187,6 +187,13 @@ SQL — see [Types](guides/types.md#composite-types-policy).
 No — intentional. Use it *alongside* Ecto; see the
 [Phoenix + CI Cookbook](guides/phoenix.md#coexistence-with-ecto-intentional).
 
+### What is intentionally out of scope?
+
+Product non-goals for 1.0 (for example PostGIS, ULID, a built-in SQL formatter) are
+listed in the
+[roadmap](https://github.com/scripthungry/squirrelix/blob/main/docs/ROADMAP.md#explicit-non-goals-not-on-the-10-path)
+— intentional boundaries, not a backlog.
+
 ## Errors and troubleshooting
 
 | Error | Typical cause | What to do |
