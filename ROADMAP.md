@@ -1,15 +1,18 @@
 # SquirrElix Roadmap
 
-SquirrElix is an independent project that reimplements
+SquirrElix is an independent Elixir library that reimplements
 [Gleam Squirrel](https://github.com/giacomocavalieri/squirrel)'s core SQL discovery,
-inference, and codegen behaviour with an idiomatic **Elixir-native** public API. It is not
-affiliated with the Gleam Squirrel project. Upstream Squirrel remains the compatibility
-reference for query conventions and edge-case tests; Elixir conventions take precedence for
-API shape, `@spec` output, and runtime return values.
+inference, and codegen ideas with an idiomatic **Elixir-native** public API (Mix, Hex,
+ExDoc, Postgrex, stdlib typespecs). It is not affiliated with, endorsed by, or
+maintained by the Gleam Squirrel project. Gleam Squirrel remains a **behavioural /
+compatibility reference** for query conventions and edge-case tests; Elixir conventions
+take precedence for API shape, `@spec` output, and runtime return values.
 
 **Elixir-native direction:** generated modules use stdlib typespecs (`String.t()`, `integer()`,
 `map()` with `required/1`, `term()` for JSON, and so on). SquirrElix does **not** generate
-Gleam records, custom enum ADTs, or opaque tagged error values.
+Gleam records, custom enum ADTs, or opaque tagged error values. The product goal is a
+solid Elixir/OTP typed-SQL helper — not a line-by-line Gleam clone or a race to “catch up”
+to upstream features that fight the platform.
 
 ## Completed
 
@@ -71,34 +74,28 @@ Gleam records, custom enum ADTs, or opaque tagged error values.
 
 - **Package and docs**
   - [x] Hex package metadata, Apache-2.0 licence, and ExDoc module grouping.
-  - [x] README mirroring Gleam Squirrel structure (motivation, installation, types, FAQ).
+  - [x] README structure inspired by Gleam Squirrel (motivation, installation, types, FAQ)
+    with Elixir-native content throughout.
   - [x] Guides: getting started, writing queries, types, configuration, and Phoenix + CI.
   - [x] Supported pre-1.0 public API inventory; internals `@moduledoc false`.
   - [x] Adopter CI workflow examples (`examples/github-actions/`).
   - [x] CI test coverage metrics (ExCoveralls; soft floor).
   - [x] ExDoc extras and module docs linking to guides.
 
-## Remaining (path to 1.0)
+### Shipped history (0.x → current 0.5.x)
 
-GitHub is the source of truth for open work: [project board](https://github.com/orgs/scripthungry/projects/1)
-and milestones below. **1.0** means production-ready typed SQL codegen for Elixir/Phoenix,
-Gleam-aligned where intentional, with a SemVer stability promise — not infinite feature creep.
-
-### Shipped slices (folded into Completed above)
-
-Post-0.1 roadmap items through **v0.5.1** are done: nullability expansion, structured
+Post-0.1 work through the **0.5** line is done: nullability expansion, structured
 connection/timeout errors, ranges/unsupported built-ins, composite reject-with-hints,
-parameter-name/Gleam parity ports, Phoenix-ready `DATABASE_URL`/SSL `--infer`, atomic
-codegen (query-error refuse-all; write-pass temp/rename in **0.5.2**), INSERT/VALUES and
-broader structural parameter naming, additive soft query companions with command row
-counts, watch mode, `--write-metadata`, Phoenix + CI cookbook, production hardening
-(multi-schema docs/tests, Dialyzer-friendly codegen, public API audit, adopter CI
-examples, error-message consistency, CI coverage), and Hex `0.1.0`–`0.5.2` releases
-(**0.5.3** adds Dialyzer/ExDNA/Reach/ExSlop CI gates).
+structural parameter naming (shared query conventions with Gleam Squirrel where useful),
+Phoenix-ready `DATABASE_URL`/SSL `--infer`, atomic codegen (query-error refuse-all;
+write-pass temp/rename), soft query companions with command row counts, watch mode,
+`--write-metadata`, Phoenix + CI cookbook, production hardening (multi-schema docs/tests,
+Dialyzer-friendly codegen, public API audit, adopter CI examples, error-message
+consistency, CI coverage), and Hex releases from `0.1.0` through the current **0.5.x**
+point-release line (**0.5.3** quality gates; **0.5.7**–**0.5.8** review follow-ups below).
 
-### [Post-0.5 backlog](https://github.com/scripthungry/squirrelix/milestone/6)
-
-Point-release follow-ups from the multi-model review (not the 1.0 SemVer cut):
+[Post-0.5 backlog](https://github.com/scripthungry/squirrelix/milestone/6) follow-ups are
+**all shipped** (point releases, not the 1.0 SemVer cut):
 
 - Optional `file_system` (watch-only) (#50) — **0.5.8**
 - Document intentional `sslmode=require` → `verify_none` (libpq-aligned; no silent
@@ -107,10 +104,23 @@ Point-release follow-ups from the multi-model review (not the 1.0 SemVer cut):
 - Postgres ≥ 16 version guard on `--infer` connect (#65) — **0.5.7**
 - Hard-reject multi-statement `.sql` files (#66) — **0.5.7**
 - Nested array runtime helper recursion (#67) — **0.5.7**
-- Docs hygiene: soften parity claims, `numeric` divergence, dead `timestamptz` hint (#68) — **0.5.7**
+- Docs hygiene: intentional divergences vs Gleam Squirrel, `numeric`, dead `timestamptz`
+  hint (#68) — **0.5.7**
 - Document EXPLAIN nullability fallback (#69) — **0.5.7**
 - Library Dialyzer CI job for the package itself (#51) — **0.5.3**
 - Write-pass atomicity (#49) — **0.5.2**
+
+## Remaining (path to 1.0)
+
+GitHub is the source of truth for open work: [project board](https://github.com/orgs/scripthungry/projects/1)
+and the milestone below. **1.0** means production-ready typed SQL codegen for
+Elixir/Phoenix — an Elixir-appropriate reimplementation with Gleam-inspired query
+conventions where intentional — plus a SemVer stability promise. It is **not** infinite
+feature creep or a checklist of remaining Gleam APIs.
+
+Near term: finish 1.0 prep docs and keep Hex/`0.5.x` healthy. Medium term: ship **1.0**
+only after the adoption gate. Longer term: maintenance and Elixir-native improvements
+driven by adopter needs (not upstream feature mirroring).
 
 ### [v1.0.0](https://github.com/scripthungry/squirrelix/milestone/5) — Stability promise
 

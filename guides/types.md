@@ -180,8 +180,8 @@ Workarounds:
 - Cast the range to `text` or `jsonb` in SQL if you need the literal form.
 
 Postgrex can decode ranges as `Postgrex.Range` at runtime, but SquirrElix does not
-generate typed helpers for them — keeping the supported surface aligned with
-Gleam Squirrel and Elixir stdlib typespecs.
+generate typed helpers for them — an intentional Elixir-native scope choice that also
+overlaps Gleam Squirrel’s unsupported set.
 
 ### Other unsupported built-ins
 
@@ -245,7 +245,7 @@ Example metadata entry:
 | `timestamptz` | Hint to use `timestamp` | `DateTime.t()` |
 | Database driver | `pog` | `Postgrex` |
 
-See [NOTICE](../NOTICE) for upstream attribution.
+See [NOTICE](../NOTICE) for attribution and independence wording.
 
 ## Next steps
 

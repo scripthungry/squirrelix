@@ -131,7 +131,7 @@ do not.
 | Composable / dynamic queries in Elixir | `Ecto.Query` (or raw SQL via `Repo.query/2`) |
 | One-off or few static queries, no codegen | Direct [Postgrex](https://hexdocs.pm/postgrex) |
 | File-based SQL with a different stack | [yesql](https://github.com/krisajenkins/yesql)-style approaches, or [sqlx](https://github.com/launchbadge/sqlx) outside Elixir |
-| Gleam instead of Elixir | Upstream [Squirrel](https://github.com/giacomocavalieri/squirrel) |
+| Gleam instead of Elixir | [Gleam Squirrel](https://github.com/giacomocavalieri/squirrel) |
 
 ### Using SquirrElix alongside an ORM
 
@@ -602,7 +602,7 @@ mix ci
 GitHub Actions also compiles and runs `mix test` on Elixir **1.18**, **1.19**, and
 **1.20**; every matrix cell is a hard gate (the workflow fails if any version fails).
 
-See [ROADMAP.md](ROADMAP.md) for completed work and remaining compatibility slices.
+See [ROADMAP.md](ROADMAP.md) for completed work and the path to 1.0.
 Maintainer release steps live in [docs/RELEASE.md](docs/RELEASE.md).
 
 ## Guides

@@ -68,7 +68,7 @@ defmodule Squirrelix.MixProject do
       licenses: ["Apache-2.0"],
       links: %{
         "GitHub" => @source_url,
-        "Upstream Squirrel" => "https://github.com/giacomocavalieri/squirrel"
+        "Gleam Squirrel" => "https://github.com/giacomocavalieri/squirrel"
       },
       files:
         ~w(lib mix.exs README.md LICENSE NOTICE ROADMAP.md CHANGELOG.md docs/PERFORMANCE.md guides examples .formatter.exs)
