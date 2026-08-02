@@ -16,8 +16,10 @@ For many applications that is enough: generated convenience functions and typing
 over your SQL, no extra abstraction to learn, and easier visibility when you need to optimise
 queries.
 
-This project currently targets **Elixir 1.20** and uses native typespecs. Earlier versions of
-Elixir may get support in future, but have yet to be tested.
+SquirrElix requires **Elixir ~> 1.18** (stdlib `JSON`). **Elixir 1.20+** is recommended for
+the compiler’s gradual typing and typechecking (patterns and guards inference without needing
+annotations). Generated Dialyzer `@spec`s remain part of the codegen story on all supported
+versions and are still useful for Dialyzer.
 
 The [Gleam Squirrel](https://github.com/giacomocavalieri/squirrel) project is the inspiration
 and basis for this work. SquirrElix brings Squirrel's idea and general architecture to native
@@ -153,7 +155,7 @@ at the same policy.
 
 ## Requirements
 
-* Elixir ~> 1.20
+* Elixir ~> 1.18 (recommend **1.20+** for gradual typing / compiler typechecking)
 * Postgrex ~> 0.22 (for generated query modules and optional `--infer` mode)
 * PostgreSQL >= 16 (when using `--infer` mode)
 
@@ -575,13 +577,16 @@ mix precommit
 (`mix precommit` compiles with `--warnings-as-errors`, then runs `mix format`,
 `mix credo --strict --all`, and `mix test`.)
 
-For the full quality gate used in CI (also Dialyzer, [ExDNA](https://github.com/elixir-vibe/ex_dna),
-and [Reach](https://github.com/elixir-vibe/reach), with [ExSlop](https://github.com/elixir-vibe/ex_slop)
-Credo checks):
+For the full quality gate used in CI on Elixir 1.20 (also Dialyzer,
+[ExDNA](https://github.com/elixir-vibe/ex_dna), and [Reach](https://github.com/elixir-vibe/reach),
+with [ExSlop](https://github.com/elixir-vibe/ex_slop) Credo checks):
 
 ```sh
 mix ci
 ```
+
+GitHub Actions also compiles and runs `mix test` on Elixir **1.18**, **1.19**, and
+**1.20**; every matrix cell is a hard gate (the workflow fails if any version fails).
 
 See [ROADMAP.md](ROADMAP.md) for completed work and remaining compatibility slices.
 

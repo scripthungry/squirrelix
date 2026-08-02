@@ -13,12 +13,21 @@ jobs:
   test:
     name: Elixir ${{ matrix.elixir }} / OTP ${{ matrix.otp }}
     runs-on: ubuntu-latest
+    # Every matrix cell is a hard gate: no continue-on-error.
+    # fail-fast false so we see all version failures in one run.
     strategy:
       fail-fast: false
       matrix:
         include:
+          - elixir: "1.18.4"
+            otp: "27.3"
+            quality: false
+          - elixir: "1.19.4"
+            otp: "28.0"
+            quality: false
           - elixir: "1.20.0"
             otp: "28.0"
+            quality: true
 
     services:
       postgres:
@@ -68,6 +77,7 @@ jobs:
             ${{ runner.os }}-mix-${{ matrix.otp }}-${{ matrix.elixir }}-
 
       - name: Cache Dialyzer PLT
+        if: matrix.quality
         uses: actions/cache@v4
         with:
           path: |
@@ -79,26 +89,40 @@ jobs:
             ${{ runner.os }}-plt-${{ matrix.otp }}-${{ matrix.elixir }}-
 
       - run: mix deps.get
-      - run: mix format --check-formatted
       - run: mix compile --warnings-as-errors
-      - run: mix credo --strict --all
+
+      - name: Format check
+        if: matrix.quality
+        run: mix format --check-formatted
+
+      - name: Credo
+        if: matrix.quality
+        run: mix credo --strict --all
 
       - name: Dialyzer
+        if: matrix.quality
         run: mix dialyzer --format github
 
       - name: ExDNA (no clones)
+        if: matrix.quality
         run: mix ex_dna --max-clones 0
 
       - name: Reach architecture and smells
+        if: matrix.quality
         run: mix reach.check --arch --smells --strict
 
+      - name: Run tests
+        if: ${{ !matrix.quality }}
+        run: mix test
+
       - name: Run tests with coverage
+        if: matrix.quality
         run: |
           set -o pipefail
           mix coveralls.html 2>&1 | tee coverage-output.txt
 
       - name: Publish coverage summary
-        if: always()
+        if: matrix.quality && always()
         run: |
           set -euo pipefail
           TOTAL_LINE=$(grep -E '\[TOTAL\]' coverage-output.txt | tail -n1 || true)
@@ -131,10 +155,27 @@ jobs:
           fi
 
       - name: Upload coverage HTML report
-        if: always()
+        if: matrix.quality && always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-html
           path: cover/
           if-no-files-found: ignore
           retention-days: 14
+
+  # Single required check: fails if any matrix cell failed/cancelled.
+  # Branch protection can watch this job name instead of one Elixir cell.
+  ci-success:
+    name: CI success
+    if: always()
+    needs: [test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every matrix cell to succeed
+        run: |
+          result="${{ needs.test.result }}"
+          echo "Matrix aggregate result: ${result}"
+          if [ "$result" != "success" ]; then
+            echo "CI failed: one or more Elixir/OTP matrix cells did not succeed."
+            exit 1
+          fi

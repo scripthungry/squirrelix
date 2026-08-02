@@ -8,7 +8,7 @@ defmodule Squirrelix.MixProject do
     [
       app: :squirr_elix,
       version: @version,
-      elixir: "~> 1.20",
+      elixir: "~> 1.18",
       name: "SquirrElix",
       description:
         "Generates typed Elixir query modules from plain SQL files using Postgres inference or static metadata.",

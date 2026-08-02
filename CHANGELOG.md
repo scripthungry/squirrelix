@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Lower the Elixir requirement to `~> 1.18` (stdlib `JSON` floor). Recommend
+  Elixir **1.20+** for gradual typing / compiler typechecking; generated Dialyzer
+  `@spec`s remain for Dialyzer on all supported versions (#85).
+- CI matrix compiles and tests on Elixir **1.18**, **1.19**, and **1.20** (every
+  cell is a hard gate); Dialyzer / Reach / ExDNA / format / Credo stay on 1.20.
+  Hex publish remains on Elixir 1.20 (#85).
+
 ## [0.5.9] — 2026-08-02
 
 ### Changed
