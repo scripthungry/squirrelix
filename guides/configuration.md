@@ -158,9 +158,24 @@ mix squirrelix.gen --infer \
   --database my_app_dev
 ```
 
-Connection precedence (highest first): flags → `--url` → `DATABASE_URL` → `PG*`
-environment variables → defaults. Prefer `PGPASSWORD` / `DATABASE_URL` over
-`--password`.
+Connection precedence (highest first): flags → `--url` → `DATABASE_URL` →
+`--repo` → `PG*` environment variables → defaults. Prefer `PGPASSWORD` /
+`DATABASE_URL` over `--password`.
+
+### Ecto Repo config (`--repo`)
+
+With `--infer`, you can reuse an Ecto Repo’s `config/0` instead of duplicating
+host credentials:
+
+```sh
+mix squirrelix.gen --infer --repo MyApp.Repo
+mix squirrelix.check --infer --repo MyApp.Repo
+```
+
+`--repo` requires `--infer`. Mix runs `app.config` first so `config/*.exs` values
+are visible. Repo `:url` / `:database_url`, when set, are parsed like
+`DATABASE_URL`. This is for **connection settings only** — see
+[Phoenix → What the optional Repo integration is for](phoenix.md#what-the-optional-repo-integration-is-for).
 
 ## Metadata files
 
@@ -248,12 +263,29 @@ Both `mix squirrelix.gen` and `mix squirrelix.check` accept:
 | `--username USER` | Database user |
 | `--password PASS` | Database password (prefer `PGPASSWORD`) |
 | `--port PORT` | Database port |
+| `--repo MODULE` | With `--infer`, read connection settings from an Ecto Repo `config/0` |
+| `--runner postgrex\|ecto` | Codegen runner (default `postgrex`). `ecto` emits Repo-first functions via `Ecto.Adapters.SQL` |
 
 `mix squirrelix.gen` also accepts:
 
 | Option | Description |
 | --- | --- |
 | `--watch` | After the initial generate, watch `{lib,test,dev}/**/sql/*.sql` and regenerate on change |
+
+### Codegen runners (`--runner`)
+
+| Runner | First argument | Executes via | Use when |
+| --- | --- | --- | --- |
+| `postgrex` (default) | `Postgrex.conn()` | `Postgrex.query!/3` / `query/3` | Non-Ecto apps, or you already pass a pool/conn |
+| `ecto` | Repo module | `Ecto.Adapters.SQL.query!/3` / `query/3` | Phoenix/Ecto apps that want Repo checkout, transactions, and Sandbox |
+
+```sh
+mix squirrelix.gen --infer --repo MyApp.Repo --runner ecto
+```
+
+The Ecto runner needs `ecto_sql` in the **host** application. It does **not** map
+rows to schemas or integrate changesets — only connection ownership. Details:
+[Phoenix cookbook](phoenix.md#what-the-optional-repo-integration-is-for).
 
 ## Watch mode
 
@@ -341,6 +373,10 @@ Options:
 
 - `:version` (required) — version string written into generated file headers.
 - `:postgrex` — module passed to generated code (defaults to `Postgrex`).
+- `:runner` — `:postgrex` (default) or `:ecto` (Repo-first `Ecto.Adapters.SQL`
+  codegen; not schemas).
+- `:ecto_sql` — module used when `:runner` is `:ecto` (defaults to
+  `Ecto.Adapters.SQL`; injectable in tests).
 
 Returns:
 

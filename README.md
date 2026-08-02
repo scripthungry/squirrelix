@@ -79,21 +79,22 @@ encoders, decoders, and `@spec`s in sync.
 ## When SquirrElix may not be the right fit
 
 SquirrElix is opinionated: Postgres only, one query per file, convention over configuration,
-and generated modules that talk to Postgrex — not to an Ecto `Repo`.
+and typed SQL codegen (default: Postgrex). Optional `--runner ecto` is for Repo
+**connection ownership** only — not schemas or an ORM replacement.
 
 **Consider something else when:**
 
 * You need a database other than Postgres.
 * Most of your data access is CRUD through schemas, changesets, and associations (prefer Ecto).
 * You need dynamic query construction at runtime (prefer `Ecto.Query`).
-* You want first-class `Repo.transaction/2` / Multi integration without wrapping Postgrex.
+* You need schema structs, changesets, or `Ecto.Multi` from generated SQL (out of scope).
 * Your team wants the data layer to hide SQL — SquirrElix keeps SQL front and centre.
 * You only have a handful of queries and are happy with small `Postgrex.query/3` helpers.
 
 **Alternatives:** [Ecto](https://hexdocs.pm/ecto) / `Ecto.Query`, direct
 [Postgrex](https://hexdocs.pm/postgrex), or [Gleam Squirrel](https://github.com/giacomocavalieri/squirrel)
 on Gleam. Using SquirrElix *alongside* Ecto (migrations/schemas via Ecto; typed `.sql` via
-SquirrElix + Postgrex) is a common Phoenix setup — see the
+SquirrElix) is a common Phoenix setup — see the
 [Phoenix + CI Cookbook](guides/phoenix.md).
 
 ## Requirements
@@ -143,7 +144,8 @@ Walkthrough: [Getting Started](guides/getting_started.md).
 * `mix squirrelix.check` — fail CI when generated code is stale
 
 Both accept the same query-source / connection options (`--infer`, `--metadata`,
-`DATABASE_URL`, `PG*`, …). Details: [Configuration](guides/configuration.md).
+`DATABASE_URL`, `PG*`, optional `--repo` / `--runner`, …). Details:
+[Configuration](guides/configuration.md).
 
 ## Guides
 
@@ -153,7 +155,7 @@ Both accept the same query-source / connection options (`--infer`, `--metadata`,
 | [Writing Queries](guides/writing_queries.md) | Naming, comments, nullability, commands |
 | [Types](guides/types.md) | Postgres → Elixir mapping, unsupported types |
 | [Configuration](guides/configuration.md) | Infer vs metadata, SSL, watch, public API, CI |
-| [Phoenix + CI Cookbook](guides/phoenix.md) | Migrate-then-gen, Mix aliases, Ecto coexistence |
+| [Phoenix + CI Cookbook](guides/phoenix.md) | Migrate-then-gen, Mix aliases, optional Repo runner |
 | [Adopter CI workflows](https://github.com/scripthungry/squirrelix/tree/main/examples/github-actions) | Copy-pasteable GitHub Actions |
 
 ## FAQ
@@ -184,8 +186,15 @@ SQL — see [Types](guides/types.md#composite-types-policy).
 
 ### Does SquirrElix integrate with Ecto `Repo`?
 
-No — intentional. Use it *alongside* Ecto; see the
-[Phoenix + CI Cookbook](guides/phoenix.md#coexistence-with-ecto-intentional).
+**Optionally, for connection ownership only** — not as an ORM:
+
+* `--repo MyApp.Repo` with `--infer` reuses Repo config for the database URL/host.
+* `--runner ecto` generates Repo-first functions via `Ecto.Adapters.SQL` so calls
+  share checkout, `Repo.transaction/2`, and Sandbox.
+
+It does **not** produce schema structs, changesets, or Multi. Default remains
+Postgrex. See
+[What the optional Repo integration is for](guides/phoenix.md#what-the-optional-repo-integration-is-for).
 
 ### What is intentionally out of scope?
 

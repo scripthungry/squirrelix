@@ -22,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ROADMAP non-goals: freeze “first-class Ecto ORM integration”; allow the
   optional Repo runner / `--repo` infer path above.
 
+### Docs
+
+- Document optional Repo integration purpose (connection ownership / Sandbox /
+  transactions — not schemas) in the Phoenix cookbook, Configuration (`--repo`,
+  `--runner`), Getting Started, and README FAQ.
+
 ## [0.5.13] — 2026-08-02
 
 ### Docs
