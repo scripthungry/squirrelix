@@ -21,9 +21,11 @@ the compiler’s gradual typing and typechecking (patterns and guards inference 
 annotations). Generated Dialyzer `@spec`s remain part of the codegen story on all supported
 versions and are still useful for Dialyzer.
 
-The [Gleam Squirrel](https://github.com/giacomocavalieri/squirrel) project is the inspiration
-and basis for this work. SquirrElix brings Squirrel's idea and general architecture to native
-Elixir code and Elixir-native typing, following Elixir idioms.
+SquirrElix is an independent Elixir library inspired by
+[Gleam Squirrel](https://github.com/giacomocavalieri/squirrel). It reimplements similar
+SQL-file discovery, inference, and codegen ideas in native Elixir with Elixir-native typing
+and idioms. It is not affiliated with, endorsed by, or maintained by the Gleam Squirrel
+project.
 
 ## What's SquirrElix?
 
@@ -550,8 +552,10 @@ pass prepares every `sql.ex` before committing (temp + rename with rollback).
 
 ## Relationship to Gleam Squirrel
 
-SquirrElix is an Elixir port of [Gleam Squirrel](https://github.com/giacomocavalieri/squirrel)
-by Giacomo Cavalieri. It follows upstream query conventions — one query per file,
+SquirrElix is an independent project inspired by
+[Gleam Squirrel](https://github.com/giacomocavalieri/squirrel) by Giacomo Cavalieri.
+It is not an official port of that project and is not affiliated with its authors or
+maintainers. SquirrElix follows similar query conventions — one query per file,
 `sql/` directory layout, comment-to-doc mapping, parameter name inference, and
 Postgres type inference — while producing idiomatic Elixir output:
 
@@ -577,6 +581,12 @@ mix precommit
 (`mix precommit` compiles with `--warnings-as-errors`, then runs `mix format`,
 `mix credo --strict --all`, and `mix test`.)
 
+When a change touches codegen, inference, or generated runtime helpers, run
+`mix bench` before and after, and note only meaningful wins or trade-offs in
+[docs/PERFORMANCE.md](docs/PERFORMANCE.md) (and `CHANGELOG.md` when shipping) —
+do not record timing noise. CI posts the microbench summary on the Elixir 1.20
+quality cell as a soft check only — it never fails the job on timings.
+
 For the full quality gate used in CI on Elixir 1.20 (also Dialyzer,
 [ExDNA](https://github.com/elixir-vibe/ex_dna), and [Reach](https://github.com/elixir-vibe/reach),
 with [ExSlop](https://github.com/elixir-vibe/ex_slop) Credo checks):
@@ -589,8 +599,11 @@ GitHub Actions also compiles and runs `mix test` on Elixir **1.18**, **1.19**, a
 **1.20**; every matrix cell is a hard gate (the workflow fails if any version fails).
 
 See [ROADMAP.md](ROADMAP.md) for completed work and remaining compatibility slices.
+Maintainer release steps live in [docs/RELEASE.md](docs/RELEASE.md).
 
 ## Guides
+
+User-facing guides (also published via `mix docs` / HexDocs):
 
 * [Getting Started](guides/getting_started.md)
 * [Writing Queries](guides/writing_queries.md)
@@ -598,6 +611,14 @@ See [ROADMAP.md](ROADMAP.md) for completed work and remaining compatibility slic
 * [Configuration](guides/configuration.md)
 * [Phoenix + CI Cookbook](guides/phoenix.md)
 * [Adopter CI workflows](examples/github-actions/) — copy-pasteable GitHub Actions for `squirrelix.check`
+
+## Project documentation
+
+Hand-written project docs live under [`docs/`](docs/) (see that folder’s README for
+how `docs/`, `guides/`, and generated `doc/` relate):
+
+* [Performance](docs/PERFORMANCE.md) — `mix bench`, baselines, soft CI policy
+* [Release checklist](docs/RELEASE.md) — maintainers only (not on HexDocs)
 
 ## License
 

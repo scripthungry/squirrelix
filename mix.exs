@@ -1,7 +1,7 @@
 defmodule Squirrelix.MixProject do
   use Mix.Project
 
-  @version "0.5.10"
+  @version "0.5.11"
   @source_url "https://github.com/scripthungry/squirrelix"
 
   def project do
@@ -71,7 +71,7 @@ defmodule Squirrelix.MixProject do
         "Upstream Squirrel" => "https://github.com/giacomocavalieri/squirrel"
       },
       files:
-        ~w(lib mix.exs README.md LICENSE NOTICE ROADMAP.md CHANGELOG.md guides examples .formatter.exs)
+        ~w(lib mix.exs README.md LICENSE NOTICE ROADMAP.md CHANGELOG.md docs/PERFORMANCE.md guides examples .formatter.exs)
     ]
   end
 
@@ -82,6 +82,7 @@ defmodule Squirrelix.MixProject do
         "README.md",
         "CHANGELOG.md",
         "ROADMAP.md",
+        "docs/PERFORMANCE.md",
         "guides/getting_started.md",
         "guides/writing_queries.md",
         "guides/types.md",
@@ -89,7 +90,8 @@ defmodule Squirrelix.MixProject do
         "guides/phoenix.md"
       ],
       groups_for_extras: [
-        Guides: Path.wildcard("guides/*.md")
+        Guides: Path.wildcard("guides/*.md"),
+        Development: ["docs/PERFORMANCE.md"]
       ],
       source_url: @source_url,
       source_ref: "v#{@version}",
@@ -123,6 +125,8 @@ defmodule Squirrelix.MixProject do
       "credo.strict": "credo --strict --all",
       # Opt-in coverage; plain `mix test` / `mix precommit` stay fast locally.
       cover: ["coveralls.html"],
+      # Lightweight local/CI-optional microbench (see docs/PERFORMANCE.md).
+      bench: "run bench/micro.exs",
       # Full quality gate (VibeKit): Dialyzer, ExDNA, Reach, plus compile/format/credo/test.
       ci: [
         "compile --warnings-as-errors",
