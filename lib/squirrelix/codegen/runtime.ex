@@ -7,6 +7,17 @@ defmodule Squirrelix.Codegen.Runtime do
 
   alias Squirrelix.TypeMapper
 
+  # Keep as a list — Dialyzer rejects MapSet opaque ops across module boundaries
+  # when the set is constructed elsewhere.
+  @reserved_name_list ~w(
+    decode_command decode_command_num_rows decode_rows decode_row decode_column_value decode_scalar
+    encode_value uuid_to_string uuid_from_string
+  )
+
+  @doc false
+  @spec reserved_names() :: [String.t()]
+  def reserved_names, do: @reserved_name_list
+
   @spec section([Squirrelix.TypedQuery.t()]) :: String.t()
   def section(queries) when is_list(queries) do
     case sources(queries) do

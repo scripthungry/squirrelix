@@ -36,6 +36,7 @@ defmodule Squirrelix.Codegen do
   @moduledoc false
 
   alias Squirrelix.Codegen.Runtime
+  alias Squirrelix.Codegen.Target
   alias Squirrelix.Discover
   alias Squirrelix.Output
   alias Squirrelix.Parameter
@@ -54,7 +55,7 @@ defmodule Squirrelix.Codegen do
     ecto_sql_module = Keyword.get(opts, :ecto_sql, Module.concat([Ecto, Adapters, SQL]))
 
     sorted_queries = Enum.sort_by(queries, & &1.file)
-    exec = execution_context(runner, postgrex_module, ecto_sql_module)
+    exec = execution_target(runner, postgrex_module, ecto_sql_module)
 
     # Scaffold only: embeds the generated `@moduledoc` and splices query/helper
     # source. Per-query names stay textual so codegen does not create Mix VM atoms.
@@ -91,8 +92,8 @@ defmodule Squirrelix.Codegen do
     |> Kernel.<>("\n")
   end
 
-  defp execution_context(:postgrex, postgrex_module, _ecto_sql_module) do
-    %{
+  defp execution_target(:postgrex, postgrex_module, _ecto_sql_module) do
+    %Target{
       runner: :postgrex,
       first_arg: "conn",
       first_arg_type: "Postgrex.conn()",
@@ -105,8 +106,8 @@ defmodule Squirrelix.Codegen do
     }
   end
 
-  defp execution_context(:ecto, _postgrex_module, ecto_sql_module) do
-    %{
+  defp execution_target(:ecto, _postgrex_module, ecto_sql_module) do
+    %Target{
       runner: :ecto,
       first_arg: "repo",
       first_arg_type: "module()",
@@ -119,12 +120,12 @@ defmodule Squirrelix.Codegen do
     }
   end
 
-  defp execution_context(other, _postgrex_module, _ecto_sql_module) do
+  defp execution_target(other, _postgrex_module, _ecto_sql_module) do
     raise ArgumentError,
           "unknown codegen runner #{inspect(other)}; expected :postgrex or :ecto"
   end
 
-  defp moduledoc_execution(%{runner: :postgrex}) do
+  defp moduledoc_execution(%Target{runner: :postgrex}) do
     """
     Each query has a raising function (via `Postgrex.query!/3`) and an additive
     soft companion named `<name>_ok/arity` (via `Postgrex.query/3`) that returns
@@ -134,7 +135,7 @@ defmodule Squirrelix.Codegen do
     |> String.trim()
   end
 
-  defp moduledoc_execution(%{runner: :ecto}) do
+  defp moduledoc_execution(%Target{runner: :ecto}) do
     """
     Generated with the optional Ecto runner: the first argument is an Ecto Repo
     module. Raising functions call `Ecto.Adapters.SQL.query!/3`; soft companions
@@ -251,8 +252,9 @@ defmodule Squirrelix.Codegen do
     end
   end
 
-  defp raising_function_source(%TypedQuery{} = query, exec) do
-    args = TypedQuery.resolve_parameter_names(query.params)
+  defp raising_function_source(%TypedQuery{} = query, %Target{} = exec) do
+    reserved = Target.reserved_argument_names(exec)
+    args = TypedQuery.resolve_parameter_names(query.params, reserved)
     all_args = [exec.first_arg | args]
     encoded_params = encode_params_call(args, query.params)
     sql = sql_string_literal(query.content)
@@ -269,8 +271,9 @@ defmodule Squirrelix.Codegen do
     |> Enum.join()
   end
 
-  defp soft_function_source(%TypedQuery{} = query, exec, soft_name) do
-    args = TypedQuery.resolve_parameter_names(query.params)
+  defp soft_function_source(%TypedQuery{} = query, %Target{} = exec, soft_name) do
+    reserved = Target.reserved_argument_names(exec)
+    args = TypedQuery.resolve_parameter_names(query.params, reserved)
     all_args = [exec.first_arg | args]
     encoded_params = encode_params_call(args, query.params)
     arity = length(all_args)

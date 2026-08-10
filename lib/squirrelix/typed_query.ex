@@ -48,11 +48,6 @@ defmodule Squirrelix.TypedQuery do
 
   @sql_literal_argument_names MapSet.new(~w(false nil null true))
 
-  @runtime_helper_names MapSet.new(~w(
-    decode_command decode_command_num_rows decode_rows decode_row decode_column_value decode_scalar
-    encode_value uuid_to_string uuid_from_string
-  ))
-
   @type t :: %__MODULE__{
           file: String.t(),
           starting_line: pos_integer(),
@@ -109,10 +104,20 @@ defmodule Squirrelix.TypedQuery do
     end
   end
 
-  @spec resolve_parameter_names([Parameter.t()]) :: [String.t()]
-  def resolve_parameter_names(params) when is_list(params) do
+  @doc """
+  Resolve Elixir argument names for parameters.
+
+  `reserved` must include the codegen first argument (`conn` / `repo`) and any
+  inlined runtime helper names. Callers typically pass
+  `Squirrelix.Codegen.Target.reserved_argument_names/1`.
+  """
+  @spec resolve_parameter_names([Parameter.t()], Enumerable.t()) :: [String.t()]
+  def resolve_parameter_names(params, reserved \\ ["conn"])
+      when is_list(params) do
+    used = MapSet.new(reserved)
+
     params
-    |> Enum.reduce({[], MapSet.new(["conn"])}, fn param, {names, used} ->
+    |> Enum.reduce({[], used}, fn param, {names, used} ->
       name = param |> preferred_argument_name() |> safe_argument_name(param.index, used)
       name = unique_argument_name(name, used, param.index)
       {[name | names], MapSet.put(used, name)}
@@ -214,9 +219,10 @@ defmodule Squirrelix.TypedQuery do
   end
 
   defp shadowing_helper_name?(name) do
-    MapSet.member?(@runtime_helper_names, name) or
-      String.ends_with?(name, "decoder") or
-      String.ends_with?(name, "encoder")
+    # Suffix rule is independent of the helper inventory: generated helpers
+    # historically use `*_decoder` / `*_encoder` names, and callers pass the
+    # concrete reserved set (see `Codegen.Runtime.reserved_names/0`).
+    String.ends_with?(name, "decoder") or String.ends_with?(name, "encoder")
   end
 
   defp rename_shadowed_name(name, used, tries \\ 1) do
