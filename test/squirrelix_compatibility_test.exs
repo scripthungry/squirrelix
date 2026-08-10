@@ -25,10 +25,17 @@ defmodule SquirrelixCompatibilityTest do
     assert Squirrelix.compare_code_snippets(@generated_code, actual_code) == :same
   end
 
-  test "if code snippets differ by comments they are the same" do
+  test "Gleam-style // comments are not ignored by drift comparison" do
     actual_code = "// Comment!\n" <> @generated_code
 
-    assert Squirrelix.compare_code_snippets(@generated_code, actual_code) == :same
+    assert Squirrelix.compare_code_snippets(@generated_code, actual_code) == :different
+  end
+
+  test "Elixir floor division // is not treated as a comment" do
+    expected = "def f(a, b), do: a // b\n"
+    actual = "def f(a, b), do: a + b\n"
+
+    assert Squirrelix.compare_code_snippets(expected, actual) == :different
   end
 
   test "if Elixir code snippets differ by comments they are the same" do

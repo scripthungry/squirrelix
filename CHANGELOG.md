@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `generate/3` / `check/3` expand the project root and metadata map keys so
   relative paths match discovered query files; metadata maps are adapted to the
   inferrer pipeline internally (single Query→TypedQuery driver).
+- Row-type name collisions return `Error.RowTypeNameCollision` (via prepare/check)
+  instead of only raising mid-emit; shared `SourceRef` for location context on
+  that error.
+- Drift comparison no longer treats `//` as a line comment (Elixir floor division).
 
 ## [0.5.14] — 2026-08-02
 

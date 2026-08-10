@@ -163,6 +163,24 @@ defmodule Squirrelix.Error.ParameterArityMismatch do
         }
 end
 
+defmodule Squirrelix.Error.RowTypeNameCollision do
+  @moduledoc """
+  Error returned when two queries in one directory would emit the same row type name.
+
+  Filenames that differ only by a trailing `!` / `?` (e.g. `get_user.sql` and
+  `get_user!.sql`) both map to `get_user_row`.
+  """
+
+  @enforce_keys [:type_name, :query_names, :source]
+  defstruct [:type_name, :query_names, :source]
+
+  @type t :: %__MODULE__{
+          type_name: String.t(),
+          query_names: [String.t()],
+          source: Squirrelix.SourceRef.t()
+        }
+end
+
 defmodule Squirrelix.Error.InvalidQueryMetadataFile do
   @moduledoc """
   Error returned when a query metadata file cannot be evaluated to a metadata map.
@@ -403,9 +421,11 @@ defmodule Squirrelix.Error do
   alias Squirrelix.Error.QueryHasInvalidColumn
   alias Squirrelix.Error.QueryHasInvalidEnum
   alias Squirrelix.Error.QueryHasMultipleStatements
+  alias Squirrelix.Error.RowTypeNameCollision
   alias Squirrelix.Error.UnsupportedPostgresType
   alias Squirrelix.Error.UnsupportedPostgresVersion
   alias Squirrelix.Query
+  alias Squirrelix.SourceRef
 
   @doc false
   @spec normalize(struct()) :: struct()
@@ -476,6 +496,10 @@ defmodule Squirrelix.Error do
 
   @doc false
   @spec attach_query(struct(), Query.t()) :: struct()
+  def attach_query(%{source: %SourceRef{}} = error, %Query{} = query) do
+    %{error | source: SourceRef.from_query(query)}
+  end
+
   def attach_query(%{__struct__: module} = error, %Query{} = query) do
     if query_context_fields?(module) do
       %{error | file: query.file, starting_line: query.starting_line, content: query.content}
@@ -569,6 +593,8 @@ defmodule Squirrelix.Error do
 
   defp do_format(%ParameterArityMismatch{} = error),
     do: format_parameter_arity_mismatch_error(error)
+
+  defp do_format(%RowTypeNameCollision{} = error), do: format_row_type_name_collision_error(error)
 
   defp do_format(%InvalidQueryMetadataFile{} = error),
     do: format_invalid_query_metadata_file_error(error)
@@ -805,6 +831,18 @@ defmodule Squirrelix.Error do
       "",
       "The metadata for #{error.file} #{detail}.",
       "Hint: Make `params:` length match the highest `$n` placeholder in the query (or `[]` when there are none)."
+    ]
+    |> Enum.join("\n")
+  end
+
+  defp format_row_type_name_collision_error(%RowTypeNameCollision{} = error) do
+    names = Enum.map_join(error.query_names, "` and `", & &1)
+
+    [
+      "Error: Row type name collision",
+      "",
+      "Queries `#{names}` would both generate the `@type #{error.type_name}` name.",
+      "Hint: Rename one of the `.sql` files so their basenames (ignoring trailing `!` / `?`) differ."
     ]
     |> Enum.join("\n")
   end

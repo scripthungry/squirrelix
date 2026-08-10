@@ -39,9 +39,12 @@ defmodule Squirrelix.Codegen do
   alias Squirrelix.Codegen.Target
   alias Squirrelix.Column
   alias Squirrelix.Discover
+  alias Squirrelix.Error
+  alias Squirrelix.Error.RowTypeNameCollision
   alias Squirrelix.Output
   alias Squirrelix.Parameter
   alias Squirrelix.Project
+  alias Squirrelix.SourceRef
   alias Squirrelix.TypedQuery
   alias Squirrelix.TypeMapper
 
@@ -162,15 +165,18 @@ defmodule Squirrelix.Codegen do
           {:ok, map()} | {:error, :invalid_sql_directory | struct()}
   def prepare_directory(root, sql_directory, queries, opts \\ [])
       when is_binary(root) and is_binary(sql_directory) and is_list(queries) and is_list(opts) do
-    case Project.module_for_sql_directory(root, sql_directory) do
-      {:ok, module} ->
-        content = generate_module(module, queries, opts)
-        output_file = Discover.directory_to_output_file(sql_directory)
-        # generate_module/3 already runs Code.format_string!/1.
-        Output.prepare_write(output_file, content, format: false)
-
+    with :ok <- validate_row_type_names(queries),
+         {:ok, module} <- Project.module_for_sql_directory(root, sql_directory) do
+      content = generate_module(module, queries, opts)
+      output_file = Discover.directory_to_output_file(sql_directory)
+      # generate_module/3 already runs Code.format_string!/1.
+      Output.prepare_write(output_file, content, format: false)
+    else
       {:error, :invalid_sql_directory} ->
         {:error, :invalid_sql_directory}
+
+      {:error, %RowTypeNameCollision{} = error} ->
+        {:error, error}
     end
   end
 
@@ -178,15 +184,18 @@ defmodule Squirrelix.Codegen do
           :ok | {:error, :invalid_sql_directory | struct()}
   def check_directory(root, sql_directory, queries, opts \\ [])
       when is_binary(root) and is_binary(sql_directory) and is_list(queries) and is_list(opts) do
-    case Project.module_for_sql_directory(root, sql_directory) do
-      {:ok, module} ->
-        content = generate_module(module, queries, opts)
-        output_file = Discover.directory_to_output_file(sql_directory)
+    with :ok <- validate_row_type_names(queries),
+         {:ok, module} <- Project.module_for_sql_directory(root, sql_directory) do
+      content = generate_module(module, queries, opts)
+      output_file = Discover.directory_to_output_file(sql_directory)
 
-        Output.check_file(output_file, content)
-
+      Output.check_file(output_file, content)
+    else
       {:error, :invalid_sql_directory} ->
         {:error, :invalid_sql_directory}
+
+      {:error, %RowTypeNameCollision{} = error} ->
+        {:error, error}
     end
   end
 
@@ -229,7 +238,14 @@ defmodule Squirrelix.Codegen do
 
   defp function_sources(queries, exec) do
     taken_names = MapSet.new(queries, & &1.name)
-    _ = validate_row_type_names!(queries)
+
+    case validate_row_type_names(queries) do
+      :ok ->
+        :ok
+
+      {:error, %RowTypeNameCollision{} = error} ->
+        raise ArgumentError, Error.format(error)
+    end
 
     queries
     |> Enum.reduce({[], taken_names}, fn query, {sources, claimed} ->
@@ -322,21 +338,32 @@ defmodule Squirrelix.Codegen do
 
   defp row_type_name(%TypedQuery{name: name}), do: identifier_base_name(name) <> "_row"
 
-  defp validate_row_type_names!(queries) do
+  @doc false
+  @spec validate_row_type_names([TypedQuery.t()]) :: :ok | {:error, RowTypeNameCollision.t()}
+  def validate_row_type_names(queries) when is_list(queries) do
     queries
     |> Enum.filter(&(&1.returns != []))
-    |> Enum.reduce(%{}, fn query, seen ->
+    |> Enum.reduce_while(%{}, fn query, seen ->
       type_name = row_type_name(query)
 
       case Map.fetch(seen, type_name) do
         {:ok, other} ->
-          raise ArgumentError,
-                "row type name collision on `#{type_name}` between queries `#{other}` and `#{query.name}`"
+          {:halt,
+           {:error,
+            %RowTypeNameCollision{
+              type_name: type_name,
+              query_names: Enum.sort([other, query.name]),
+              source: SourceRef.from_typed_query(query)
+            }}}
 
         :error ->
-          Map.put(seen, type_name, query.name)
+          {:cont, Map.put(seen, type_name, query.name)}
       end
     end)
+    |> case do
+      {:error, _} = error -> error
+      _seen -> :ok
+    end
   end
 
   defp soft_doc_source(%TypedQuery{name: name, returns: []}, arity) do

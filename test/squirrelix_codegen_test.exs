@@ -672,7 +672,10 @@ defmodule SquirrelixCodegenTest do
       )
     ]
 
-    assert_raise ArgumentError, ~r/row type name collision|q_row/, fn ->
+    assert {:error, %Squirrelix.Error.RowTypeNameCollision{type_name: "q_row"}} =
+             Codegen.validate_row_type_names(queries)
+
+    assert_raise ArgumentError, ~r/Row type name collision|q_row/, fn ->
       Codegen.generate_module(Squirrelix.GeneratedRowTypeCollisionTest.SQL, queries,
         version: "v-test"
       )
