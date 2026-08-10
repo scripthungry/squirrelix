@@ -175,10 +175,8 @@ defmodule Squirrelix do
   defp do_tokenize([], :line_comment, current, tokens), do: maybe_push(current, tokens)
   defp do_tokenize([], :string, current, tokens), do: maybe_push(current, tokens)
 
-  defp do_tokenize([?/, ?/ | rest], :normal, current, tokens) do
-    tokens = maybe_push(current, tokens)
-    do_tokenize(rest, :line_comment, [], tokens)
-  end
+  # Elixir line comments start with `#`. Do not treat `//` as a comment — that is
+  # floor division in Elixir and a Gleam/JS-shaped false positive for drift check.
 
   defp do_tokenize([?# | rest], :normal, current, tokens) do
     tokens = maybe_push(current, tokens)
