@@ -1,8 +1,8 @@
 defmodule SquirrelixTypedQueryTest do
   use ExUnit.Case, async: true
 
-  alias Squirrelix.Column
   alias Squirrelix.Codegen.Runtime
+  alias Squirrelix.Column
   alias Squirrelix.Error.DuplicateReturnColumns
   alias Squirrelix.Error.MissingQueryMetadata
   alias Squirrelix.Error.MissingQueryMetadataField
