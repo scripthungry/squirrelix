@@ -1,7 +1,7 @@
 defmodule Squirrelix.MixProject do
   use Mix.Project
 
-  @version "0.5.14"
+  @version "0.5.15"
   @source_url "https://github.com/scripthungry/squirrelix"
 
   def project do
