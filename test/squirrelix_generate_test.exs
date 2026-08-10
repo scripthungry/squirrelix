@@ -29,6 +29,27 @@ defmodule SquirrelixGenerateTest do
              "defmodule AcornCounter.Accounts.SQL do"
   end
 
+  test "generate resolves metadata keys relative to the project root" do
+    root = tmp_project(:acorn_counter)
+    sql_directory = Path.join(root, "lib/accounts/sql")
+    File.mkdir_p!(sql_directory)
+
+    File.write!(
+      Path.join(sql_directory, "find_account.sql"),
+      "select name from accounts where id = $1"
+    )
+
+    metadata = %{
+      "lib/accounts/sql/find_account.sql" => [
+        params: [:integer],
+        returns: [%{name: "name", type: :string, nullable?: false}]
+      ]
+    }
+
+    assert Squirrelix.generate(root, metadata, version: "v-test").status == :ok
+    assert File.exists?(Path.join(root, "lib/accounts/sql.ex"))
+  end
+
   test "generate accepts a query inferrer instead of static metadata" do
     root = tmp_project(:acorn_counter)
     sql_directory = Path.join(root, "lib/accounts/sql")

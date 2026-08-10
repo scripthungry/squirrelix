@@ -34,8 +34,9 @@ defmodule Squirrelix do
 
   Generation and checking accept a *query source* in one of two forms:
 
-    * A metadata map — keys are query file paths, values are keyword lists with
-      `:params` and `:returns`. Load from `squirr_elix.exs` or pass a map to
+    * A metadata map — keys are query file paths (absolute, or relative to the
+      project `root`; both are expanded before lookup), values are keyword lists
+      with `:params` and `:returns`. Load from `squirr_elix.exs` or pass a map to
       `generate/3` and `check/3`.
     * An inferrer — a `(query -> {:ok, keyword()} | {:error, struct()})` function
       or a module implementing `Squirrelix.Inference.Inferrer`. The Mix task
@@ -119,6 +120,8 @@ defmodule Squirrelix do
   """
   @spec generate(Path.t(), query_source(), keyword()) :: Squirrelix.CodegenSummary.t()
   def generate(root, query_source, opts \\ []) when is_binary(root) and is_list(opts) do
+    root = Path.expand(root)
+
     case typed_query_directories(root, query_source) do
       {:error, error} ->
         Squirrelix.Codegen.summarize_write_outcomes([{root, {:error, error}, 0}])
@@ -146,6 +149,8 @@ defmodule Squirrelix do
   """
   @spec check(Path.t(), query_source(), keyword()) :: Squirrelix.CodegenCheckSummary.t()
   def check(root, query_source, opts \\ []) when is_binary(root) and is_list(opts) do
+    root = Path.expand(root)
+
     case typed_query_directories(root, query_source) do
       {:error, error} ->
         Squirrelix.Codegen.summarize_check_outcomes([{root, {:error, error}, 0}])
@@ -236,15 +241,9 @@ defmodule Squirrelix do
   end
 
   defp typed_query_directories(root, metadata) when is_map(metadata) do
-    case Squirrelix.Discover.query_directories(root) do
-      {:ok, directories} ->
-        directories
-        |> Enum.map(&Squirrelix.TypedQueryDirectory.from_query_directory(&1, metadata))
-        |> Enum.sort_by(& &1.directory)
-
-      {:error, _} = error ->
-        error
-    end
+    metadata
+    |> normalize_metadata_paths(root)
+    |> then(&typed_query_directories(root, metadata_inferrer(&1)))
   end
 
   defp typed_query_directories(root, inferrer)
@@ -255,6 +254,24 @@ defmodule Squirrelix do
 
       {:error, _} = error ->
         error
+    end
+  end
+
+  defp normalize_metadata_paths(metadata, root) when is_map(metadata) and is_binary(root) do
+    Map.new(metadata, fn {path, entry} ->
+      {Path.expand(path, root), entry}
+    end)
+  end
+
+  defp metadata_inferrer(metadata) when is_map(metadata) do
+    fn %Squirrelix.Query{} = query ->
+      case Map.fetch(metadata, query.file) do
+        {:ok, query_metadata} ->
+          {:ok, query_metadata}
+
+        :error ->
+          {:error, %Squirrelix.Error.MissingQueryMetadata{file: query.file}}
+      end
     end
   end
 

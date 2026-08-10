@@ -38,6 +38,8 @@ defmodule Squirrelix.Query do
           | {:error,
              CannotReadFile.t() | QueryFileHasInvalidName.t() | QueryHasMultipleStatements.t()}
   def from_file(file) when is_binary(file) do
+    file = Path.expand(file)
+
     with {:ok, content} <- read_query_file(file),
          :ok <- ensure_single_statement(file, content),
          {:ok, name} <- query_name(file) do
