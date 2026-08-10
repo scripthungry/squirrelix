@@ -10,9 +10,11 @@ defmodule Squirrelix.Inference.Inferrer do
       {:ok, [params: types, returns: columns]}
       {:error, structured_error}
 
-  where `types` is a list of type atoms (see the Types guide) and `columns` is a
-  list of maps with `:name`, `:type`, and `:nullable?` keys — the same shape as
-  metadata-file entries.
+  where `types` is a list of type atoms (or `%{type: atom, name: optional_string}`
+  maps — see the Types guide) and `columns` is a list of `%Squirrelix.Column{}`
+  structs or maps with `:name`, `:type`, and boolean `:nullable?` keys — the same
+  shape as metadata-file entries. Results are normalised through
+  `Squirrelix.QueryMetadata.parse/2` before codegen.
 
   The Mix task uses `Squirrelix.Postgres.inferrer/1` when `--infer` is passed.
   See the [Configuration guide](configuration.html) for connection options.

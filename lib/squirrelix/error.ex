@@ -128,6 +128,41 @@ defmodule Squirrelix.Error.MissingQueryMetadataField do
   @type t :: %__MODULE__{file: String.t(), field: :params | :returns}
 end
 
+defmodule Squirrelix.Error.InvalidReturnColumn do
+  @moduledoc """
+  Error returned when a metadata/inferrer return column is malformed.
+  """
+
+  @enforce_keys [:file, :starting_line, :content, :reason]
+  defstruct [:file, :starting_line, :content, :reason]
+
+  @type reason :: :missing_nullable | :invalid_shape
+
+  @type t :: %__MODULE__{
+          file: String.t(),
+          starting_line: pos_integer(),
+          content: String.t(),
+          reason: reason()
+        }
+end
+
+defmodule Squirrelix.Error.ParameterArityMismatch do
+  @moduledoc """
+  Error returned when metadata `params` length does not match SQL `$n` placeholders.
+  """
+
+  @enforce_keys [:file, :starting_line, :content, :expected, :got]
+  defstruct [:file, :starting_line, :content, :expected, :got]
+
+  @type t :: %__MODULE__{
+          file: String.t(),
+          starting_line: pos_integer(),
+          content: String.t(),
+          expected: non_neg_integer(),
+          got: non_neg_integer()
+        }
+end
+
 defmodule Squirrelix.Error.InvalidQueryMetadataFile do
   @moduledoc """
   Error returned when a query metadata file cannot be evaluated to a metadata map.
@@ -353,12 +388,14 @@ defmodule Squirrelix.Error do
   alias Squirrelix.Error.CannotWriteFile
   alias Squirrelix.Error.DuplicateReturnColumns
   alias Squirrelix.Error.InvalidQueryMetadataFile
+  alias Squirrelix.Error.InvalidReturnColumn
   alias Squirrelix.Error.MissingPostgresColumn
   alias Squirrelix.Error.MissingPostgresConstraint
   alias Squirrelix.Error.MissingPostgresTable
   alias Squirrelix.Error.MissingQueryMetadata
   alias Squirrelix.Error.MissingQueryMetadataField
   alias Squirrelix.Error.OutdatedFile
+  alias Squirrelix.Error.ParameterArityMismatch
   alias Squirrelix.Error.PostgresConnectionTimeout
   alias Squirrelix.Error.PostgresInferenceError
   alias Squirrelix.Error.PostgresSyntaxError
@@ -500,7 +537,9 @@ defmodule Squirrelix.Error do
         "DuplicateReturnColumns",
         "QueryHasInvalidEnum",
         "QueryHasInvalidColumn",
-        "QueryHasMultipleStatements"
+        "QueryHasMultipleStatements",
+        "InvalidReturnColumn",
+        "ParameterArityMismatch"
       ]
     end)
   end
@@ -525,6 +564,11 @@ defmodule Squirrelix.Error do
 
   defp do_format(%MissingQueryMetadataField{} = error),
     do: format_missing_query_metadata_field_error(error)
+
+  defp do_format(%InvalidReturnColumn{} = error), do: format_invalid_return_column_error(error)
+
+  defp do_format(%ParameterArityMismatch{} = error),
+    do: format_parameter_arity_mismatch_error(error)
 
   defp do_format(%InvalidQueryMetadataFile{} = error),
     do: format_invalid_query_metadata_file_error(error)
@@ -725,6 +769,42 @@ defmodule Squirrelix.Error do
       "",
       "The metadata for #{error.file} is missing the `#{error.field}` field.",
       "Hint: Each metadata entry needs both `params:` and `returns:` lists."
+    ]
+    |> Enum.join("\n")
+  end
+
+  defp format_invalid_return_column_error(%InvalidReturnColumn{} = error) do
+    detail =
+      case error.reason do
+        :missing_nullable ->
+          "a return column is missing the boolean `nullable?` field"
+
+        :invalid_shape ->
+          "a return column must be a map with `:name`, `:type`, and `:nullable?`"
+      end
+
+    [
+      "Error: Invalid return column metadata",
+      "",
+      "The metadata for #{error.file} has an invalid return column: #{detail}.",
+      "Hint: Use maps like `%{name: \"id\", type: :integer, nullable?: false}` (or `%Squirrelix.Column{}`)."
+    ]
+    |> Enum.join("\n")
+  end
+
+  defp format_parameter_arity_mismatch_error(%ParameterArityMismatch{} = error) do
+    detail =
+      if error.expected == 0 do
+        "lists #{error.got} parameter type(s), but the SQL has no `$n` placeholders"
+      else
+        "lists #{error.got} parameter type(s), but the SQL uses `$1`..`$#{error.expected}` (#{error.expected} placeholder(s))"
+      end
+
+    [
+      "Error: Parameter arity mismatch",
+      "",
+      "The metadata for #{error.file} #{detail}.",
+      "Hint: Make `params:` length match the highest `$n` placeholder in the query (or `[]` when there are none)."
     ]
     |> Enum.join("\n")
   end

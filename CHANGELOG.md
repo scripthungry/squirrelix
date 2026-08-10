@@ -12,11 +12,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ecto runner no longer emits colliding heads when a parameter is inferred as
   `repo` (e.g. `def find(repo, repo)`). Codegen passes a `Codegen.Target` reserved
   set (`first_arg` plus runtime helper names) into parameter name resolution.
+- Metadata/`Inferrer` ingress now validates `params` length against SQL `$n`
+  placeholders and rejects return columns missing boolean `nullable?` with
+  structured errors instead of crashing.
 
 ### Changed
 
 - `TypedQuery.resolve_parameter_names/2` takes an explicit reserved-name set;
   helper inventory lives in `Codegen.Runtime.reserved_names/0`.
+- Introduced `Squirrelix.QueryMetadata.parse/2` as the typed boundary for
+  metadata and inferrer keywords; `Column.cast/1` / `Column.to_spec/1` normalise
+  return shapes. Explicit param name overrides are supported via
+  `%{type: type, name: "…"}`.
 
 ## [0.5.14] — 2026-08-02
 

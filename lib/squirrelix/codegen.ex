@@ -37,6 +37,7 @@ defmodule Squirrelix.Codegen do
 
   alias Squirrelix.Codegen.Runtime
   alias Squirrelix.Codegen.Target
+  alias Squirrelix.Column
   alias Squirrelix.Discover
   alias Squirrelix.Output
   alias Squirrelix.Parameter
@@ -384,7 +385,8 @@ defmodule Squirrelix.Codegen do
   defp column_specs_literal(columns) do
     columns
     |> Enum.map_join(", ", fn column ->
-      "{#{atom_literal(column.name)}, #{inspect(column.type, limit: :infinity)}, #{inspect(column.nullable?)}}"
+      {name, type, nullable?} = Column.to_spec(column)
+      "{#{atom_literal(name)}, #{inspect(type, limit: :infinity)}, #{inspect(nullable?)}}"
     end)
     |> then(&"[#{&1}]")
   end

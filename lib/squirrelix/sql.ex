@@ -83,6 +83,16 @@ defmodule Squirrelix.SQL do
     |> merge_set_list_parameter_names(stripped_sql)
   end
 
+  @doc false
+  @spec max_parameter_index(String.t()) :: non_neg_integer()
+  def max_parameter_index(sql) when is_binary(sql) do
+    sql
+    |> strip_comments_and_strings()
+    |> then(&Regex.scan(~r/\$(\d+)/, &1))
+    |> Enum.map(fn [_, index] -> String.to_integer(index) end)
+    |> Enum.max(fn -> 0 end)
+  end
+
   @doc """
   Returns true when `sql` contains a single statement (ignoring comments/strings).
 
