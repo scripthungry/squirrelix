@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Ecto runner no longer emits colliding heads when a parameter is inferred as
+  `repo` (e.g. `def find(repo, repo)`). Codegen passes a `Codegen.Target` reserved
+  set (`first_arg` plus runtime helper names) into parameter name resolution.
+
+### Changed
+
+- `TypedQuery.resolve_parameter_names/2` takes an explicit reserved-name set;
+  helper inventory lives in `Codegen.Runtime.reserved_names/0`.
+
 ## [0.5.14] — 2026-08-02
 
 ### Added

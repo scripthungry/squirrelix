@@ -1080,6 +1080,28 @@ defmodule SquirrelixCodegenTest do
     assert_received {:query, "select name from users where id = $1", [123]}
   end
 
+  test "ecto runner deconflicts parameter named repo from first argument" do
+    query =
+      typed_query(
+        "find_by_repo.sql",
+        "find_by_repo",
+        "select name from checkouts where repo = $1",
+        [%Parameter{index: 1, name: "repo", type: :string}],
+        [%Column{name: "name", type: :string, nullable?: false}]
+      )
+
+    code =
+      Codegen.generate_module(Squirrelix.GeneratedEctoRepoCollision.SQL, [query],
+        version: "v-test",
+        runner: :ecto,
+        ecto_sql: PostgrexMock
+      )
+
+    assert code =~ "def find_by_repo(repo, repo_1)"
+    refute code =~ "def find_by_repo(repo, repo)"
+    assert code =~ "def find_by_repo_ok(repo, repo_1)"
+  end
+
   test "ecto runner rejects unknown runner atoms" do
     query = typed_query("q.sql", "q", "select 1 as id", [])
 

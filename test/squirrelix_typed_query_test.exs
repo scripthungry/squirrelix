@@ -2,6 +2,7 @@ defmodule SquirrelixTypedQueryTest do
   use ExUnit.Case, async: true
 
   alias Squirrelix.Column
+  alias Squirrelix.Codegen.Runtime
   alias Squirrelix.Error.DuplicateReturnColumns
   alias Squirrelix.Error.MissingQueryMetadata
   alias Squirrelix.Error.MissingQueryMetadataField
@@ -334,13 +335,25 @@ defmodule SquirrelixTypedQueryTest do
   test "resolve_parameter_names renames arguments that would shadow decoder helpers" do
     params = [%Parameter{index: 1, name: "uuid_decoder", type: :string}]
 
-    assert TypedQuery.resolve_parameter_names(params) == ["uuid_decoder_1"]
+    assert TypedQuery.resolve_parameter_names(params, reserved("conn")) == ["uuid_decoder_1"]
+  end
+
+  test "resolve_parameter_names renames exact runtime helper names when reserved" do
+    params = [%Parameter{index: 1, name: "encode_value", type: :string}]
+
+    assert TypedQuery.resolve_parameter_names(params, reserved("conn")) == ["encode_value_1"]
   end
 
   test "resolve_parameter_names renames inferred conn argument" do
     params = [%Parameter{index: 1, name: "conn", type: :integer}]
 
-    assert TypedQuery.resolve_parameter_names(params) == ["conn_1"]
+    assert TypedQuery.resolve_parameter_names(params, reserved("conn")) == ["conn_1"]
+  end
+
+  test "resolve_parameter_names renames inferred repo argument for ecto reserved set" do
+    params = [%Parameter{index: 1, name: "repo", type: :integer}]
+
+    assert TypedQuery.resolve_parameter_names(params, reserved("repo")) == ["repo_1"]
   end
 
   test "from_query renames inferred conn argument in generated params" do
@@ -363,7 +376,7 @@ defmodule SquirrelixTypedQueryTest do
                returns: [%{name: "conn", type: :integer, nullable?: false}]
              )
 
-    assert TypedQuery.resolve_parameter_names(params) == ["conn_1"]
+    assert TypedQuery.resolve_parameter_names(params, reserved("conn")) == ["conn_1"]
   end
 
   test "resolve_parameter_names deconflicts duplicate inferred names" do
@@ -372,7 +385,7 @@ defmodule SquirrelixTypedQueryTest do
       %Parameter{index: 2, name: "number", type: :integer}
     ]
 
-    assert TypedQuery.resolve_parameter_names(params) == ["number", "number_1"]
+    assert TypedQuery.resolve_parameter_names(params, reserved("conn")) == ["number", "number_1"]
   end
 
   test "resolve_parameter_names deconflicts fallback argument names" do
@@ -381,14 +394,14 @@ defmodule SquirrelixTypedQueryTest do
       %Parameter{index: 2, name: "arg_1", type: :integer}
     ]
 
-    assert TypedQuery.resolve_parameter_names(params) == ["arg_1", "arg_1_1"]
+    assert TypedQuery.resolve_parameter_names(params, reserved("conn")) == ["arg_1", "arg_1_1"]
   end
 
   test "resolve_parameter_names preserves very long argument names" do
     long_name = "this_is_a_very_very_very_long_parameter_name_test_aa"
     params = [%Parameter{index: 1, name: long_name, type: :integer}]
 
-    assert TypedQuery.resolve_parameter_names(params) == [long_name]
+    assert TypedQuery.resolve_parameter_names(params, reserved("conn")) == [long_name]
   end
 
   test "resolve_parameter_names avoids Elixir reserved argument names" do
@@ -397,7 +410,7 @@ defmodule SquirrelixTypedQueryTest do
       %Parameter{index: 2, name: "fn", type: :integer}
     ]
 
-    assert TypedQuery.resolve_parameter_names(params) == ["type", "fn_"]
+    assert TypedQuery.resolve_parameter_names(params, reserved("conn")) == ["type", "fn_"]
   end
 
   test "from_query resolves parameter names end-to-end for duplicate inferred names" do
@@ -421,7 +434,7 @@ defmodule SquirrelixTypedQueryTest do
                returns: [%{name: "number", type: :integer, nullable?: false}]
              )
 
-    assert TypedQuery.resolve_parameter_names(params) == ["number", "number_1"]
+    assert TypedQuery.resolve_parameter_names(params, reserved("conn")) == ["number", "number_1"]
   end
 
   test "from_query rejects metadata missing required fields" do
@@ -530,5 +543,9 @@ defmodule SquirrelixTypedQueryTest do
              TypedQueryDirectory.from_query_directory(query_directory, %{
                query.file => [params: []]
              })
+  end
+
+  defp reserved(first_arg) when is_binary(first_arg) do
+    MapSet.put(Runtime.reserved_names(), first_arg)
   end
 end

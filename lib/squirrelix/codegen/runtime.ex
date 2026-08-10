@@ -7,6 +7,15 @@ defmodule Squirrelix.Codegen.Runtime do
 
   alias Squirrelix.TypeMapper
 
+  @reserved_names MapSet.new(~w(
+    decode_command decode_command_num_rows decode_rows decode_row decode_column_value decode_scalar
+    encode_value uuid_to_string uuid_from_string
+  ))
+
+  @doc false
+  @spec reserved_names() :: MapSet.t(String.t())
+  def reserved_names, do: @reserved_names
+
   @spec section([Squirrelix.TypedQuery.t()]) :: String.t()
   def section(queries) when is_list(queries) do
     case sources(queries) do
