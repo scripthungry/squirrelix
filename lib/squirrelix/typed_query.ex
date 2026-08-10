@@ -24,6 +24,29 @@ defmodule Squirrelix.Column do
           type: elixir_type(),
           nullable?: boolean()
         }
+
+  @type cast_error :: :missing_nullable | :invalid_shape
+
+  @doc false
+  @spec cast(term()) :: {:ok, t()} | {:error, cast_error()}
+  def cast(%__MODULE__{} = column), do: {:ok, column}
+
+  def cast(%{name: name, type: type, nullable?: nullable?})
+      when is_binary(name) and is_boolean(nullable?) do
+    {:ok, %__MODULE__{name: name, type: type, nullable?: nullable?}}
+  end
+
+  def cast(%{name: name, type: _type}) when is_binary(name) do
+    {:error, :missing_nullable}
+  end
+
+  def cast(_other), do: {:error, :invalid_shape}
+
+  @doc false
+  @spec to_spec(t()) :: {String.t(), elixir_type(), boolean()}
+  def to_spec(%__MODULE__{name: name, type: type, nullable?: nullable?}) do
+    {name, type, nullable?}
+  end
 end
 
 defmodule Squirrelix.TypedQuery do
@@ -35,12 +58,10 @@ defmodule Squirrelix.TypedQuery do
   alias Squirrelix.Column
   alias Squirrelix.Error
   alias Squirrelix.Error.DuplicateReturnColumns
-  alias Squirrelix.Error.MissingQueryMetadataField
-  alias Squirrelix.Error.QueryHasInvalidColumn
   alias Squirrelix.Parameter
   alias Squirrelix.Query
+  alias Squirrelix.QueryMetadata
   alias Squirrelix.SQL
-  alias Squirrelix.TypeMapper
 
   @reserved_argument_names MapSet.new(~w(
     after and catch cond do else end false fn for if in nil not or receive rescue true try unless when with
@@ -60,17 +81,10 @@ defmodule Squirrelix.TypedQuery do
 
   @spec from_query(Query.t(), keyword()) ::
           {:ok, t()}
-          | {:error,
-             DuplicateReturnColumns.t()
-             | MissingQueryMetadataField.t()
-             | QueryHasInvalidColumn.t()
-             | struct()}
+          | {:error, DuplicateReturnColumns.t() | QueryMetadata.parse_error() | struct()}
   def from_query(%Query{} = query, opts) when is_list(opts) do
-    with {:ok, params} <- fetch_metadata_field(query, opts, :params),
-         {:ok, returns} <- fetch_metadata_field(query, opts, :returns),
-         {:ok, params} <- normalize_params(params),
-         {:ok, returns} <- normalize_returns(returns, query) do
-      case duplicate_column_names(returns) do
+    with {:ok, %QueryMetadata{} = metadata} <- QueryMetadata.parse(opts, query) do
+      case duplicate_column_names(metadata.returns) do
         [] ->
           {:ok,
            %__MODULE__{
@@ -79,8 +93,8 @@ defmodule Squirrelix.TypedQuery do
              name: query.name,
              comment: query.comment,
              content: query.content,
-             params: build_parameters(query.content, params),
-             returns: returns
+             params: build_parameters(query.content, metadata.params),
+             returns: metadata.returns
            }}
 
         names ->
@@ -126,74 +140,15 @@ defmodule Squirrelix.TypedQuery do
     |> Enum.reverse()
   end
 
-  defp fetch_metadata_field(query, opts, field) do
-    case Keyword.fetch(opts, field) do
-      {:ok, value} -> {:ok, value}
-      :error -> {:error, %MissingQueryMetadataField{file: query.file, field: field}}
-    end
-  end
-
-  defp build_parameters(sql, types) do
+  defp build_parameters(sql, params) do
     inferred_names = SQL.infer_parameter_names(sql)
 
-    types
+    params
     |> Enum.with_index(1)
-    |> Enum.map(fn {type, index} ->
-      %Parameter{index: index, name: Map.get(inferred_names, index), type: type}
+    |> Enum.map(fn {%{type: type, name: explicit_name}, index} ->
+      name = explicit_name || Map.get(inferred_names, index)
+      %Parameter{index: index, name: name, type: type}
     end)
-  end
-
-  defp normalize_params(params) do
-    traverse(params, &TypeMapper.normalize_type/1)
-  end
-
-  defp normalize_returns(returns, query) do
-    traverse(returns, &normalize_return_column(&1, query))
-  end
-
-  defp traverse(values, mapper) do
-    Enum.reduce_while(values, {:ok, []}, fn value, {:ok, mapped_values} ->
-      case mapper.(value) do
-        {:ok, mapped_value} -> {:cont, {:ok, [mapped_value | mapped_values]}}
-        {:error, error} -> {:halt, {:error, error}}
-      end
-    end)
-    |> case do
-      {:ok, mapped_values} -> {:ok, Enum.reverse(mapped_values)}
-      {:error, error} -> {:error, error}
-    end
-  end
-
-  defp normalize_return_column(%Column{} = column, query) do
-    with :ok <- validate_column_name(column.name, query),
-         {:ok, type} <- TypeMapper.normalize_type(column.type) do
-      {:ok, %Column{column | type: type}}
-    end
-  end
-
-  defp normalize_return_column(%{name: name, type: type, nullable?: nullable?}, query) do
-    with :ok <- validate_column_name(name, query),
-         {:ok, type} <- TypeMapper.normalize_type(type) do
-      {:ok, %Column{name: name, type: type, nullable?: nullable?}}
-    end
-  end
-
-  defp validate_column_name(name, query) do
-    case SQL.identifier_error(name) do
-      nil -> :ok
-      reason -> {:error, invalid_column_error(query, name, reason)}
-    end
-  end
-
-  defp invalid_column_error(query, column_name, reason) do
-    %QueryHasInvalidColumn{
-      file: query.file,
-      starting_line: query.starting_line,
-      content: query.content,
-      column_name: column_name,
-      reason: reason,
-      suggested_name: SQL.similar_identifier(column_name)
-    }
   end
 
   defp preferred_argument_name(%Parameter{name: nil, index: index}), do: "arg_#{index}"

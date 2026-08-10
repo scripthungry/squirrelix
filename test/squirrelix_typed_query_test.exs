@@ -31,14 +31,61 @@ defmodule SquirrelixTypedQueryTest do
               content: "select name from users where id = $1 and $2 = email",
               params: [
                 %Parameter{index: 1, name: "id", type: :integer},
-                %Parameter{index: 2, name: "email", type: :string},
-                %Parameter{index: 3, name: nil, type: :boolean}
+                %Parameter{index: 2, name: "email", type: :string}
               ],
               returns: [%Column{name: "name", type: :string, nullable?: false}]
             }} =
              TypedQuery.from_query(query,
-               params: [:integer, :string, :boolean],
+               params: [:integer, :string],
                returns: [%{name: "name", type: :string, nullable?: false}]
+             )
+  end
+
+  test "from_query accepts explicit parameter name overrides in metadata" do
+    query = %Query{
+      file: "find_user.sql",
+      starting_line: 1,
+      name: "find_user",
+      comment: [],
+      content: "select name from users where id = $1"
+    }
+
+    assert {:ok, %TypedQuery{params: [%Parameter{index: 1, name: "user_id", type: :integer}]}} =
+             TypedQuery.from_query(query,
+               params: [%{type: :integer, name: "user_id"}],
+               returns: [%{name: "name", type: :string, nullable?: false}]
+             )
+  end
+
+  test "from_query rejects metadata param arity that does not match SQL placeholders" do
+    query = %Query{
+      file: "find_user.sql",
+      starting_line: 1,
+      name: "find_user",
+      comment: [],
+      content: "select name from users where id = $1 and email = $2"
+    }
+
+    assert {:error, %Squirrelix.Error.ParameterArityMismatch{expected: 2, got: 1}} =
+             TypedQuery.from_query(query,
+               params: [:integer],
+               returns: [%{name: "name", type: :string, nullable?: false}]
+             )
+  end
+
+  test "from_query rejects return columns missing nullable?" do
+    query = %Query{
+      file: "find_user.sql",
+      starting_line: 1,
+      name: "find_user",
+      comment: [],
+      content: "select name from users"
+    }
+
+    assert {:error, %Squirrelix.Error.InvalidReturnColumn{reason: :missing_nullable}} =
+             TypedQuery.from_query(query,
+               params: [],
+               returns: [%{name: "name", type: :string}]
              )
   end
 
