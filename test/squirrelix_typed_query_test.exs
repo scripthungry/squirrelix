@@ -546,6 +546,6 @@ defmodule SquirrelixTypedQueryTest do
   end
 
   defp reserved(first_arg) when is_binary(first_arg) do
-    MapSet.put(Runtime.reserved_names(), first_arg)
+    MapSet.new([first_arg | Runtime.reserved_names()])
   end
 end

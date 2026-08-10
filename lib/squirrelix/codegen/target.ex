@@ -23,6 +23,6 @@ defmodule Squirrelix.Codegen.Target do
   @spec reserved_argument_names(t()) :: MapSet.t(String.t())
   def reserved_argument_names(%__MODULE__{first_arg: first_arg})
       when is_binary(first_arg) do
-    MapSet.put(Runtime.reserved_names(), first_arg)
+    MapSet.new([first_arg | Runtime.reserved_names()])
   end
 end
